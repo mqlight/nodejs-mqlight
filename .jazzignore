@@ -1,0 +1,6 @@
+### Jazz Ignore 0
+
+core.ignore= \
+             {.git} \
+             {build} \
+             {proton}
