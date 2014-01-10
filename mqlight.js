@@ -67,7 +67,7 @@ Client.prototype.createMessage = function(address, body) {
  * @param {sendCallback} cb - (optional) callback to be notified of errors
  */
 Client.prototype.send = function(message, cb) {
-  this.messenger.put(message);
+  if (message !== 'undefined') this.messenger.put(message);
   this.messenger.send();
   process.nextTick(cb);
 };
@@ -133,19 +133,17 @@ var client_ = new Client("0.0.0.0", 5672, "client-0");
 
 // publish registration message
 var msg = client_.createMessage("register", "available for work");
-console.log(msg);
 client_.send(msg, function() {
-  console.log("Send called.");
+  console.log("Send called with message:");
+  console.log(msg);
 });
 
 // whilst the client still has pending messages, keep calling send
 var checkFinished = function() {
-  if (client_.hasOutGoing == false) {
-    console.log("Finished");
+  if (client_.messenger.hasOutgoing == false) {
+    console.log("Message delivered");
   } else {
-    client_.send(msg, function() {
-      console.log("Send called.");
-    });
+    client_.send();
     setTimeout(checkFinished, 2500);
   }
 };

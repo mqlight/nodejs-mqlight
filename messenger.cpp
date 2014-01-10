@@ -73,7 +73,14 @@ void ProtonMessenger::Init(Handle<Object> target)
 
 ProtonMessenger::ProtonMessenger(std::string name) : ObjectWrap()
 {
-  messenger = pn_messenger(name.c_str());
+  if (name.empty())
+  {
+    messenger = pn_messenger(NULL);
+  }
+  else
+  {
+    messenger = pn_messenger(name.c_str());
+  }
   pn_messenger_set_blocking(messenger, false);
   pn_messenger_set_outgoing_window(messenger, 1024);
   pn_messenger_set_incoming_window(messenger, 1024);
@@ -98,7 +105,7 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
 
   std::string name;
   if (args.Length() < 1) {
-    name = NULL;
+    name = "";
   } else {
     // parse the 'name' parameter out of the args
     String::Utf8Value param(args[0]->ToString());
@@ -118,7 +125,7 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args) {
   ProtonMessage *msg;
 
   // throw exception if not enough args
-  if (args.Length() < 1) {
+  if (args.Length() < 1 || args[0].IsEmpty()) {
     THROW_EXCEPTION("Missing required message argument.");
   }
 
