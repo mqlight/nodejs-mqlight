@@ -50,8 +50,8 @@ var Client = function(hostName, port, clientId) {
  */
 Client.prototype.createMessage = function(address, body) {
   var msg = new proton.ProtonMessage();
-  msg.address = this.brokerUrl + '/' + address;
-  if (body !== 'undefined') msg.body = body;
+  if (address) msg.address = this.brokerUrl + '/' + address;
+  if (body) msg.body = body;
   return msg;
 };
 
@@ -67,9 +67,9 @@ Client.prototype.createMessage = function(address, body) {
  * @param {sendCallback} cb - (optional) callback to be notified of errors
  */
 Client.prototype.send = function(message, cb) {
-  if (message !== 'undefined') this.messenger.put(message);
+  if (message) this.messenger.put(message);
   this.messenger.send();
-  process.nextTick(cb);
+  if (cb) process.nextTick(cb);
 };
 
 /**
