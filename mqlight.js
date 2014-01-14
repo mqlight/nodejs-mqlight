@@ -1,28 +1,35 @@
 /*
- *   <copyright 
- *   notice="oco-source" 
- *   pids="5755-P60" 
- *   years="2013" 
- *   crc="3568777996" > 
- *   IBM Confidential 
- *    
- *   OCO Source Materials 
- *    
- *   5755-P60
- *    
- *   (C) Copyright IBM Corp. 2013 
- *    
- *   The source code for the program is not published 
- *   or otherwise divested of its trade secrets, 
- *   irrespective of what has been deposited with the 
- *   U.S. Copyright Office. 
- *   </copyright> 
+ * <copyright
+ * notice="oco-source"
+ * pids="5755-P60"
+ * years="2013"
+ * crc="3568777996" >
+ * IBM Confidential
+ *
+ * OCO Source Materials
+ *
+ * 5755-P60
+ *
+ * (C) Copyright IBM Corp. 2013, 2014
+ *
+ * The source code for the program is not published
+ * or otherwise divested of its trade secrets,
+ * irrespective of what has been deposited with the
+ * U.S. Copyright Office.
+ * </copyright>
  */
 
 var proton = require('./build/Release/proton');
 var uuid = require('node-uuid');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
+
+/** @constant {number} */
+exports.QOS_AT_MOST_ONCE = 0;
+/** @constant {number} */
+exports.QOS_AT_LEAST_ONCE = 1;
+/** @constant {number} */
+exports.QOS_EXACTLY_ONCE = 2;
 
 /**
  * Represents an MQ Light client instance.
@@ -97,7 +104,7 @@ Client.prototype.close = function() {
  * as soon as the <code>Client</code> is closed.  Setting this to
  * <code>EXPIRE_NEVER</code> will cause the destination to remain in existence
  * until its expiry time is adjusted using {@link Destination#setExpiry(long)}.
- *                      
+ *
  * @return a {@link Destination} from which can applications can receive messages.
  */
 Client.prototype.createDestination = function(pattern, expiryMillis) {
@@ -123,43 +130,47 @@ module.exports = Client;
 
 /* ------------------------------------------------------------------------- */
 
-process.on('SIGINT', function() {
-    client_.close();
-    process.exit(0);
-});
+/* Simple Test Code */
+if (require.main === module) {
+  (function() {
+    process.on('SIGINT', function() {
+      if (client) client.close();
+      process.exit(0);
+    });
 
-// simple example test run
-var client_ = new Client("0.0.0.0", 5672, "client-0");
+    // simple example test run
+    var client = new Client("0.0.0.0", 5672, "client-0");
 
-// publish registration message
-var msg = client_.createMessage("register", "available for work");
-client_.send(msg, function() {
-  console.log("Send called with message:");
-  console.log(msg);
-});
+    // publish registration message
+    var msg = client.createMessage("register", "available for work");
+    client.send(msg, function() {
+      console.log("Send called with message:");
+      console.log(msg);
+    });
 
-// whilst the client still has pending messages, keep calling send
-var checkFinished = function() {
-  if (client_.messenger.hasOutgoing == false) {
-    console.log("Message delivered");
-  } else {
-    client_.send();
-    setTimeout(checkFinished, 2500);
-  }
-};
-process.nextTick(checkFinished);
+    // whilst the client still has pending messages, keep calling send
+    var checkFinished = function() {
+      if (client.messenger.hasOutgoing == false) {
+        console.log("Message delivered");
+      } else {
+        client.send();
+        setTimeout(checkFinished, 2500);
+      }
+    };
+    process.nextTick(checkFinished);
 
-// now subscribe to topic for new work publications
-var destination = client_.createDestination("amqp://0.0.0.0:5672/workers", 5000);
+    // now subscribe to topic for new work publications
+    var destination = client.createDestination("amqp://0.0.0.0:5672/workers", 5000);
 
-// listen to new message events and process them
-destination.on('message', function (msg) {
-  console.log('# received message');
-  console.log(msg);
-});
+    // listen to new message events and process them
+    destination.on('message', function(msg) {
+      console.log('# received message');
+      console.log(msg);
+    });
 
-// listen for the closed destination event and shutdown
-destination.on('closed', function() {
-  console.log('destination closed');
-});
-
+    // listen for the closed destination event and shutdown
+    destination.on('closed', function() {
+      console.log('destination closed');
+    });
+  })();
+}
