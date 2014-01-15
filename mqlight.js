@@ -1,21 +1,19 @@
+/* %Z% %W% %I% %E% %U% */
 /*
  * <copyright
- * notice="oco-source"
+ * notice="lm-source-program"
  * pids="5755-P60"
- * years="2013"
+ * years="2013,2014"
  * crc="3568777996" >
- * IBM Confidential
- *
- * OCO Source Materials
+ * Licensed Materials - Property of IBM
  *
  * 5755-P60
  *
  * (C) Copyright IBM Corp. 2013, 2014
  *
- * The source code for the program is not published
- * or otherwise divested of its trade secrets,
- * irrespective of what has been deposited with the
- * U.S. Copyright Office.
+ * US Government Users Restricted Rights - Use, duplication or
+ * disclosure restricted by GSA ADP Schedule Contract with
+ * IBM Corp.
  * </copyright>
  */
 
