@@ -74,7 +74,7 @@ Client.prototype.createMessage = function(address, body) {
 Client.prototype.send = function(message, cb) {
   if (message) this.messenger.put(message);
   this.messenger.send();
-  if (cb) process.nextTick(cb);
+  if (cb) cb(undefined, message);
 };
 
 /**
@@ -109,16 +109,16 @@ Client.prototype.createDestination = function(pattern, expiryMillis) {
     var messenger = this.messenger;
     var emitter = new EventEmitter();
 
-    messenger.subscribe(pattern);
+    messenger.subscribe(this.brokerUrl + '/' + pattern);
     var check_for_messages = function() {
-      var messages = messenger.receive(1000);
+      var messages = messenger.receive(1024);
       if (messages.length > 0) {
         for (var i=0, tot=messages.length; i < tot; i++) {
           emitter.emit('message', messages[i]);
         }
       }
-      setTimeout(check_for_messages, 1000);
-    }
+      setTimeout(check_for_messages, 1024);
+    };
     process.nextTick(check_for_messages);
 
     return emitter;
@@ -148,7 +148,7 @@ if (require.main === module) {
 
     // whilst the client still has pending messages, keep calling send
     var checkFinished = function() {
-      if (client.messenger.hasOutgoing == false) {
+      if (client.messenger.hasOutgoing === false) {
         console.log("Message delivered");
       } else {
         client.send();
@@ -158,7 +158,7 @@ if (require.main === module) {
     process.nextTick(checkFinished);
 
     // now subscribe to topic for new work publications
-    var destination = client.createDestination("amqp://0.0.0.0:5672/workers", 5000);
+    var destination = client.createDestination("workers", 5000);
 
     // listen to new message events and process them
     destination.on('message', function(msg) {

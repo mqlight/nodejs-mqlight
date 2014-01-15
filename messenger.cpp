@@ -143,6 +143,8 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args) {
     THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)))
   }
 
+  pn_messenger_work(obj->messenger, 1024);
+
   return Boolean::New(true);
 }
 
