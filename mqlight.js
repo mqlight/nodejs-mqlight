@@ -55,7 +55,8 @@ var Client = function(hostName, port, clientId) {
  */
 Client.prototype.createMessage = function(address, body) {
   var msg = new proton.ProtonMessage();
-  if (address) msg.address = this.brokerUrl + '/' + address;
+  msg.address = this.brokerUrl;
+  if (address) msg.address += '/' + address;
   if (body) msg.body = body;
   return msg;
 };
