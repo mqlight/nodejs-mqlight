@@ -30,6 +30,20 @@ exports.QOS_AT_LEAST_ONCE = 1;
 exports.QOS_EXACTLY_ONCE = 2;
 
 /**
+ * Creates an MQ Light client instance.
+ *
+ * @param {string} hostName - the remote hostname to which we will connect.
+ * @param {number} [port] - (optional) the remote tcp port to connect to.
+ * @param {string} [clientId] - (optional) unique identifier for this client.
+ */
+exports.createClient = function(hostName, port, clientId) {
+  var client = new Client(hostName, port, clientId);
+  // FIXME: make this actually check driver/engine connection state
+  process.nextTick(function() { client.emit('connected', true) });
+  return client;
+};
+
+/**
  * Represents an MQ Light client instance.
  *
  * @param {string} hostName - the remote hostname to which we will connect.
@@ -38,6 +52,7 @@ exports.QOS_EXACTLY_ONCE = 2;
  * @constructor
  */
 var Client = function(hostName, port, clientId) {
+  EventEmitter.call(this);
   if (!port) port = 5672;
   if (!clientId) clientId = uuid.v4();
   this.brokerUrl = "amqp://" + hostName + ':' + port;
@@ -45,6 +60,7 @@ var Client = function(hostName, port, clientId) {
   this.messenger = new proton.ProtonMessenger(clientId);
   this.messenger.start();
 };
+util.inherits(Client, EventEmitter);
 
 /**
  * Creates and returns an MQ Light message object.
@@ -103,14 +119,17 @@ Client.prototype.close = function() {
  * as soon as the <code>Client</code> is closed.  Setting this to
  * <code>EXPIRE_NEVER</code> will cause the destination to remain in existence
  * until its expiry time is adjusted using {@link Destination#setExpiry(long)}.
+ * @param {sendCallback} cb - (optional) callback to be notified of errors
  *
  * @return a {@link Destination} from which can applications can receive messages.
  */
-Client.prototype.createDestination = function(pattern, expiryMillis) {
+Client.prototype.createDestination = function(pattern, expiryMillis, cb) {
     var messenger = this.messenger;
+    var address = this.brokerUrl + '/' + pattern;
     var emitter = new EventEmitter();
 
-    messenger.subscribe(this.brokerUrl + '/' + pattern);
+    messenger.subscribe(address);
+
     var check_for_messages = function() {
       var messages = messenger.receive(1024);
       if (messages.length > 0) {
@@ -122,9 +141,8 @@ Client.prototype.createDestination = function(pattern, expiryMillis) {
     };
     process.nextTick(check_for_messages);
 
+    if (cb) cb(undefined, address);
     return emitter;
 };
-
-module.exports = Client;
 
 /* ------------------------------------------------------------------------- */

@@ -57,7 +57,7 @@ if (hostname.indexOf(':') > -1) {
 }
 
 // connect client to broker
-var client = new mqlight(hostname, port);
+var client = mqlight.createClient(hostname, port, "recv.js");
 
 // catch Ctrl-C and cleanly shutdown
 process.on('SIGINT', function() {
@@ -65,19 +65,30 @@ process.on('SIGINT', function() {
   process.exit(0);
 });
 
-// now subscribe to topic for publications
-var destination = client.createDestination(address, 5000);
+client.on('connected', function() {
+  console.log("Connected to " + hostname + ":" + port + " using client-id " + client.clientId);
 
-// listen to new message events and process them
-destination.on('message', function(msg) {
-  console.log('# received message');
-  console.log(msg);
-});
+  // subscribe callback
+  var cb = function(err, address) {
+    if (address) {
+      console.log("Subscribing to " + address);
+    }
+  };
 
-// listen for the closed destination event and shutdown
-destination.on('closed', function() {
-  console.log('destination closed');
-  if (client) client.close();
-  process.exit(0);
+  // now subscribe to topic for publications
+  var destination = client.createDestination(address, 5000, cb);
+
+  // listen to new message events and process them
+  destination.on('message', function(msg) {
+    console.log('# received message');
+    console.log(msg);
+  });
+
+  // listen for the closed destination event and shutdown
+  destination.on('closed', function() {
+    console.log('destination closed');
+    if (client) client.close();
+    process.exit(0);
+  });
 });
 
