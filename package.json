@@ -1,14 +1,15 @@
 {
     "name": "mqlight",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "description": "IBM MQ Light Client Module",
     "main": "mqlight.js",
     "private": true,
     "gypfile": true,
     "dependencies": {
-        "node-uuid": "~1.4.0"
+        "node-uuid": "~1.4.0",
+        "nopt": "~2.1.2"
     },
     "engines": {
-        "node": "~0.10.21"
+        "node": "~0.10.x"
     }
 }

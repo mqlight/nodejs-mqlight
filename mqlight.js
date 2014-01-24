@@ -18,7 +18,7 @@
  */
 
 var proton = require('./build/Release/proton');
-var uuid = require('node-uuid');
+var uuid = require('node-uuid') || require(require.resolve('npm') + '/../../node_modules/request/node_modules/node-uuid');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 
@@ -39,7 +39,7 @@ exports.QOS_EXACTLY_ONCE = 2;
 exports.createClient = function(hostName, port, clientId) {
   var client = new Client(hostName, port, clientId);
   // FIXME: make this actually check driver/engine connection state
-  process.nextTick(function() { client.emit('connected', true) });
+  process.nextTick(function() { client.emit('connected', true); });
   return client;
 };
 

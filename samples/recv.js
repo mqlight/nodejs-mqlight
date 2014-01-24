@@ -17,8 +17,8 @@
  * </copyright>
  */
 
-var mqlight = require('../../lib/node_modules/mqlight');
-var nopt = require('nopt');
+var mqlight = require('mqlight') || require('../../lib/node_modules/mqlight');
+var nopt = require('nopt') || require(require.resolve('npm') + '/../../node_modules/nopt');
 
 // parse the commandline arguments
 var types = {};

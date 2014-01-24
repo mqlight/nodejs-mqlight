@@ -17,8 +17,8 @@
  * </copyright>
  */
 
-var mqlight = require('../../lib/node_modules/mqlight');
-var nopt = require('nopt');
+var mqlight = require('mqlight') || require('../../lib/node_modules/mqlight');
+var nopt = require('nopt') || require(require.resolve('npm') + '/../../node_modules/nopt');
 
 // parse the commandline arguments
 var types = { address: String };
@@ -103,7 +103,8 @@ client.on('connected', function() {
     if (++i < data.length) {
       setTimeout(sendNextMessage, 5000, cb);
     } else {
-      process.nextTick(checkFinished);
+      client.send();
+      setTimeout(checkFinished, 5000);
     }
   };
   sendNextMessage(cb);
