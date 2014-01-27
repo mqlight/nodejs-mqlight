@@ -18,9 +18,14 @@
  */
 
 var proton = require('./build/Release/proton');
-var uuid = require('node-uuid') || require(require.resolve('npm') + '/../../node_modules/request/node_modules/node-uuid');
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
+
+try {
+  var uuid = require('node-uuid');
+} catch(_) {
+  var uuid = require(require.resolve('npm') + '/../../node_modules/request/node_modules/node-uuid');
+}
 
 /** @constant {number} */
 exports.QOS_AT_MOST_ONCE = 0;

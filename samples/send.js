@@ -17,8 +17,17 @@
  * </copyright>
  */
 
-var mqlight = require('mqlight') || require('../../lib/node_modules/mqlight');
-var nopt = require('nopt') || require(require.resolve('npm') + '/../../node_modules/nopt');
+try {
+  var mqlight = require('mqlight');
+} catch(_) {
+  var mqlight = require('../../lib/node_modules/mqlight');
+}
+
+try {
+  var nopt = require('nopt');
+} catch(_) {
+  var nopt = require(require.resolve('npm') + '/../../node_modules/nopt');
+}
 
 // parse the commandline arguments
 var types = { address: String };
