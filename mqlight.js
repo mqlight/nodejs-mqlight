@@ -54,7 +54,7 @@ exports.createClient = function(hostName, port, clientId) {
 var Client = function(hostName, port, clientId) {
   EventEmitter.call(this);
   if (!port) port = 5672;
-  if (!clientId) clientId = uuid.v4();
+  if (!clientId) clientId = "AUTO:" + uuid.v4().substring(0, 7);
   this.brokerUrl = "amqp://" + hostName + ':' + port;
   this.clientId = clientId;
   this.messenger = new proton.ProtonMessenger(clientId);
