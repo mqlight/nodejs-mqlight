@@ -45,6 +45,9 @@ exports.createClient = function(hostName, port, clientId) {
   var client = new Client(hostName, port, clientId);
   // FIXME: make this actually check driver/engine connection state
   process.nextTick(function() { client.emit('connected', true); });
+  process.once('exit', function() {
+    if (client) client.close();
+  });
   return client;
 };
 
@@ -85,18 +88,41 @@ Client.prototype.createMessage = function(address, body) {
 /**
  * @callback sendCallback
  * @param {string} err - an error message if a problem occurred.
+ * @param {ProtonMessage} message - the message that was sent.
  */
 
 /**
  * Sends the given MQ Light message object to its address.
  *
  * @param {ProtonMessage} message - the message to be sent.
- * @param {sendCallback} cb - (optional) callback to be notified of errors
+ * @param {sendCallback} callback - (optional) callback to be notified of
+ *                                  errors and completion.
  */
-Client.prototype.send = function(message, cb) {
-  if (message) this.messenger.put(message);
-  this.messenger.send();
-  if (cb) cb(undefined, message);
+Client.prototype.send = function(message, callback) {
+  var messenger = this.messenger;
+  if (message) {
+    messenger.put(message);
+    messenger.send();
+
+    // setup a timer to trigger the callback once the message has been sent
+    var untilSendComplete = function(message, callback) {
+      if (messenger.hasSent(message)) {
+        process.nextTick(function() {
+          callback(undefined, message);
+        });
+        return;
+      }
+      // if message not yet sent, check again in a second or so
+      process.setImmediate(untilSendComplete, message, callback);
+    };
+    // if a callback is set, start the timer to trigger it
+    if (callback) {
+      process.nextTick(function() {
+        untilSendComplete(message, callback);
+      });
+    }
+  }
+  messenger.send();
 };
 
 /**

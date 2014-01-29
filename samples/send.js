@@ -30,8 +30,8 @@ try {
 }
 
 // parse the commandline arguments
-var types = { address: String };
-var shorthands = { a: ["--address"], h: ["--help"] };
+var types = { address: String, delay: Number };
+var shorthands = { a: ["--address"], d: ["--delay"], h: ["--help"] };
 var parsed = nopt(types, shorthands, process.argv, 2);
 
 if (parsed.help) {
@@ -42,7 +42,9 @@ if (parsed.help) {
   console.log("Options:");
   console.log("  -h, --help            show this help message and exit");
   console.log("  -a ADDRESS, --address=ADDRESS");
-  console.log("                        address: //<domain>[/<name>] (default amqp://localhost)");
+  console.log("                        address: amqp://<domain>[/<name>]");
+  console.log("                        (default amqp://localhost)");
+  console.log("  -d NUM, --delay=NUM   add a NUM seconds time delay between each request");
   process.exit(0);
 }
 
@@ -61,62 +63,44 @@ if (hostname.indexOf(':') > -1) {
   port = split[1];
 }
 
-// connect client to broker
+// create client to connect to broker with
 var client = mqlight.createClient(hostname, port, "send.js");
-
-// catch Ctrl-C and cleanly shutdown
-process.on('SIGINT', function() {
-  if (client) client.close();
-  process.exit(0);
-});
-
-// function to check if the client still has pending messages
-var checkFinished = function() {
-  client.send();
-  if (client.messenger.hasOutgoing) {
-    setTimeout(checkFinished, 2500);
-  } else {
-    console.log("Messages delivered");
-    console.log("");
-    console.log("Press <Ctrl-C> to exit.");
-
-    // keep the client around for up to 2 minutes after all messages delivered
-    setTimeout(function() {
-      if (client) client.close();
-      process.exit(0);
-    }, 120000);
-  }
-};
 
 // get message body data to send
 var remain = parsed.argv.remain;
 var data = (remain.length > 0) ? remain : ["Hello World!"];
 
+// insert a delay between sends if requested
+var delay = parsed.delay * 1000 || 0;
+
+// once connection is acquired, send messages
 client.on('connected', function() {
-  console.log("Connected to " + hostname + ":" + port + " using client-id " + client.clientId);
-  // publish message callback
-  var cb = function(err, msg) {
+  console.log("Connected to " + hostname + ":" + port + " using client-id " +
+              client.clientId);
+  // queue all messages for sending
+  var i = 0;
+  var sendNextMessage = function() {
+    var body = data[i];
+    var msg = client.createMessage(address, body);
     if (msg) {
-      console.log("Send called with message:");
-      console.log(msg);
+      client.send(msg, function(err, msg) {
+        if (msg) {
+          console.log("Sent message:");
+          console.log(msg);
+        }
+      });
+    }
+    // if there are more messages pending, send the next in delay seconds time
+    if (data.length > ++i) {
+      if (delay > 0) {
+        setTimeout(sendNextMessage, delay);
+      } else {
+        process.nextTick(sendNextMessage);
+      }
     }
   };
 
-  // queue all messages for sending
-  var i = 0;
-  var sendNextMessage = function(cb) {
-    var body = data[i];
-    var msg = client.createMessage(address, body);
-    if (msg) client.send(msg, cb);
-    // if there are more messages pending, send the next in 5 seconds time
-    if (++i < data.length) {
-      setTimeout(sendNextMessage, 5000, cb);
-    } else {
-      client.send();
-      setTimeout(checkFinished, 5000);
-    }
-  };
-  sendNextMessage(cb);
+  sendNextMessage();
 });
 
 

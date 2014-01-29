@@ -46,6 +46,7 @@ public:
     ~ProtonMessage();
 
     pn_message_t *message;
+    pn_tracker_t tracker;
 
 protected:
     static v8::Handle<v8::Value> New(const v8::Arguments &args);

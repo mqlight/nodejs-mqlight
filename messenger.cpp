@@ -64,6 +64,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "stop", Stop);
   NODE_SET_PROTOTYPE_METHOD(constructor, "subscribe", Subscribe);
   NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "hasSent", HasSent);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("hasOutgoing"),
       HasOutgoing);
@@ -143,7 +144,8 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args) {
     THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)))
   }
 
-  pn_messenger_work(obj->messenger, 1024);
+  pn_tracker_t tracker = pn_messenger_outgoing_tracker(obj->messenger);
+  msg->tracker = tracker;
 
   return Boolean::New(true);
 }
@@ -159,7 +161,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args) {
     THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)))
   }
 
-  pn_messenger_work(obj->messenger, 1024);
+  pn_messenger_work(obj->messenger, 50);
 
   if (pn_messenger_errno(obj->messenger))
   {
@@ -264,4 +266,28 @@ Handle<Value> ProtonMessenger::HasOutgoing(Local<String> property,
 
   return scope.Close(Boolean::New(hasOutgoing));
 }
+
+Handle<Value> ProtonMessenger::HasSent(const Arguments& args)
+{
+  HandleScope scope;
+
+  // throw exception if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty()) {
+    THROW_EXCEPTION("Missing required message argument.");
+  }
+
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+
+#if 0
+  /* TODO: investigate why the messenger status never changes from PN_STATUS_PENDING */
+  bool isAccepted = (pn_messenger_status(obj->messenger,
+                                         msg->tracker) == PN_STATUS_ACCEPTED);
+#endif
+  
+  bool isBuffered = pn_messenger_buffered(obj->messenger, msg->tracker);
+
+  return scope.Close(Boolean::New(!isBuffered));
+}
+
 
