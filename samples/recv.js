@@ -35,8 +35,8 @@ var shorthands = { h: ["--help"] };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
 
-if (parsed.help || remain.length < 1) {
-  console.log("Usage: recv.js [options] <address_1> ... <address_n>");
+if (parsed.help || remain.length != 1) {
+  console.log("Usage: recv.js [options] <address>");
   console.log("                        address: //<domain>[/<name>]");
   console.log("");
   console.log("simple message receiver");
