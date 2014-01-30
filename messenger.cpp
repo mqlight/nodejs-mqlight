@@ -285,7 +285,9 @@ Handle<Value> ProtonMessenger::HasSent(const Arguments& args)
                                          msg->tracker) == PN_STATUS_ACCEPTED);
 #endif
   
-  bool isBuffered = pn_messenger_buffered(obj->messenger, msg->tracker);
+  bool isBuffered = pn_messenger_buffered(obj->messenger, msg->tracker) ||
+                    (pn_messenger_status(obj->messenger,
+                                         msg->tracker) == PN_STATUS_UNKNOWN);
 
   return scope.Close(Boolean::New(!isBuffered));
 }

@@ -46,7 +46,10 @@ exports.createClient = function(hostName, port, clientId) {
   // FIXME: make this actually check driver/engine connection state
   process.nextTick(function() { client.emit('connected', true); });
   process.once('exit', function() {
-    if (client) client.close();
+    if (client) {
+      client.send();
+      client.close();
+    }
   });
   return client;
 };
@@ -113,7 +116,8 @@ Client.prototype.send = function(message, callback) {
         return;
       }
       // if message not yet sent, check again in a second or so
-      process.setImmediate(untilSendComplete, message, callback);
+      messenger.send();
+      setImmediate(untilSendComplete, message, callback);
     };
     // if a callback is set, start the timer to trigger it
     if (callback) {
@@ -162,13 +166,13 @@ Client.prototype.createDestination = function(pattern, expiryMillis, cb) {
     messenger.subscribe(address);
 
     var check_for_messages = function() {
-      var messages = messenger.receive(1024);
+      var messages = messenger.receive(50);
       if (messages.length > 0) {
         for (var i=0, tot=messages.length; i < tot; i++) {
           emitter.emit('message', messages[i]);
         }
       }
-      setTimeout(check_for_messages, 1024);
+      setImmediate(check_for_messages);
     };
     process.nextTick(check_for_messages);
 

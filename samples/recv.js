@@ -35,8 +35,8 @@ var shorthands = { h: ["--help"] };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
 
-if (parsed.help || remain.length != 1) {
-  console.log("Usage: recv.js [options] <address>");
+if (parsed.help || remain.length < 1) {
+  console.log("Usage: recv.js [options] <address_1> ... <address_n>");
   console.log("                        address: //<domain>[/<name>]");
   console.log("");
   console.log("simple message receiver");
@@ -68,36 +68,21 @@ if (hostname.indexOf(':') > -1) {
 // connect client to broker
 var client = mqlight.createClient(hostname, port, "recv.js");
 
-// catch Ctrl-C and cleanly shutdown
-process.on('SIGINT', function() {
-  if (client) client.close();
-  process.exit(0);
-});
-
 client.on('connected', function() {
   console.log("Connected to " + hostname + ":" + port + " using client-id " + client.clientId);
 
-  // subscribe callback
-  var cb = function(err, address) {
+  // now subscribe to topic for publications
+  var destination = client.createDestination(address, 5000, function(err, address) {
     if (address) {
       console.log("Subscribing to " + address);
     }
-  };
-
-  // now subscribe to topic for publications
-  var destination = client.createDestination(address, 5000, cb);
-
-  // listen to new message events and process them
-  destination.on('message', function(msg) {
-    console.log('# received message');
-    console.log(msg);
   });
 
-  // listen for the closed destination event and shutdown
-  destination.on('closed', function() {
-    console.log('destination closed');
-    if (client) client.close();
-    process.exit(0);
+  // listen to new message events and process them
+  var i = 0;
+  destination.on('message', function(msg) {
+    console.log('# received message (' + (++i) + ')');
+    console.log(msg);
   });
 });
 
