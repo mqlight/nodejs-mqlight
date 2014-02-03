@@ -84,6 +84,10 @@ client.on('connected', function() {
     var msg = client.createMessage(address, body);
     if (msg) {
       client.send(msg, function(err, msg) {
+        if (err) {
+          console.log('Problem with send request: ' + err.message);
+          process.exit(0);
+        }
         if (msg) {
           console.log("Sent message:");
           console.log(msg);
@@ -95,13 +99,11 @@ client.on('connected', function() {
       if (delay > 0) {
         setTimeout(sendNextMessage, delay);
       } else {
-        process.nextTick(sendNextMessage);
+        setImmediate(sendNextMessage);
       }
     }
   };
 
   sendNextMessage();
 });
-
-
 

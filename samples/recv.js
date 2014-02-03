@@ -73,6 +73,10 @@ client.on('connected', function() {
 
   // now subscribe to topic for publications
   var destination = client.createDestination(address, 5000, function(err, address) {
+    if (err) {
+      console.log('Problem with createDestination request: ' + err.message);
+      process.exit(0);
+    }
     if (address) {
       console.log("Subscribing to " + address);
     }

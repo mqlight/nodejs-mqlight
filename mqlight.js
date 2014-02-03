@@ -44,7 +44,9 @@ exports.QOS_EXACTLY_ONCE = 2;
 exports.createClient = function(hostName, port, clientId) {
   var client = new Client(hostName, port, clientId);
   // FIXME: make this actually check driver/engine connection state
-  process.nextTick(function() { client.emit('connected', true); });
+  process.nextTick(function() {
+    client.emit('connected', true);
+  });
   process.once('exit', function() {
     if (client) {
       client.send();
@@ -98,35 +100,44 @@ Client.prototype.createMessage = function(address, body) {
  * Sends the given MQ Light message object to its address.
  *
  * @param {ProtonMessage} message - the message to be sent.
- * @param {sendCallback} callback - (optional) callback to be notified of
- *                                  errors and completion.
+ * @param {sendCallback} cb - (optional) callback to be notified of
+ *                                       errors and completion.
  */
-Client.prototype.send = function(message, callback) {
+Client.prototype.send = function(message, cb) {
   var messenger = this.messenger;
-  if (message) {
-    messenger.put(message);
-    messenger.send();
-
-    // setup a timer to trigger the callback once the message has been sent
-    var untilSendComplete = function(message, callback) {
-      if (messenger.hasSent(message)) {
-        process.nextTick(function() {
-          callback(undefined, message);
-        });
-        return;
-      }
-      // if message not yet sent, check again in a second or so
+  var callback = cb;
+  try {
+    if (message) {
+      messenger.put(message);
       messenger.send();
-      setImmediate(untilSendComplete, message, callback);
-    };
-    // if a callback is set, start the timer to trigger it
-    if (callback) {
-      process.nextTick(function() {
-        untilSendComplete(message, callback);
-      });
+
+      // setup a timer to trigger the callback once the message has been sent
+      var untilSendComplete = function(message, callback) {
+        if (messenger.hasSent(message)) {
+          process.nextTick(function() {
+            callback(undefined, message);
+          });
+          return;
+        }
+        // if message not yet sent, check again in a second or so
+        messenger.send();
+        setImmediate(untilSendComplete, message, callback);
+      };
+      // if a callback is set, start the timer to trigger it
+      if (callback) {
+        setImmediate(untilSendComplete, message, callback);
+      }
     }
+    messenger.send();
+  } catch (e) {
+    var err = new Error(e.message);
+    process.nextTick(function() {
+      if (callback) {
+        callback(err, message);
+      }
+      if (err) this.emit('error', err);
+    });
   }
-  messenger.send();
 };
 
 /**
@@ -138,6 +149,12 @@ Client.prototype.send = function(message, callback) {
 Client.prototype.close = function() {
   this.messenger.stop();
 };
+
+/**
+ * @callback destCallback
+ * @param {string} err - an error message if a problem occurred.
+ * @param {string} address - the address that was subscribed to.
+ */
 
 /**
  * Create a {@link Destination} and associates it with a <code>pattern</code>.
@@ -154,7 +171,7 @@ Client.prototype.close = function() {
  * as soon as the <code>Client</code> is closed.  Setting this to
  * <code>EXPIRE_NEVER</code> will cause the destination to remain in existence
  * until its expiry time is adjusted using {@link Destination#setExpiry(long)}.
- * @param {sendCallback} cb - (optional) callback to be notified of errors
+ * @param {destCallback} cb - (optional) callback to be notified of errors
  *
  * @return a {@link Destination} from which can applications can receive messages.
  */
@@ -162,21 +179,34 @@ Client.prototype.createDestination = function(pattern, expiryMillis, cb) {
     var messenger = this.messenger;
     var address = this.brokerUrl + '/' + pattern;
     var emitter = new EventEmitter();
+    var callback = cb;
 
-    messenger.subscribe(address);
+    try {
+      messenger.subscribe(address);
+    } catch (e) {
+      var err = new Error(e.message);
+    }
 
-    var check_for_messages = function() {
-      var messages = messenger.receive(50);
-      if (messages.length > 0) {
-        for (var i=0, tot=messages.length; i < tot; i++) {
-          emitter.emit('message', messages[i]);
-        }
+    process.nextTick(function() {
+      if (callback) {
+        callback(err, address);
       }
-      setImmediate(check_for_messages);
-    };
-    process.nextTick(check_for_messages);
+      if (err) emitter.emit('error', err);
+    });
 
-    if (cb) cb(undefined, address);
+    if (!err) {
+      var check_for_messages = function() {
+        var messages = messenger.receive(50);
+        if (messages.length > 0) {
+          for (var i=0, tot=messages.length; i < tot; i++) {
+            emitter.emit('message', messages[i]);
+          }
+        }
+        setImmediate(check_for_messages);
+      };
+      setImmediate(check_for_messages);
+    }
+
     return emitter;
 };
 
