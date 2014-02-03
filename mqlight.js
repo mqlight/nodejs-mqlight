@@ -109,18 +109,18 @@ Client.prototype.send = function(message, cb) {
   try {
     if (message) {
       messenger.put(message);
-      messenger.send();
 
       // setup a timer to trigger the callback once the message has been sent
       var untilSendComplete = function(message, callback) {
+        messenger.send();
         if (messenger.hasSent(message)) {
+          messenger.send();
           process.nextTick(function() {
             callback(undefined, message);
           });
           return;
         }
         // if message not yet sent, check again in a second or so
-        messenger.send();
         setImmediate(untilSendComplete, message, callback);
       };
       // if a callback is set, start the timer to trigger it
@@ -128,7 +128,6 @@ Client.prototype.send = function(message, cb) {
         setImmediate(untilSendComplete, message, callback);
       }
     }
-    messenger.send();
   } catch (e) {
     var err = new Error(e.message);
     process.nextTick(function() {
