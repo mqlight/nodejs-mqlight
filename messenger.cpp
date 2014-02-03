@@ -204,6 +204,11 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
   pn_messenger_subscribe(obj->messenger, address.c_str());
   pn_messenger_recv(obj->messenger, -1);
 
+  if (pn_messenger_errno(obj->messenger))
+  {
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)))
+  }
+
   return Boolean::New(true);
 }
 
@@ -218,7 +223,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
 
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   Local<Integer> integer = args[0]->ToInteger();
-  int timeout = integer->Value();
+  int timeout = (int)integer->Value();
 
   pn_messenger_work(obj->messenger, timeout);
 
@@ -230,7 +235,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
   std::vector< Local<Object> > vector;
   while (pn_messenger_incoming(obj->messenger))
   {
-    Local<Value> argv[] = {};
+    Local<Value> argv[1] = { args[0] };
     Local<Object> msgObj = ProtonMessage::constructor->NewInstance(0, argv);
     ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(msgObj);
 
