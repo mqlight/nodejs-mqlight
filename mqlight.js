@@ -68,6 +68,11 @@ var Client = function(hostName, port, clientId) {
   EventEmitter.call(this);
   if (!port) port = 5672;
   if (!clientId) clientId = "AUTO:" + uuid.v4().substring(0, 7);
+  if (clientId.length > 48) { 
+    var msg = "Client identifier '" + clientId + "' is longer than the " +
+        "maximum ID length of 48.";
+    throw new Error(msg);
+  }
   this.brokerUrl = "amqp://" + hostName + ':' + port;
   this.clientId = clientId;
   this.messenger = new proton.ProtonMessenger(clientId);
