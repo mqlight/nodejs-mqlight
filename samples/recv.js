@@ -17,11 +17,7 @@
  * </copyright>
  */
 
-try {
-  var mqlight = require('mqlight');
-} catch(_) {
-  var mqlight = require('../../lib/node_modules/mqlight');
-}
+var mqlight = require('mqlight');
 
 try {
   var nopt = require('nopt');
