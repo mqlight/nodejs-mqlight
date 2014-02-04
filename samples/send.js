@@ -39,17 +39,17 @@ if (parsed.help) {
   console.log("  -h, --help            show this help message and exit");
   console.log("  -a ADDRESS, --address=ADDRESS");
   console.log("                        address: amqp://<domain>[/<name>]");
-  console.log("                        (default amqp://localhost)");
+  console.log("                        (default amqp://localhost/public)");
   console.log("  -d NUM, --delay=NUM   add a NUM seconds time delay between each request");
   process.exit(0);
 }
 
 // extract appropriate values from arguments
-var broker = parsed.address || "amqp://localhost";
+var broker = parsed.address || "amqp://localhost/public";
 var hostname = broker.replace("amqp://", '');
-var address = '';
+var topic = '';
 if (hostname.indexOf('/') > -1) {
-  address = hostname.substring(hostname.indexOf('/')+1);
+  topic = hostname.substring(hostname.indexOf('/')+1);
   hostname = hostname.substring(0, hostname.indexOf('/'));
 }
 var port = 5672;
@@ -60,7 +60,8 @@ if (hostname.indexOf(':') > -1) {
 }
 
 // create client to connect to broker with
-var client = mqlight.createClient(hostname, port, "send.js");
+var opts = { host: hostname, port: port, clientId: "send.js"};
+var client = mqlight.createClient(opts);
 
 // get message body data to send
 var remain = parsed.argv.remain;
@@ -72,25 +73,23 @@ var delay = parsed.delay * 1000 || 0;
 // once connection is acquired, send messages
 client.on('connected', function() {
   console.log("Connected to " + hostname + ":" + port + " using client-id " +
-              client.clientId);
+    client.clientId);
+
   // queue all messages for sending
   var i = 0;
   var sendNextMessage = function() {
     var body = data[i];
-    var msg = client.createMessage(address, body);
-    if (msg) {
-      client.send(msg, function(err, msg) {
-        if (err) {
-          console.log('Problem with send request: ' + err.message);
-          process.exit(0);
-        }
-        if (msg) {
-          console.log("Sent message:");
-          console.log(msg);
-        }
-      });
-    }
-    // if there are more messages pending, send the next in delay seconds time
+    client.send(topic, body, function(err, msg) {
+      if (err) {
+        console.log('Problem with send request: ' + err.message);
+        process.exit(0);
+      }
+      if (msg) {
+        console.log("Sent message:");
+        console.log(msg);
+      }
+    });
+    // if there are more messages pending, send the next in <delay> seconds time
     if (data.length > ++i) {
       if (delay > 0) {
         setTimeout(sendNextMessage, delay);

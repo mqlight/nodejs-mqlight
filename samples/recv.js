@@ -31,9 +31,10 @@ var shorthands = { h: ["--help"] };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
 
-if (parsed.help || remain.length != 1) {
+if (parsed.help || remain.length > 1) {
   console.log("Usage: recv.js [options] <address>");
-  console.log("                        address: //<domain>[/<name>]");
+  console.log("                          address: amqp://<domain>[/<name>]");
+  console.log("                          (default amqp://localhost/public)");
   console.log("");
   console.log("simple message receiver");
   console.log("");
@@ -47,11 +48,11 @@ if (parsed.help || remain.length != 1) {
 }
 
 // extract appropriate values from arguments
-var broker = remain[0] || "amqp://0.0.0.0";
+var broker = remain[0] || "amqp://localhost/public";
 var hostname = broker.replace("amqp://", '');
-var address = '';
+var topic = '';
 if (hostname.indexOf('/') > -1) {
-  address = hostname.substring(hostname.indexOf('/')+1);
+  topic = hostname.substring(hostname.indexOf('/')+1);
   hostname = hostname.substring(0, hostname.indexOf('/'));
 }
 var port = 5672;
@@ -62,13 +63,15 @@ if (hostname.indexOf(':') > -1) {
 }
 
 // connect client to broker
-var client = mqlight.createClient(hostname, port, "recv.js");
+var opts = { host: hostname, port: port, clientId: "recv.js"};
+var client = mqlight.createClient(opts);
 
 client.on('connected', function() {
-  console.log("Connected to " + hostname + ":" + port + " using client-id " + client.clientId);
+  console.log("Connected to " + hostname + ":" + port + " using client-id " +
+    client.clientId);
 
   // now subscribe to topic for publications
-  var destination = client.createDestination(address, 5000, function(err, address) {
+  var destination = client.createDestination(topic, function(err, address) {
     if (err) {
       console.log('Problem with createDestination request: ' + err.message);
       process.exit(0);
