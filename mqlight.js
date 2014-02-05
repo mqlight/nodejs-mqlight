@@ -113,7 +113,13 @@ Client.prototype.send = function(topic, message, options, cb) {
       var protonMsg = new proton.ProtonMessage();
       protonMsg.address = this.brokerUrl;
       if (topic) protonMsg.address += '/' + topic;
-      if (typeof message === 'string') protonMsg.body = message;
+      if (typeof message === 'string') {
+        protonMsg.body = message;
+      } else if (typeof message === 'object') {
+        protonMsg.body = JSON.stringify(message);
+      } else {
+        throw new Error("TypeError: unsupported message type " + typeof message);
+      }
       messenger.put(protonMsg);
 
       // setup a timer to trigger the callback once the msg has been sent
@@ -200,7 +206,18 @@ Client.prototype.createDestination = function(pattern, options, cb) {
         var messages = messenger.receive(50);
         if (messages.length > 0) {
           for (var i=0, tot=messages.length; i < tot; i++) {
-            emitter.emit('message', messages[i]);
+            var protonMsg = messages[i];
+            var message = { address: protonMsg.address, body: protonMsg.body };
+
+            // if body is a JSON'ified object, parse it back to a js obj
+            try {
+                var obj = JSON.parse(message.body);
+                if (typeof obj === 'object') {
+                    message.body = obj;
+                }
+            } catch(_) {}
+            
+            emitter.emit('message', message);
           }
         }
         setImmediate(check_for_messages);

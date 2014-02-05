@@ -81,11 +81,11 @@ client.on('connected', function() {
     var body = data[i];
     client.send(topic, body, function(err, msg) {
       if (err) {
-        console.log('Problem with send request: ' + err.message);
+        console.error('Problem with send request: ' + err.message);
         process.exit(0);
       }
       if (msg) {
-        console.log("Sent message:");
+        console.log("# sent message:");
         console.log(msg);
       }
     });
