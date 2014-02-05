@@ -51,6 +51,8 @@ protected:
     static v8::Handle<v8::Value> Send(const v8::Arguments& args);
     static v8::Handle<v8::Value> Start(const v8::Arguments& args);
     static v8::Handle<v8::Value> Stop(const v8::Arguments& args);
+    static v8::Handle<v8::Value> Stopped(v8::Local<v8::String> property,
+                                         const v8::AccessorInfo &info);
     static v8::Handle<v8::Value> Subscribe(const v8::Arguments& args);
     static v8::Handle<v8::Value> Receive(const v8::Arguments& args);
     static v8::Handle<v8::Value> HasSent(const v8::Arguments& args);

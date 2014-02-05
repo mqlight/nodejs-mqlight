@@ -66,6 +66,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
   NODE_SET_PROTOTYPE_METHOD(constructor, "hasSent", HasSent);
 
+  tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
   tpl->InstanceTemplate()->SetAccessor(String::New("hasOutgoing"),
       HasOutgoing);
 
@@ -187,6 +188,17 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args) {
   pn_messenger_stop(obj->messenger);
 
   return Boolean::New(true);
+}
+
+Handle<Value> ProtonMessenger::Stopped(Local<String> property,
+                                       const AccessorInfo &info)
+{
+  HandleScope scope;
+
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(info.Holder());
+  bool stopped = pn_messenger_stopped(obj->messenger);
+
+  return scope.Close(Boolean::New(stopped));
 }
 
 Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {

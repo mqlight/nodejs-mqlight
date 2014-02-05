@@ -132,8 +132,10 @@ Client.prototype.send = function(topic, message, options, cb) {
           });
           return;
         }
-        // if msg not yet sent, check again in a second or so
-        setImmediate(untilSendComplete, protonMsg, callback);
+        // if msg not yet sent and still running, check again in a second or so
+        if (!messenger.stopped) {
+          setImmediate(untilSendComplete, protonMsg, callback);
+        }
       };
       // if a callback is set, start the timer to trigger it
       if (callback) {
@@ -220,7 +222,9 @@ Client.prototype.createDestination = function(pattern, options, cb) {
             emitter.emit('message', message);
           }
         }
-        setImmediate(check_for_messages);
+        if (!messenger.stopped) {
+          setImmediate(check_for_messages);
+        }
       };
       setImmediate(check_for_messages);
     }
