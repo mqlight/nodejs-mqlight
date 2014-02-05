@@ -125,17 +125,16 @@ Handle<Value> ProtonMessage::GetString(Local<String> property,
   HandleScope scope;
 
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
-  pn_data_t *body = pn_message_body(msg->message);
 
   // XXX: maybe cache this in the C++ object at set time?
   char *buffer = (char *) malloc(512 * sizeof(char));
   size_t buffsize = sizeof(buffer);
-  int rc = pn_data_format(body, buffer, &buffsize);
+  int rc = pn_message_save_text(msg->message, buffer, &buffsize);
   while (rc == PN_OVERFLOW)
   {
     buffsize = 2*buffsize;
     buffer = (char *) realloc(buffer, buffsize);
-    rc = pn_data_format(body, buffer, &buffsize);
+    rc = pn_message_save_text(msg->message, buffer, &buffsize);
   }
 
 #ifdef _DEBUG
