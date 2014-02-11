@@ -52,8 +52,8 @@ exports.QOS_EXACTLY_ONCE = 2;
  * @param {Object} [options] (optional) map of options for the client.
  */
 exports.createClient = function(options) {
-  this.options = options || {};
-  var client = new Client(options.host, options.port, options.clientId);
+  var opt = (typeof options == 'object') ? options : {};
+  var client = new Client(opt.host, opt.port, opt.clientId);
   // FIXME: make this actually check driver/engine connection state
   process.nextTick(function() {
     client.emit('connected', true);
@@ -77,6 +77,7 @@ exports.createClient = function(options) {
  */
 var Client = function(host, port, clientId) {
   EventEmitter.call(this);
+  if (!host) host = "localhost";
   if (!port) port = 5672;
   if (!clientId) clientId = "AUTO_" + uuid.v4().substring(0, 7);
   if (clientId.length > 48) {
@@ -86,12 +87,12 @@ var Client = function(host, port, clientId) {
   }
   /* currently client ids are restricted to a fixed char set, reject those not in it*/
   var i;
-  for ( i in clientId ){
-    if ( validClientIdChars.indexOf(clientId[i]) == -1){
-      var msg = "Client Identifier '" + clientId + "' contains invalid char: "+
-          clientId[i];
-      throw new Error(msg);
-    } 
+  for (i in clientId) {
+    if (validClientIdChars.indexOf(clientId[i]) == -1) {
+      var err = "Client Identifier '" + clientId + "' contains invalid char: " +
+        clientId[i];
+      throw new Error(err);
+    }
   }
   this.brokerUrl = "amqp://" + host + ':' + port;
   this.clientId = clientId;
