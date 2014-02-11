@@ -33,6 +33,7 @@ try {
   var uuid = require(require.resolve('npm') + '/../../node_modules/request/node_modules/node-uuid');
 }
 
+var validClientIdChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%/._';
 /** @constant {number} */
 exports.QOS_AT_MOST_ONCE = 0;
 /** @constant {number} */
@@ -46,7 +47,7 @@ exports.QOS_EXACTLY_ONCE = 2;
  * Options:
  *  - **host**, (String, default: localhost), the remote hostname to which we will connect.
  *  - **port**, (Number, default: 5672), the remote tcp port to connect to.
- *  - **clientId (String, default: AUTO-[0-9a-f]{7}), a unique identifier for this client.
+ *  - **clientId (String, default: AUTO_[0-9a-f]{7}), a unique identifier for this client.
  *
  * @param {Object} [options] (optional) map of options for the client.
  */
@@ -77,11 +78,20 @@ exports.createClient = function(options) {
 var Client = function(host, port, clientId) {
   EventEmitter.call(this);
   if (!port) port = 5672;
-  if (!clientId) clientId = "AUTO:" + uuid.v4().substring(0, 7);
+  if (!clientId) clientId = "AUTO_" + uuid.v4().substring(0, 7);
   if (clientId.length > 48) {
     var msg = "Client identifier '" + clientId + "' is longer than the " +
         "maximum ID length of 48.";
     throw new Error(msg);
+  }
+  /* currently client ids are restricted to a fixed char set, reject those not in it*/
+  var i;
+  for ( i in clientId ){
+    if ( validClientIdChars.indexOf(clientId[i]) == -1){
+      var msg = "Client Identifier '" + clientId + "' contains invalid char: "+
+          clientId[i];
+      throw new Error(msg);
+    } 
   }
   this.brokerUrl = "amqp://" + host + ':' + port;
   this.clientId = clientId;
