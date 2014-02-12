@@ -33,13 +33,12 @@ var remain = parsed.argv.remain;
 
 if (parsed.help || remain.length > 1) {
   console.log("Usage: recv.js [options] <address>");
-  console.log("                          address: amqp://<domain>[/<name>]");
+  console.log("                          address: amqp://<domain>/<name>");
   console.log("                          (default amqp://localhost/public)");
-  console.log("");
-  console.log("simple message receiver");
   console.log("");
   console.log("Options:");
   console.log("  -h, --help            show this help message and exit");
+  console.log("");
   if (parsed.help) {
     process.exit(0);
   } else {
@@ -47,19 +46,28 @@ if (parsed.help || remain.length > 1) {
   }
 }
 
-// extract appropriate values from arguments
-var broker = remain[0] || "amqp://localhost/public";
-var hostname = broker.replace("amqp://", '');
-var topic = '';
-if (hostname.indexOf('/') > -1) {
-  topic = hostname.substring(hostname.indexOf('/')+1);
-  hostname = hostname.substring(0, hostname.indexOf('/'));
-}
+// defaults
+var hostname = 'localhost';
 var port = 5672;
-if (hostname.indexOf(':') > -1) {
-  var split = hostname.split(':');
-  hostname = split[0];
-  port = split[1];
+var topic = 'public';
+
+// extract override values from cmdline arguments (if given)
+if (remain[0]) {
+  var addr = remain[0];
+  if (addr.indexOf('amqp://') === 0) {
+    hostname = addr.replace("amqp://", '');
+  }
+  if (hostname.indexOf('/') > -1) {
+    topic = hostname.substring(hostname.indexOf('/')+1);
+    hostname = hostname.substring(0, hostname.indexOf('/'));
+  } else {
+    topic = addr;
+  }
+  if (hostname.indexOf(':') > -1) {
+    var split = hostname.split(':');
+    hostname = split[0];
+    port = split[1];
+  }
 }
 
 // connect client to broker
