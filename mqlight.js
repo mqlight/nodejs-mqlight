@@ -22,7 +22,10 @@ var _system = os.platform() + '-' + process.arch;
 try {
   var proton = require('./lib/' + _system + '/proton');
 } catch(_) {
-  throw new Error('mqlight.js is not currently supported on ' + _system);
+  if ('MODULE_NOT_FOUND' === _.code) {
+    throw new Error('mqlight.js is not currently supported on ' + _system);
+  }
+  throw _;
 }
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
