@@ -157,12 +157,13 @@ Client.prototype.send = function(topic, message, options, cb) {
       }
     }
   } catch (e) {
+    var client = this;
     var err = new Error(e.message);
     process.nextTick(function() {
       if (callback) {
         callback(err, protonMsg);
       }
-      if (err) this.emit('error', err);
+      if (err) client.emit('error', err);
     });
   }
 };
@@ -194,7 +195,8 @@ Client.prototype.close = function() {
  * @param pattern used to match against the <code>address</code> attribute of
  * messages to determine if a copy of the message should be delivered to the
  * <code>Destination</code>.
- * @param {Object} [options] (optional) map of additional options for the send.
+ * @param {Object} [options] (optional) map of additional options for the
+ *        destination.
  * @param {destCallback} cb - (optional) callback to be notified of errors
  * @return a {@link Destination} which will emit 'message' events on arrival.
  */
