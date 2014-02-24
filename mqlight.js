@@ -61,6 +61,7 @@ exports.createClient = function(options) {
   process.nextTick(function() {
     client.emit('connected', true);
   });
+  process.setMaxListeners(0);
   process.once('exit', function() {
     if (client) {
       client.send();
@@ -212,7 +213,7 @@ Client.prototype.createDestination = function(pattern, options, cb) {
       var err = new Error(e.message);
     }
 
-    process.nextTick(function() {
+    setImmediate(function() {
       if (callback) {
         callback(err, address);
       }
@@ -242,7 +243,11 @@ Client.prototype.createDestination = function(pattern, options, cb) {
           setImmediate(check_for_messages);
         }
       };
-      setImmediate(check_for_messages);
+      process.nextTick(function() {
+        if (!messenger.stopped) {
+          check_for_messages();
+        }
+      });
     }
 
     return emitter;
