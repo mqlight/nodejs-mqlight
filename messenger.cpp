@@ -296,17 +296,9 @@ Handle<Value> ProtonMessenger::HasSent(const Arguments& args)
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
 
-#if 0
-  /* TODO: investigate why the messenger status never changes from PN_STATUS_PENDING */
   bool isAccepted = (pn_messenger_status(obj->messenger,
                                          msg->tracker) == PN_STATUS_ACCEPTED);
-#endif
-  
-  bool isBuffered = pn_messenger_buffered(obj->messenger, msg->tracker) ||
-                    (pn_messenger_status(obj->messenger,
-                                         msg->tracker) == PN_STATUS_UNKNOWN);
-
-  return scope.Close(Boolean::New(!isBuffered));
+  return scope.Close(Boolean::New(isAccepted));
 }
 
 
