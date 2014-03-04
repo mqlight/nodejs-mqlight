@@ -27,7 +27,7 @@ try {
 
 // parse the commandline arguments
 var types = { address: String, delay: Number };
-var shorthands = { a: ["--address"], d: ["--delay"], h: ["--help"] };
+var shorthands = { a: ["--address", "public"], d: ["--delay"], h: ["--help"] };
 var parsed = nopt(types, shorthands, process.argv, 2);
 
 if (parsed.help) {
