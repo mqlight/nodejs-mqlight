@@ -24,7 +24,7 @@
             ["OS=='mac'", {
                 "cflags_cc+": ["-Wall", "-Wno-comment", "-g"],
                 "include_dirs+": [".", "<!(echo $BROOT)/ship/opt/mqm/include"],
-                "libraries": ["-lqpid-proton", "-L<!(echo $BROOT)/ship/opt/mqm/lib64", "-Wl,-install_name,@rpath/proton.node", "-Wl,-rpath,@loader_path/../lib64", "-Wl,-headerpad_max_install_names"],
+                "libraries": ["-lqpid-proton", "-L<!(echo $BROOT)/ship/opt/mqm/lib64", "-Wl,-install_name,@rpath/proton.node", "-Wl,-rpath,@loader_path/", "-Wl,-headerpad_max_install_names"],
             }],
         ]
     }]
