@@ -7,7 +7,7 @@
     "gypfile": true,
     "dependencies": {
         "node-uuid": "~1.4.0",
-        "nopt": "~2.1.2"
+        "nopt": "~2.2.0"
     },
     "engines": {
         "node": "~0.10.x"
@@ -15,5 +15,6 @@
     "licenses": [{
         "type": "proprietary",
         "url": "http://www14.software.ibm.com/cgi-bin/weblap/lap.pl?popup=Y&li_formnum=L-ACRR-9FLFNA"
-    }]
+    }],
+    "readme": "README.md"
 }
