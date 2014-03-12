@@ -34,6 +34,7 @@
 #include <string>
 
 #include <node.h>
+#include <node_buffer.h>
 
 #include <proton/message.h>
 #include <proton/messenger.h>
@@ -55,11 +56,11 @@ protected:
     static void SetAddress(v8::Local<v8::String> property,
                            v8::Local<v8::Value> value,
                            const v8::AccessorInfo &args);
-    static v8::Handle<v8::Value> GetString(v8::Local<v8::String> property,
-                                           const v8::AccessorInfo &args);
-    static void PutString(v8::Local<v8::String> property,
-                          v8::Local<v8::Value> value,
-                          const v8::AccessorInfo &args);
+    static v8::Handle<v8::Value> GetBody(v8::Local<v8::String> property,
+                                         const v8::AccessorInfo &args);
+    static void PutBody(v8::Local<v8::String> property,
+                        v8::Local<v8::Value> value,
+                        const v8::AccessorInfo &args);
 };
 
 #endif /* MESSAGE_HPP */

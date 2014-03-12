@@ -38,6 +38,7 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 #include "message.hpp"
 
 using namespace v8;
+using namespace node;
 
 #define THROW_EXCEPTION(error) \
     const char *msg = error; \
@@ -59,7 +60,7 @@ void ProtonMessage::Init(Handle<Object> target)
   tpp->InstanceTemplate()->SetAccessor(String::New("address"),
       GetAddress, SetAddress);
   tpp->InstanceTemplate()->SetAccessor(String::New("body"),
-      GetString, PutString);
+      GetBody, PutBody);
 
   constructor = Persistent<Function>::New(tpp->GetFunction());
   target->Set(name, tpp->GetFunction());
@@ -119,22 +120,49 @@ void ProtonMessage::SetAddress(Local<String> property,
   pn_message_set_address(msg->message, address.c_str());
 }
 
-Handle<Value> ProtonMessage::GetString(Local<String> property,
-                                       const AccessorInfo &info)
+Handle<Value> ProtonMessage::GetBody(Local<String> property,
+                                     const AccessorInfo &info)
 {
   HandleScope scope;
+  Local<Value> result;
 
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+
+  // inspect data to see if we have PN_STRING data
+  pn_data_next(pn_message_body(msg->message));
+  pn_type_t type = pn_data_type(pn_message_body(msg->message));
+  if (type == PN_STRING)
+  {
+    pn_message_set_format(msg->message, PN_TEXT);
+  }
 
   // XXX: maybe cache this in the C++ object at set time?
   char *buffer = (char *) malloc(512 * sizeof(char));
   size_t buffsize = sizeof(buffer);
-  int rc = pn_message_save_text(msg->message, buffer, &buffsize);
+
+  // TODO: patch proton to return the required size in buffsize for realloc
+  int rc = pn_message_save(msg->message, buffer, &buffsize);
   while (rc == PN_OVERFLOW)
   {
     buffsize = 2*buffsize;
     buffer = (char *) realloc(buffer, buffsize);
-    rc = pn_message_save_text(msg->message, buffer, &buffsize);
+    rc = pn_message_save(msg->message, buffer, &buffsize);
+  }
+
+  // return appropriate JS object based on type
+  switch (type)
+  {
+    case PN_STRING:
+      result = String::New(buffer, (int)buffsize);
+      break;
+    default:
+      Local<Object> global = Context::GetCurrent()->Global();
+      Local<Function> constructor = Local<Function>::Cast(global->Get(
+            String::New("Buffer")));
+      Handle<Value> args[1] = { v8::Integer::New(buffsize) };
+      result = constructor->NewInstance(1, args);
+      memcpy(Buffer::Data(result), buffer, buffsize);
+      break;
   }
 
 #ifdef _DEBUG
@@ -144,22 +172,27 @@ Handle<Value> ProtonMessage::GetString(Local<String> property,
     printf("Content: %s\n", buffer);
 #endif
 
-  return scope.Close(String::New(buffer, (int)buffsize));
+  return scope.Close(result);
 }
 
-void ProtonMessage::PutString(Local<String> property,
-                              Local<Value> value,
-                              const AccessorInfo &info)
+void ProtonMessage::PutBody(Local<String> property,
+                            Local<Value> value,
+                            const AccessorInfo &info)
 {
   HandleScope scope;
 
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
 
-  String::Utf8Value param(value->ToString());
-  std::string msgtext = std::string(*param);
-
-  pn_data_t *body = pn_message_body(msg->message);
-  pn_data_put_string(body, pn_bytes_dup(strlen(msgtext.c_str()),
-                                        msgtext.c_str()));
+  if (value->IsString()) {
+    String::Utf8Value param(value->ToString());
+    std::string msgtext = std::string(*param);
+    pn_message_set_format(msg->message, PN_TEXT);
+    pn_message_load_text(msg->message, msgtext.c_str(), strlen(msgtext.c_str()));
+  } else if (value->IsObject()) {
+    Local<Object> buffer = value->ToObject();
+    char *msgdata = Buffer::Data(buffer);
+    size_t msglen = Buffer::Length(buffer);
+    pn_message_set_format(msg->message, PN_DATA);
+    pn_message_load_data(msg->message, msgdata, msglen);
+  }
 }
-

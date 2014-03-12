@@ -131,7 +131,11 @@ Client.prototype.send = function(topic, message, options, cb) {
       if (typeof message === 'string') {
         protonMsg.body = message;
       } else if (typeof message === 'object') {
-        protonMsg.body = JSON.stringify(message);
+        if (message instanceof Buffer) {
+          protonMsg.body = message;
+        } else {
+          protonMsg.body = JSON.stringify(message);
+        }
       } else {
         throw new Error("TypeError: unsupported message type " + typeof message);
       }
