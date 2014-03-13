@@ -36,16 +36,18 @@ var client = mqlight.createClient({
   clientId: 'client-id1'
 });
 
+var topic = "public";
 client.on('connected', function() {
-  client.send("topic1", "Hello World!");
+  client.send(topic, "Hello World!");
 });
 
 var client = mqlight.createClient({
   clientId: 'client-id2'
 });
 
+var address = "public";
 client.on('connected', function() {
-  var destination = client.createDestination('address1');
+  var destination = client.createDestination(address);
   destination.on('message', function(msg) {
     console.log(msg);
   });
@@ -70,10 +72,13 @@ Returns `Client` object representing the client instance.
 
 ### mqlight.Client.send(`topic`, `message` [, `options` [, `callback`]])
 
-Sends the given MQ Light message object to its address.
+Sends the given MQ Light message object to its address. String and Buffer
+messages will be sent and received as-is. Any other Object will be converted to
+JSON before sending and automatically parsed back into the same Object type
+when received.
 
 * `topic` - (String) the topic to which the message will be sent.
-* `message` - (String | Object) the message body to be sent
+* `message` - (String | Buffer | Object) the message body to be sent
 * `options` - (Object) (optional) map of additional options for the send.
 * `callback` - (Function) (optional) callback to be notified of errors &
   completion
