@@ -128,16 +128,10 @@ Client.prototype.send = function(topic, message, options, cb) {
       var protonMsg = new proton.ProtonMessage();
       protonMsg.address = this.brokerUrl;
       if (topic) protonMsg.address += '/' + topic;
-      if (typeof message === 'string') {
+      if (typeof message === 'string' || message instanceof Buffer) {
         protonMsg.body = message;
-      } else if (typeof message === 'object') {
-        if (message instanceof Buffer) {
-          protonMsg.body = message;
-        } else {
-          protonMsg.body = JSON.stringify(message);
-        }
       } else {
-        throw new Error("TypeError: unsupported message type " + typeof message);
+        protonMsg.body = JSON.stringify(message);
       }
       messenger.put(protonMsg);
 
@@ -235,9 +229,7 @@ Client.prototype.createDestination = function(pattern, options, cb) {
             // if body is a JSON'ified object, parse it back to a js obj
             try {
                 var obj = JSON.parse(message.body);
-                if (typeof obj === 'object') {
-                    message.body = obj;
-                }
+                message.body = obj;
             } catch(_) {}
             
             emitter.emit('message', message);
