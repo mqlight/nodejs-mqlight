@@ -128,10 +128,15 @@ Client.prototype.send = function(topic, message, options, cb) {
       var protonMsg = new proton.ProtonMessage();
       protonMsg.address = this.brokerUrl;
       if (topic) protonMsg.address += '/' + topic;
-      if (typeof message === 'string' || message instanceof Buffer) {
+      if (typeof message === 'string') {
         protonMsg.body = message;
+        protonMsg.contentType = 'text/plain';
+      } else if (message instanceof Buffer) {
+        protonMsg.body = message;
+        protonMsg.contentType = 'application/octet-stream';
       } else {
         protonMsg.body = JSON.stringify(message);
+        protonMsg.contentType = 'application/json';
       }
       messenger.put(protonMsg);
 
@@ -223,15 +228,15 @@ Client.prototype.createDestination = function(pattern, options, cb) {
         var messages = messenger.receive(50);
         if (messages.length > 0) {
           for (var i=0, tot=messages.length; i < tot; i++) {
-            var protonMsg = messages[i];
-            var message = { address: protonMsg.address, body: protonMsg.body };
+            var message = messages[i];
 
-            // if body is a JSON'ified object, parse it back to a js obj
-            try {
+            // if body is a JSON'ified object, try to parse it back to a js obj
+            if (message.contentType === 'application/json') {
+              try {
                 var obj = JSON.parse(message.body);
                 message.body = obj;
-            } catch(_) {}
-            
+              } catch(_) {}
+            }
             emitter.emit('message', message);
           }
         }

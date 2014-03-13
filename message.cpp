@@ -57,10 +57,12 @@ void ProtonMessage::Init(Handle<Object> target)
   Local<String> name = String::NewSymbol("ProtonMessage");
   tpp->SetClassName(name);
 
-  tpp->InstanceTemplate()->SetAccessor(String::New("address"),
-      GetAddress, SetAddress);
   tpp->InstanceTemplate()->SetAccessor(String::New("body"),
       GetBody, PutBody);
+  tpp->InstanceTemplate()->SetAccessor(String::New("contentType"),
+      GetContentType, SetContentType);
+  tpp->InstanceTemplate()->SetAccessor(String::New("address"),
+      GetAddress, SetAddress);
 
   constructor = Persistent<Function>::New(tpp->GetFunction());
   target->Set(name, tpp->GetFunction());
@@ -195,4 +197,29 @@ void ProtonMessage::PutBody(Local<String> property,
     pn_message_set_format(msg->message, PN_DATA);
     pn_message_load_data(msg->message, msgdata, msglen);
   }
+}
+
+Handle<Value> ProtonMessage::GetContentType(Local<String> property,
+                                            const AccessorInfo &info)
+{
+  HandleScope scope;
+
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char *type = pn_message_get_content_type(msg->message);
+
+  return scope.Close(type ? String::New(type) : Null());
+}
+
+void ProtonMessage::SetContentType(Local<String> property,
+                                   Local<Value> value,
+                                   const AccessorInfo &info)
+{
+  HandleScope scope;
+
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+
+  String::Utf8Value param(value->ToString());
+  std::string type = std::string(*param);
+
+  pn_message_set_content_type(msg->message, type.c_str());
 }

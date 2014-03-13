@@ -61,6 +61,11 @@ protected:
     static void PutBody(v8::Local<v8::String> property,
                         v8::Local<v8::Value> value,
                         const v8::AccessorInfo &args);
+    static v8::Handle<v8::Value> GetContentType(v8::Local<v8::String> property,
+                                                const v8::AccessorInfo &args);
+    static void SetContentType(v8::Local<v8::String> property,
+                               v8::Local<v8::Value> value,
+                               const v8::AccessorInfo &args);
 };
 
 #endif /* MESSAGE_HPP */
