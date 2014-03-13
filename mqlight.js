@@ -228,14 +228,18 @@ Client.prototype.createDestination = function(pattern, options, cb) {
         var messages = messenger.receive(50);
         if (messages.length > 0) {
           for (var i=0, tot=messages.length; i < tot; i++) {
-            var message = messages[i];
+            var protonMsg = messages[i];
+            var message = { address: protonMsg.address,
+                            contentType: protonMsg.contentType,
+                            body: protonMsg.body
+                          };
 
             // if body is a JSON'ified object, try to parse it back to a js obj
             if (message.contentType === 'application/json') {
               try {
                 var obj = JSON.parse(message.body);
                 message.body = obj;
-              } catch(_) {}
+              } catch(_) {console.log(_);}
             }
             emitter.emit('message', message);
           }
