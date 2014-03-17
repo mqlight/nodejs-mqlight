@@ -130,7 +130,11 @@ Client.prototype.send = function(topic, message, options, cb) {
   var messenger = this.messenger;
   var callback = (typeof options === 'function') ? options : cb;
   try {
-    if (message) {
+    if (!message) {
+      throw new Error('Cannot send undefined');
+    } else if (message instanceof Function) {
+      throw new Error('Cannot send a function');
+    } else {
       var protonMsg = new proton.ProtonMessage();
       protonMsg.address = this.brokerUrl;
       if (topic) protonMsg.address += '/' + topic;
