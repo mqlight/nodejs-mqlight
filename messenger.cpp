@@ -106,16 +106,45 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
   }
 
   std::string name;
+  std::string username;
+  std::string password;
   if (args.Length() < 1) {
     name = "";
   } else {
     // parse the 'name' parameter out of the args
     String::Utf8Value param(args[0]->ToString());
     name = std::string(*param);
+
+    //look for the username and password parameters
+    if ( !args[1]->IsUndefined()){
+      String::Utf8Value userparam(args[1]->ToString());
+      username = std::string(*userparam);
+
+      if ( !args[2]->IsUndefined() ){
+        String::Utf8Value passwordparam(args[2]->ToString());
+        password = std::string(*passwordparam);
+      }
+    }
   }
 
   // create a new instance of this type and wrap it in 'this' v8 Object
   ProtonMessenger *obj = new ProtonMessenger(name);
+
+  //if we have a username make sure we set a route to force auth
+  std::string authPattern;
+  if ( username.length() > 0){
+    if ( password.length() > 0 ){
+      authPattern = "amqp://" + username + ":" + password + "@$1";
+    } else {
+      authPattern = "amqp://" + username + "@$1";
+    }
+    //set the route so any address starting with amqp:// gets the supplied user and password added
+    int errno = pn_messenger_route(obj->messenger, "amqp://*", authPattern.c_str());
+    if (errno){
+        THROW_EXCEPTION("Failed to set messenger route");
+    }
+  }
+
   obj->Wrap(args.This());
 
   return args.This();

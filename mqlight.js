@@ -56,7 +56,7 @@ exports.QOS_EXACTLY_ONCE = 2;
  */
 exports.createClient = function(options) {
   var opt = (typeof options == 'object') ? options : {};
-  var client = new Client(opt.host, opt.port, opt.clientId);
+  var client = new Client(opt.host, opt.port, opt.clientId, opt.userName, opt.password);
   // FIXME: make this actually check driver/engine connection state
   process.nextTick(function() {
     client.emit('connected', true);
@@ -79,11 +79,12 @@ exports.createClient = function(options) {
  * @param {string} [clientId] - (optional) unique identifier for this client.
  * @constructor
  */
-var Client = function(host, port, clientId) {
+var Client = function(host, port, clientId, userName, password) {
   EventEmitter.call(this);
   if (!host) host = "localhost";
   if (!port) port = 5672;
   if (!clientId) clientId = "AUTO_" + uuid.v4().substring(0, 7);
+  if (!password) password = "";
   if (clientId.length > 48) {
     var msg = "Client identifier '" + clientId + "' is longer than the " +
         "maximum ID length of 48.";
@@ -98,9 +99,14 @@ var Client = function(host, port, clientId) {
       throw new Error(err);
     }
   }
+
   this.brokerUrl = "amqp://" + host + ':' + port;
   this.clientId = clientId;
-  this.messenger = new proton.ProtonMessenger(clientId);
+  if (userName){
+    this.messenger = new proton.ProtonMessenger(clientId, userName, password);
+  } else {
+    this.messenger = new proton.ProtonMessenger(clientId);
+  }
   this.messenger.start();
 };
 util.inherits(Client, EventEmitter);
