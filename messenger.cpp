@@ -133,13 +133,14 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
   //if we have a username make sure we set a route to force auth
   std::string authPattern;
   if ( username.length() > 0){
+    int errno;
     if ( password.length() > 0 ){
       authPattern = "amqp://" + username + ":" + password + "@$1";
     } else {
       authPattern = "amqp://" + username + "@$1";
     }
     //set the route so any address starting with amqp:// gets the supplied user and password added
-    int errno = pn_messenger_route(obj->messenger, "amqp://*", authPattern.c_str());
+    errno = pn_messenger_route(obj->messenger, "amqp://*", authPattern.c_str());
     if (errno){
         THROW_EXCEPTION("Failed to set messenger route");
     }
@@ -272,7 +273,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
   {
     THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)))
   }
-  
+
   std::vector< Local<Object> > vector;
   while (pn_messenger_incoming(obj->messenger))
   {
