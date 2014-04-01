@@ -67,49 +67,56 @@ if (parsed.address) {
   }
 }
 
+var service = "amqp://" + hostname + ":" + port;
+
 // create client to connect to broker with
-var opts = { host: hostname, port: port, clientId: "send.js"};
+var opts = { service: service, id: "send.js"};
 var client = mqlight.createClient(opts);
 
 // get message body data to send
 var remain = parsed.argv.remain;
-var data = (remain.length > 0) ? remain : ["Hello World!"];
+var data = (remain.length > 0) ? remain : [ "Hello World!" ];
 
 // insert a delay between sends if requested
 var delay = parsed.delay * 1000 || 0;
 
-// once connection is acquired, send messages
-client.on('connected', function() {
-  console.log("Connected to " + hostname + ":" + port + " using client-id " +
-    client.clientId);
-
-  // queue all messages for sending
-  var i = 0;
-  var sendNextMessage = function() {
-    var body = data[i];
-    client.send(topic, body, function(err, msg) {
-      if (err) {
-        console.error('Problem with send request: ' + err.message);
-        process.exit(0);
-      }
-      if (msg) {
-        console.log("# sent message:");
-        console.log(msg);
-      }
-    });
-    // if there are more messages pending, send the next in <delay> seconds time
-    if (data.length > ++i) {
-      if (delay > 0) {
-        setTimeout(sendNextMessage, delay);
-      } else {
-        setImmediate(sendNextMessage);
-      }
-    } else {
-      // wait a short time before exiting
-      setTimeout(process.exit, 1500, 0);
-    }
-  };
-
-  sendNextMessage();
+// Make the connection
+client.connect(function(err) {
+	if (err) {
+		console.log(err);
+	}
 });
 
+// once connection is acquired, send messages
+client.on('connected', function() {
+	console.log("Connected to service:" + service + " using client-id " + client.getId());
+
+	// queue all messages for sending
+	var i = 0;
+	var sendNextMessage = function() {
+		var body = data[i];
+		client.send(topic, body, function(err, msg) {
+			if (err) {
+				console.error('Problem with send request: ' + err.message);
+				process.exit(0);
+			}
+			if (msg) {
+				console.log("# sent message:");
+				console.log(msg);
+			}
+		});
+		// if there are more messages pending, send the next in <delay> seconds time
+		if (data.length > ++i) {
+			if (delay > 0) {
+				setTimeout(sendNextMessage, delay);
+			} else {
+				setImmediate(sendNextMessage);
+			}
+		} else {
+			// wait a short time before exiting
+			setTimeout(process.exit, 1500, 0);
+		}
+	};
+
+	sendNextMessage();
+});
