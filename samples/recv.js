@@ -21,13 +21,15 @@ var mqlight = require('mqlight');
 
 try {
   var nopt = require('nopt');
-} catch(_) {
+} catch (_) {
   var nopt = require(require.resolve('npm') + '/../../node_modules/nopt');
 }
 
 // parse the commandline arguments
 var types = {};
-var shorthands = { h: ["--help"] };
+var shorthands = {
+  h : [ "--help" ]
+};
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
 
@@ -58,7 +60,7 @@ if (remain[0]) {
     hostname = addr.replace("amqp://", '');
   }
   if (hostname.indexOf('/') > -1) {
-    topic = hostname.substring(hostname.indexOf('/')+1);
+    topic = hostname.substring(hostname.indexOf('/') + 1);
     hostname = hostname.substring(0, hostname.indexOf('/'));
   } else {
     topic = addr;
@@ -73,36 +75,39 @@ if (remain[0]) {
 var service = "amqp://" + hostname + ":" + port;
 
 // connect client to broker
-var opts = { service: service, id: "recv.js"};
+var opts = {
+  service : service,
+  id : "recv.js"
+};
 var client = mqlight.createClient(opts);
 console.log("Calling connect for client service: " + client.getId() + " current state is: " + client.getState());
 
 // Make the connection
 client.connect(function(err) {
-	if (err) {
-		console.log(err);
-	}
+  if (err) {
+    console.log(err);
+  }
 });
 
 // once connection is acquired, receive messages from the required topic
 client.on('connected', function() {
-	console.log("Connected to " + client.getService() + " using client-id " + client.getId());
-	
-	// now subscribe to topic for publications
-	var destination = client.subscribe(topic, function(err, address) {
-		if (err) {
-			console.error('Problem with subscribe request: ' + err.message);
-			process.exit(0);
-		}
-		if (address) {
-			console.log("Subscribed to " + address);
-		}
-	});
-	
-	// listen to new message events and process them
-	var i = 0;
-	destination.on('message', function(msg) {
-		console.log('# received message (' + (++i) + ')');
-		console.log(msg);
-	});
+  console.log("Connected to " + client.getService() + " using client-id " + client.getId());
+
+  // now subscribe to topic for publications
+  var destination = client.subscribe(topic, function(err, address) {
+    if (err) {
+      console.error('Problem with subscribe request: ' + err.message);
+      process.exit(0);
+    }
+    if (address) {
+      console.log("Subscribed to " + address);
+    }
+  });
+
+  // listen to new message events and process them
+  var i = 0;
+  destination.on('message', function(msg) {
+    console.log('# received message (' + (++i) + ')');
+    console.log(msg);
+  });
 });
