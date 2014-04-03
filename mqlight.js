@@ -517,7 +517,7 @@ Client.prototype.send = function(topic, data, options, callback) {
           messenger.send();
           if (sendCallback) {
             process.nextTick(function() {
-              callback(undefined, protonMsg);
+              sendCallback(undefined, protonMsg);
             });
           }
           return;
