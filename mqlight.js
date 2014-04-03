@@ -92,6 +92,12 @@ exports.createClient = function(options) {
  *           if an unsupported or invalid URL specified.
  */
 generateServiceList = function(service) {
+  
+  // Validate the parameter list length
+  if (arguments.length > 1) {
+    throw new Error('Too many arguments');    
+  }
+  
   // Ensure the service is an Array
   var inputServiceList = new Array();
   if (!service) {
@@ -251,6 +257,11 @@ util.inherits(Client, EventEmitter);
  */
 Client.prototype.connect = function(callback) {
 
+  // Validate the parameter list length
+  if (arguments.length > 1) {
+    throw new Error('Too many arguments');    
+  }
+  
   // Performs the connect
   var performConnect = function(client, callback) {
     if (client.user) {
@@ -334,6 +345,11 @@ Client.prototype.connect = function(callback) {
  */
 Client.prototype.disconnect = function(callback) {
 
+  // Validate the parameter list length
+  if (arguments.length > 1) {
+    throw new Error('Too many arguments');    
+  }
+  
   // Performs the disconnect
   var performDisconnect = function(client, callback) {
     client.messenger.stop();
@@ -431,6 +447,11 @@ Client.prototype.getState = function() {
  */
 Client.prototype.send = function(topic, data, options, callback) {
 
+  // Validate the parameter list length
+  if (arguments.length > 4) {
+    throw new Error('Too many arguments');    
+  }
+  
   // Validate the passed parameters
   if (topic === undefined) {
     throw new Error('Cannot send to undefined topic');
@@ -438,21 +459,37 @@ Client.prototype.send = function(topic, data, options, callback) {
     throw new TypeError('topic must be a string type');
   }
   if (data === undefined) {
-    throw new Error('Cannot send undefined');
+    throw new Error('Cannot send undefined data');
   } else if (data instanceof Function) {
     throw new TypeError('Cannot send a function');
   }
-  if ( options && !(options instanceof Object)) {
-    if (!callback && !(options instanceof Function)) {
-      throw new TypeError('options must be an object type');  
+   
+  // Validate the remaining optional parameters, assigning local variables to the appropriate parameter
+  var optionsOption = undefined;
+  var callbackOption = undefined;
+  if (options) {
+    if (options instanceof Function) {
+      callbackOption = options;
+    } else {
+      if (options instanceof Object) {
+        optionsOption = options;
+      } else {
+        throw new TypeError('options must be an object type');
+      }
     }
-  }
-  if (callback && !(callback instanceof Function)) {
-    throw new TypeError("callback must be a function");
+    if (callback) {
+      if (callbackOption) {
+        throw new TypeError('Invalid forth argument, callback already matched for third argument');
+      }
+      if (callback instanceof Function) {
+        callbackOption = callback;
+      } else {
+        throw new TypeError('callback must be a function type');
+      }
+    }
   }
   
   // Send the data as a message to the specified topic
-  var sendCallback = (options instanceof Function) ? options : callback;
   var messenger = this.messenger;
   var protonMsg = undefined;
   try {
@@ -474,32 +511,32 @@ Client.prototype.send = function(topic, data, options, callback) {
       }
 
       // setup a timer to trigger the callback once the msg has been sent, or immediately if no message to be sent
-      var untilSendComplete = function(protonMsg, sendCallback) {
+      var untilSendComplete = function(protonMsg, callback) {
         messenger.send();
         if (messenger.hasSent(protonMsg)) {
           messenger.send();
-          if (sendCallback) {
+          if (callback) {
             process.nextTick(function() {
-              sendCallback(undefined, protonMsg);
+              callback(undefined, protonMsg);
             });
           }
           return;
         }
         // if msg not yet sent and still running, check again in a second or so
         if (!messenger.stopped) {
-          setImmediate(untilSendComplete, protonMsg, sendCallback);
+          setImmediate(untilSendComplete, protonMsg, callbackOption);
         }
       };
       // if a callback is set, start the timer to trigger it
-      if (sendCallback) {
-        setImmediate(untilSendComplete, protonMsg, sendCallback);
+      if (callbackOption) {
+        setImmediate(untilSendComplete, protonMsg, callbackOption);
       }
   } catch (e) {
     var client = this;
     var err = new Error(e.message);
     process.nextTick(function() {
-      if (sendCallback) {
-        sendCallback(err, protonMsg);
+      if (callbackOption) {
+        callbackOption(err, protonMsg);
       }
       if (err) client.emit('error', err);
     });
@@ -547,31 +584,69 @@ Client.prototype.send = function(topic, data, options, callback) {
  */
 Client.prototype.subscribe = function(pattern, share, options, callback) {
   
-  // Validate the passed parameters
+  // Validate the parameter list length
+  if (arguments.length > 4) {
+    throw new Error('Too many arguments');    
+  }
+  
+  // Validate the pattern parameter
   if (pattern === undefined) {
-    throw new Error('Cannot subscribe to undefined');
+    throw new Error('Cannot subscribe to undefined pattern');
   } else if (!(typeof pattern === 'string')) {
     throw new TypeError('pattern must be a string type');
   }
-  if (share && !(typeof share === 'string')) {
-    if (!options && !(share instanceof Object || share instanceof Function)) {
+  
+  // Validate the remaining optional parameters, assigning local variables to the appropriate parameter
+  var shareOption = undefined;
+  var optionsOption = undefined;
+  var callbackOption = undefined;
+  if (share) {
+    if (typeof share === 'string') {
+      shareOption = "share:" + share + ":";
+    } else if (share instanceof Function) {
+      shareOption = "private:";
+      callbackOption = share;
+    } else if (share instanceof Object) {
+      shareOption = "private:";
+      optionsOption = share;
+    } else {
       throw new TypeError('share must be a string type');
     }
-  }
-  if ( options && !(options instanceof Object)) {
-    if (!callback && !(options instanceof Function)) {
-      throw new TypeError('options must be an object type');  
+    if (options) {
+      if (callbackOption) {
+        throw new TypeError('Invalid third argument, callback already matched for second argument');
+      }
+      if (options instanceof Function) {
+        callbackOption = options;
+      } else {
+        if (optionsOption) {
+          throw new TypeError('Invalid third argument, options already matched for second argument');
+        }
+        if (options instanceof Object) {
+          optionsOption = options;
+        } else {
+          throw new TypeError('options must be an object type');
+        }
+      }
+      if (callback) {
+        if (callbackOption) {
+          throw new TypeError('Invalid forth argument, callback already matched for third argument');
+        }
+        if (callback instanceof Function) {
+          callbackOption = callback;
+        } else {
+          throw new TypeError('callback must be a function type');
+        }
+      }
     }
-  }    
-  if (callback && !(callback instanceof Function)) {
-    throw new TypeError("callback must be a function");
+  } else {
+    shareOption = "private:";
   }
   
   // Subscribe using the specified pattern and share options
   var messenger = this.messenger;
-  var address = this.getService() + '/private:' + pattern;
+  var address = this.getService() + '/' + shareOption + pattern;
   var emitter = new EventEmitter();
-  var subscribeCallback = (typeof share === 'function') ? share : (typeof options === 'function') ? options : callback;
 
   var err = undefined;
   try {
@@ -581,8 +656,8 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   }
 
   setImmediate(function() {
-    if (subscribeCallback) {
-      subscribeCallback(err, address);
+    if (callbackOption) {
+      callbackOption(err, address);
     }
     if (err) emitter.emit('error', err);
   });
