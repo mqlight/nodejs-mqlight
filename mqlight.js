@@ -511,11 +511,11 @@ Client.prototype.send = function(topic, data, options, callback) {
       }
 
       // setup a timer to trigger the callback once the msg has been sent, or immediately if no message to be sent
-      var untilSendComplete = function(protonMsg, callback) {
+      var untilSendComplete = function(protonMsg, sendCallback) {
         messenger.send();
         if (messenger.hasSent(protonMsg)) {
           messenger.send();
-          if (callback) {
+          if (sendCallback) {
             process.nextTick(function() {
               callback(undefined, protonMsg);
             });
