@@ -53,10 +53,9 @@ exports.QOS_EXACTLY_ONCE = 2;
  * until either a connection is successfully established to one of the URLs, or all of the URLs have been tried. When an instance of Function is specified for this argument, then
  * function is invoked each time the client wants to establish a connection (e.g. for any of the state transitions, on the state diagram shown earlier on this page, which lead to
  * the 'connected' state). The function must return either an instance of String or Array, which are treated in the manner described previously.</li>
- * <li>id - Optional; an identifier that is used to identify this client. To different instances of Client can have the same id, however only one instance can be subscribed to any
- * particular topic at a given moment in time. If two instances of Client have the same id and both try to subscribe to the same topic pattern (or topic pattern and share name)
- * then the first instance to establish its subscription be unsubscribed from the topic, in favour of the second instance. If this property is not specified then the client will
- * generate a probabalistically unique ID.</li>
+ * <li>id - Optional; an identifier that is used to identify this client. Two different instances of Client can have the same id, however only one instance can be connected
+ * to the MQ Light service at a given moment in time. If two instances of Client have the same id and both try to connect then the first instance to establish its connection 
+ * is diconnected in favour of the second instance. If this property is not specified then the client will generate a probabalistically unique ID.</li>
  * <li>user - Optional; the user name to use for authentication to the MQ Light service.</li>
  * <li>password - Optional; the password to use for authentication.</li>
  * </ul>
@@ -261,9 +260,10 @@ Client.prototype.connect = function(callback) {
   if (arguments.length > 1) {
     throw new Error('Too many arguments');
   }
-
+  
   // Performs the connect
   var performConnect = function(client, callback) {
+    client.state = "connecting";
     if (client.user) {
       var password = !client.password ? "" : client.password;
       client.messenger = new proton.ProtonMessenger(client.id, client.user, password);
@@ -282,11 +282,14 @@ Client.prototype.connect = function(callback) {
         serviceList = client.serviceList;
       }
     } catch (e) {
+      //if there is an error getting the service list disconnect
+      client.disconnect();
       var err = new Error(e.message);
       process.nextTick(function() {
         if (callback) {
           callback(err);
         }
+        client.emit('error', err);
       });
       return;
     }
@@ -314,9 +317,34 @@ Client.prototype.connect = function(callback) {
   }
 
   var client = this;
-  process.nextTick(function() {
-    performConnect(client, callback);
-  });
+
+  var stillDisconnecting = function(client, callback){
+    if ( client.getState() === "disconnecting" ){
+      process.nextTick(function() {
+        stillDisconnecting(client, callback);
+      });
+    } else {
+      process.nextTick(function() {
+        performConnect(client, callback);
+      });
+    }
+  };
+
+  var currentState = client.getState();
+  // if we are not disconnected or disconnecting return with the client object
+  if ( currentState !== "disconnected" ){ 
+    if ( currentState === "disconnecting" ){
+      process.nextTick(function() {
+        stillDisconnecting(client, callback);
+      });
+    } else {
+      return this;
+    }
+  } else {
+    process.nextTick(function() {
+      performConnect(client, callback);
+    });
+  }
 
   return client;
 };
@@ -345,6 +373,7 @@ Client.prototype.connect = function(callback) {
  */
 Client.prototype.disconnect = function(callback) {
 
+  var client = this;
   // Validate the parameter list length
   if (arguments.length > 1) {
     throw new Error('Too many arguments');
@@ -352,6 +381,7 @@ Client.prototype.disconnect = function(callback) {
 
   // Performs the disconnect
   var performDisconnect = function(client, callback) {
+    client.state = 'disconnecting';
     if (client.messenger) {
       client.messenger.stop();
       delete client.messenger;
@@ -375,7 +405,11 @@ Client.prototype.disconnect = function(callback) {
     throw new TypeError("callback must be a function");
   }
 
-  var client = this;
+  //just return if already disconnected or in the process of disconnecting
+  if ( client.getState() === "disconnected" || client.getState() === "disconnecting" ){
+    return client;
+  }
+
   process.nextTick(function() {
     performDisconnect(client, callback);
   });
@@ -414,10 +448,10 @@ Client.prototype.getState = function() {
 };
 
 /**
- * @returns {Boolean} <code>true</code> if a connection has been made (i.e. state is connected or retrying), <code>false</code> otherwise.
+ * @returns {Boolean} <code>true</code> if a connection has been made (i.e. state is connected), <code>false</code> otherwise.
  */
 Client.prototype.hasConnected = function() {
-  return this.state === 'connected' || this.state === 'retrying';
+  return this.state === 'connected';
 };
 
 /**
@@ -436,16 +470,7 @@ Client.prototype.hasConnected = function() {
  *          immutable as they pass through the MQ Light service. E.g. if the sender sends a String, the receiver receives a String. undefined and Function objects will be rejected
  *          with an error.
  * @param {Object}
- *          options (Optional) Used to specify options that affect how the MQ Light service processes the message. The options argument accepts an object with the following
- *          properties:
- *          <ul>
- *          <li>deliveryDelay - Optional; TODO: describe</li>
- *          <li>ttl - Optional; TODO: describe</li>
- *          <li>deliverToSomeone - Optional; TODO: describe + think of a better name for this!</li>
- *          <li>properties - If present, this is used to specify properties that are carried alongside the data being sent. The properties argument accepts an object with
- *          properties of types: String, Number, Boolean and Null. Other types will be ignored.</li>
- *          <li>qos - Optional: the quality of service to use when sending the message. 0 is used to denote at most once (the default) and 1 is used for at least once.</li>
- *          </ul>
+ *          options (Optional) Used to specify options that affect how the MQ Light service processes the message. 
  * @param {sendCallback}
  *          callback - (Optional) callback to be notified of errors and completion. The callback function accepts a single Error argument which is used to indicate whether the
  *          message was successfully delivered to the MQ Light service. The callback may be omitted if a qos of 0 (at most once) is used - however it must be present if a qos of 1
@@ -545,6 +570,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   } catch (e) {
     var client = this;
     var err = new Error(e.message);
+    client.disconnect();
     process.nextTick(function() {
       if (callbackOption) {
         callbackOption(err, protonMsg);
@@ -571,23 +597,11 @@ Client.prototype.send = function(topic, data, options, callback) {
  *          share. (Optional) Specifies whether to create or join a shared subscription for which messages are anycast amongst the present subscribers. If this argument is omitted
  *          then the subscription will be unshared (e.g. private to the client).
  * @param {Object}
- *          [options] (optional) The options argument accepts an object with the following properties:
- *          <ul>
- *          <li>qos - The quality of service to use of delivering messages to the subscription. Valid values are: 0 (default) and 1. When a qos of 0 is specified then network or
- *          infrastructure failures may result in messages published to a topic that matches this subscription's pattern not being emitted as message events. There is, however, no
- *          situation where a qos of 0 can result in duplicate messages being delivered. When a qos of 1 is specified then network or infrastructure failures may result in
- *          messages, published to a topic that matches this subscription's pattern generating duplicate message events. As the name suggest; with at-least-once quality of service:
- *          at least one copy of the message will always be delivered. Messages received using the 1 qos must be acknowledged using the message context's accept method before the
- *          MQ Light service considers the message successfully delivered.</li>
- *          <li>ttl - The subscription's time-to-live in milliseconds - the default being 0. MQ Light will automatically destroy a subscription that has no active subscriber for a
- *          period of time exceeding ttl. When MQ Light destroys a subscription it will discard any messages held, at the subscription, pending delivery. A subscriber is considered
- *          no longer active if the client's unsubscribe method is used to unsubscribe it, the client's disconnect function is called, or the client loses connectivity to the MQ
- *          Light service.</li>
- *          <li>in-flight-messages - TODO: this is a terrible name. Basically this is the link credit that we'll use. Default of 1?</li>
+ *          [options] (optional) The options argument accepts an object with properties to set.
  * @param {destCallback}
  *          callback - (optional) Invoked when the subscription request has been processed. A single Error parameter is passed to this function to indicate whether the subscription
  *          request was successful, and if not: why not.
- * @returns {@link Destination} which will emit 'message' events on arrival.
+ * @returns {@link Client} the instance of the client this was called on which will emit 'message' events on arrival.
  * @throws {TypeError}
  *           If one of the specified parameters is of the wrong type.
  * @throws {Error}
@@ -660,7 +674,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   // Subscribe using the specified pattern and share options
   var messenger = this.messenger;
   var address = this.getService() + '/' + shareOption + pattern;
-  var emitter = new EventEmitter();
+  var client = this;
 
   var err = undefined;
   try {
@@ -673,7 +687,10 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
     if (callbackOption) {
       callbackOption(err, address);
     }
-    if (err) emitter.emit('error', err);
+    if (err){
+      client.emit('error', err);
+      client.disconnect();
+    }
   });
 
   if (!err) {
@@ -697,7 +714,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
               console.log(_);
             }
           }
-          emitter.emit('message', message);
+          client.emit('message', message);
         }
       }
       if (!messenger.stopped) {
@@ -711,7 +728,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
     });
   }
 
-  return emitter;
+  return client;
 };
 
 /* ------------------------------------------------------------------------- */
