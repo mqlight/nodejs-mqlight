@@ -90,7 +90,7 @@ exports.createClient = function(options) {
  * @throws Error
  *           if an unsupported or invalid URL specified.
  */
-generateServiceList = function(service) {
+var generateServiceList = function(service) {
 
   // Validate the parameter list length
   if (arguments.length > 1) {
@@ -98,13 +98,13 @@ generateServiceList = function(service) {
   }
 
   // Ensure the service is an Array
-  var inputServiceList = new Array();
+  var inputServiceList = [];
   if (!service) {
     throw new Error("service is undefined");
   } else if (service instanceof Function) {
     throw new TypeError("service cannot be a function");
   } else if (service instanceof Array) {
-    if (service.length == 0) {
+    if (service.length === 0) {
       throw new Error("service array is empty");
     }
     inputServiceList = service;
@@ -116,21 +116,23 @@ generateServiceList = function(service) {
 
   // Validate the list of URLs for the service, inserting default values as necessary
   // Expected format for each URL is: amqp://host:port or amqps://host:port (port is optional, defaulting to 5672)
-  var serviceList = new Array();
+  var serviceList = [];
   for ( var i = 0; i < inputServiceList.length; i++) {
     // Validate that a protocol has been specified, and is supported
     var protocolCheck = inputServiceList[i].split("://");
+    var msg;
     if (protocolCheck.length == 1) {
-      var msg = "Invalid URL '" + inputServiceList[i] + "' specified for service. Service URLs must start with amqp:// or amqps://";
+      msg = "Invalid URL '" + inputServiceList[i] + "' specified for service. Service URLs must start with amqp:// or amqps://";
       throw new Error(msg);
     } else if (protocolCheck[0] != "amqp" && protocolCheck[0] != "amqps") {
-      var msg = "Unsupported URL '" + inputServiceList[i] + "' specified for service. Only the amqp or amqps protocol are supported.";
+      msg = "Unsupported URL '" + inputServiceList[i] + "' specified for service. Only the amqp or amqps protocol are supported.";
       throw new Error(msg);
     }
 
     var protocol = protocolCheck[0];
     var hostport = inputServiceList[i].substring(protocol.length + 3);
     var index = hostport.indexOf(":");
+    var host, port;
     if (index == -1) {
       host = hostport;
       port = "5672";
@@ -174,8 +176,7 @@ var Client = function(service, id, user, password) {
   EventEmitter.call(this);
 
   // Ensure the service is an Array or Function
-  var serviceList = undefined;
-  var serviceFunction = undefined;
+  var serviceList, serviceFunction;
   if (service instanceof Function) {
     serviceFunction = service;
   } else {
@@ -192,7 +193,7 @@ var Client = function(service, id, user, password) {
   }
 
   // If client id is not a string then throw an error
-  if (!(typeof id === 'string')) {
+  if (typeof id !== 'string') {
     throw new TypeError("Client identifier must be a string type");
   }
 
@@ -205,10 +206,10 @@ var Client = function(service, id, user, password) {
   }
 
   // Validate user and password parameters, when specified
-  if (user && !(typeof user === 'string')) {
+  if (user && typeof user !== 'string') {
     throw new TypeError("user must be a string type");
   }
-  if (password && !(typeof password === 'string')) {
+  if (password && typeof password !== 'string') {
     throw new TypeError("password must be a string type");
   }
 
@@ -273,7 +274,7 @@ Client.prototype.connect = function(callback) {
     client.messenger.start();
 
     // Obtain the list of services for connect
-    var serviceList = undefined;
+    var serviceList;
     try {
       if (client.serviceFunction) {
         var service = client.serviceFunction();
@@ -490,7 +491,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   // Validate the passed parameters
   if (topic === undefined) {
     throw new Error('Cannot send to undefined topic');
-  } else if (!(typeof topic === 'string')) {
+  } else if (typeof topic !== 'string') {
     throw new TypeError('topic must be a string type');
   }
   if (data === undefined) {
@@ -500,8 +501,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   // Validate the remaining optional parameters, assigning local variables to the appropriate parameter
-  var optionsOption = undefined;
-  var callbackOption = undefined;
+  var optionsOption, callbackOption;
   if (options) {
     if (options instanceof Function) {
       callbackOption = options;
@@ -529,7 +529,7 @@ Client.prototype.send = function(topic, data, options, callback) {
 
   // Send the data as a message to the specified topic
   var messenger = this.messenger;
-  var protonMsg = undefined;
+  var protonMsg;
   try {
     protonMsg = new proton.ProtonMessage();
     protonMsg.address = this.getService();
@@ -617,14 +617,12 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   // Validate the pattern parameter
   if (pattern === undefined) {
     throw new Error('Cannot subscribe to undefined pattern');
-  } else if (!(typeof pattern === 'string')) {
+  } else if (typeof pattern !== 'string') {
     throw new TypeError('pattern must be a string type');
   }
 
   // Validate the remaining optional parameters, assigning local variables to the appropriate parameter
-  var shareOption = undefined;
-  var optionsOption = undefined;
-  var callbackOption = undefined;
+  var shareOption, optionsOption, callbackOption;
   if (share) {
     if (typeof share === 'string') {
       shareOption = "share:" + share + ":";
@@ -676,7 +674,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   var address = this.getService() + '/' + shareOption + pattern;
   var client = this;
 
-  var err = undefined;
+  var err;
   try {
     messenger.subscribe(address);
   } catch (e) {
