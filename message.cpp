@@ -174,6 +174,8 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
     printf("Content: %s\n", buffer);
 #endif
 
+  free(buffer);
+
   return scope.Close(result);
 }
 
@@ -190,12 +192,14 @@ void ProtonMessage::PutBody(Local<String> property,
     std::string msgtext = std::string(*param);
     pn_message_set_format(msg->message, PN_TEXT);
     pn_message_load_text(msg->message, msgtext.c_str(), strlen(msgtext.c_str()));
+    V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgtext.c_str()));
   } else if (value->IsObject()) {
     Local<Object> buffer = value->ToObject();
     char *msgdata = Buffer::Data(buffer);
     size_t msglen = Buffer::Length(buffer);
     pn_message_set_format(msg->message, PN_DATA);
     pn_message_load_data(msg->message, msgdata, msglen);
+    V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgdata));
   }
 }
 
