@@ -319,7 +319,9 @@ Handle<Value> ProtonMessenger::HasSent(const Arguments& args)
   HandleScope scope;
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
+      || args[0]->IsUndefined())
+  {
     THROW_EXCEPTION("Missing required message argument.");
   }
 

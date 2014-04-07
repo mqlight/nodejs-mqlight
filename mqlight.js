@@ -60,7 +60,7 @@ exports.QOS_EXACTLY_ONCE = 2;
  * <li>user - Optional; the user name to use for authentication to the MQ Light service.</li>
  * <li>password - Optional; the password to use for authentication.</li>
  * </ul>
- * 
+ *
  * @param {Object}
  *          options - (optional) map of options for the client.
  * @returns {Object} The created Client object.
@@ -82,7 +82,7 @@ exports.createClient = function(options) {
 
 /**
  * Function to take a single service URL, or array of service URLs, validate them, returning an array of service URLs.
- * 
+ *
  * @param {String|Array}
  *          service - Required; when an instance of String this is a URL to connect to. When an instance of Array this is an array of URLs to connect to
  * @returns {Array} Valid service URLs, with port number added as appropriate.
@@ -92,12 +92,12 @@ exports.createClient = function(options) {
  *           if an unsupported or invalid URL specified.
  */
 generateServiceList = function(service) {
-  
+
   // Validate the parameter list length
   if (arguments.length > 1) {
-    throw new Error('Too many arguments');    
+    throw new Error('Too many arguments');
   }
-  
+
   // Ensure the service is an Array
   var inputServiceList = new Array();
   if (!service) {
@@ -148,7 +148,7 @@ generateServiceList = function(service) {
 
 /**
  * Represents an MQ Light client instance.
- * 
+ *
  * @param {String|Array|Function}
  *          service - Required; when an instance of String this is a URL to connect to. When an instance of Array this is an array of URLs to connect to - each will be tried in
  *          turn until either a connection is successfully established to one of the URLs, or all of the URLs have been tried. When an instance of Function is specified for this
@@ -196,7 +196,7 @@ var Client = function(service, id, user, password) {
   if (!(typeof id === 'string')) {
     throw new TypeError("Client identifier must be a string type");
   }
-  
+
   // currently client ids are restricted to a fixed char set, reject those not in it
   for ( var i in id) {
     if (validClientIdChars.indexOf(id[i]) == -1) {
@@ -212,7 +212,7 @@ var Client = function(service, id, user, password) {
   if (password && !(typeof password === 'string')) {
     throw new TypeError("password must be a string type");
   }
-  
+
   // Save the required data as client fields
   this.serviceFunction = serviceFunction;
   this.serviceList = serviceList;
@@ -248,7 +248,7 @@ util.inherits(Client, EventEmitter);
  * If this method is invoked while the client is in 'connecting', 'connected' or 'retrying' states then the method will complete without performing any work or changing the state
  * of the client. If this method is invoked while the client is in 'disconnecting' state then it's effect will be deferred until the client has transitioned into 'disconnected'
  * state.
- * 
+ *
  * @param {connectCallback}
  *          callback - (optional) callback to be notified of errors and completion.
  * @returns {Object} The instance of client that it is invoked on - allowing for chaining of other method calls on the client object.
@@ -259,9 +259,9 @@ Client.prototype.connect = function(callback) {
 
   // Validate the parameter list length
   if (arguments.length > 1) {
-    throw new Error('Too many arguments');    
+    throw new Error('Too many arguments');
   }
-  
+
   // Performs the connect
   var performConnect = function(client, callback) {
     if (client.user) {
@@ -312,7 +312,7 @@ Client.prototype.connect = function(callback) {
   if (callback && !(callback instanceof Function)) {
     throw new TypeError("callback must be a function");
   }
-  
+
   var client = this;
   process.nextTick(function() {
     performConnect(client, callback);
@@ -336,7 +336,7 @@ Client.prototype.connect = function(callback) {
  * <p>
  * Calling client.disconnect() when the client is in 'disconnecting' or 'disconnected' state has no effect. Calling client.disconnect() from any other state results in the client
  * disconnecting and the 'disconnected' event being generated.
- * 
+ *
  * @param {disconnectCallback}
  *          callback - (optional) callback to be notified of errors and completion.
  * @returns {Object} The instance of client that it is invoked on - allowing for chaining of other method calls on the client object.
@@ -347,9 +347,9 @@ Client.prototype.disconnect = function(callback) {
 
   // Validate the parameter list length
   if (arguments.length > 1) {
-    throw new Error('Too many arguments');    
+    throw new Error('Too many arguments');
   }
-  
+
   // Performs the disconnect
   var performDisconnect = function(client, callback) {
     if (client.messenger) {
@@ -374,7 +374,7 @@ Client.prototype.disconnect = function(callback) {
   if (callback && !(callback instanceof Function)) {
     throw new TypeError("callback must be a function");
   }
-  
+
   var client = this;
   process.nextTick(function() {
     performDisconnect(client, callback);
@@ -428,7 +428,7 @@ Client.prototype.hasConnected = function() {
 
 /**
  * Sends a message to the MQ Light service.
- * 
+ *
  * @param {String}
  *          topic - Identifies which subscriptions receive the message - based on the pattern argument supplied when the subscription is created.
  * @param {Object}
@@ -459,9 +459,9 @@ Client.prototype.send = function(topic, data, options, callback) {
 
   // Validate the parameter list length
   if (arguments.length > 4) {
-    throw new Error('Too many arguments');    
+    throw new Error('Too many arguments');
   }
-  
+
   // Validate the passed parameters
   if (topic === undefined) {
     throw new Error('Cannot send to undefined topic');
@@ -473,7 +473,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   } else if (data instanceof Function) {
     throw new TypeError('Cannot send a function');
   }
-   
+
   // Validate the remaining optional parameters, assigning local variables to the appropriate parameter
   var optionsOption = undefined;
   var callbackOption = undefined;
@@ -498,52 +498,50 @@ Client.prototype.send = function(topic, data, options, callback) {
       }
     }
   }
-  
+
   // Ensure we have attempted a connect
   if (!this.hasConnected()) throw new Error('not connected');
-  
+
   // Send the data as a message to the specified topic
   var messenger = this.messenger;
   var protonMsg = undefined;
   try {
-      if (data) {
-        protonMsg = new proton.ProtonMessage();
-        protonMsg.address = this.getService();
-        if (topic) protonMsg.address += '/' + topic;
-        if (typeof data === 'string') {
-          protonMsg.body = data;
-          protonMsg.contentType = 'text/plain';
-        } else if (data instanceof Buffer) {
-          protonMsg.body = data;
-          protonMsg.contentType = 'application/octet-stream';
-        } else {
-          protonMsg.body = JSON.stringify(data);
-          protonMsg.contentType = 'application/json';
-        }
-        messenger.put(protonMsg);
-      }
+    protonMsg = new proton.ProtonMessage();
+    protonMsg.address = this.getService();
+    if (topic) protonMsg.address += '/' + topic;
+    if (typeof data === 'string') {
+      protonMsg.body = data;
+      protonMsg.contentType = 'text/plain';
+    } else if (data instanceof Buffer) {
+      protonMsg.body = data;
+      protonMsg.contentType = 'application/octet-stream';
+    } else {
+      protonMsg.body = JSON.stringify(data);
+      protonMsg.contentType = 'application/json';
+    }
+    messenger.put(protonMsg);
 
-      // setup a timer to trigger the callback once the msg has been sent, or immediately if no message to be sent
-      var untilSendComplete = function(protonMsg, sendCallback) {
+    // setup a timer to trigger the callback once the msg has been sent, or immediately if no message to be sent
+    var untilSendComplete = function(protonMsg, sendCallback) {
+      messenger.send();
+      if (messenger.hasSent(protonMsg)) {
         messenger.send();
-        if (messenger.hasSent(protonMsg)) {
-          messenger.send();
-          if (sendCallback) {
-            process.nextTick(function() {
-              sendCallback(undefined, protonMsg);
-            });
-          }
-          return;
+        if (sendCallback) {
+          process.nextTick(function() {
+            sendCallback(undefined, protonMsg);
+          });
         }
-        // if msg not yet sent and still running, check again in a second or so
-        if (!messenger.stopped) {
-          setImmediate(untilSendComplete, protonMsg, callbackOption);
-        }
-      };
-      // if a callback is set, start the timer to trigger it
-      if (callbackOption) {
+        return;
+      }
+      // if msg not yet sent and still running, check again in a second or so
+      if (!messenger.stopped) {
         setImmediate(untilSendComplete, protonMsg, callbackOption);
       }
+    };
+    // if a callback is set, start the timer to trigger it
+    if (callbackOption) {
+      setImmediate(untilSendComplete, protonMsg, callbackOption);
+    }
   } catch (e) {
     var client = this;
     var err = new Error(e.message);
@@ -566,7 +564,7 @@ Client.prototype.send = function(topic, data, options, callback) {
 
 /**
  * Constructs a subscription object and starts the emission of message events each time a message arrives, at the MQ Light service, that matches pattern.
- * 
+ *
  * @param {String}
  *          pattern used to match against the <code>address</code> attribute of messages to determine if a copy of the message should be delivered to the <code>Destination</code>.
  * @param {String}
@@ -596,19 +594,19 @@ Client.prototype.send = function(topic, data, options, callback) {
  *           If the pattern parameter is undefined.
  */
 Client.prototype.subscribe = function(pattern, share, options, callback) {
-  
+
   // Validate the parameter list length
   if (arguments.length > 4) {
-    throw new Error('Too many arguments');    
+    throw new Error('Too many arguments');
   }
-  
+
   // Validate the pattern parameter
   if (pattern === undefined) {
     throw new Error('Cannot subscribe to undefined pattern');
   } else if (!(typeof pattern === 'string')) {
     throw new TypeError('pattern must be a string type');
   }
-  
+
   // Validate the remaining optional parameters, assigning local variables to the appropriate parameter
   var shareOption = undefined;
   var optionsOption = undefined;
@@ -655,10 +653,10 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   } else {
     shareOption = "private:";
   }
-  
+
   // Ensure we have attempted a connect
   if (!this.hasConnected()) throw new Error('not connected');
-  
+
   // Subscribe using the specified pattern and share options
   var messenger = this.messenger;
   var address = this.getService() + '/' + shareOption + pattern;
