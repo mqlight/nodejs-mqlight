@@ -264,6 +264,24 @@ Client.prototype.connect = function(callback) {
   
   // Performs the connect
   var performConnect = function(client, callback) {
+
+    var currentState = client.getState();
+    // if we are not disconnected or disconnecting return with the client object
+    if ( currentState !== "disconnected" ){ 
+      if ( currentState === "disconnecting" ){
+        process.nextTick(function() {
+          stillDisconnecting(client, callback);
+        });
+      } else {
+        process.nextTick(function() {
+          if (callback) {
+            callback(undefined);
+          }
+        });
+        return client;
+      }
+    }
+  
     client.state = "connecting";
     if (client.user) {
       var password = !client.password ? "" : client.password;
@@ -331,21 +349,9 @@ Client.prototype.connect = function(callback) {
     }
   };
 
-  var currentState = client.getState();
-  // if we are not disconnected or disconnecting return with the client object
-  if ( currentState !== "disconnected" ){ 
-    if ( currentState === "disconnecting" ){
-      process.nextTick(function() {
-        stillDisconnecting(client, callback);
-      });
-    } else {
-      return this;
-    }
-  } else {
-    process.nextTick(function() {
-      performConnect(client, callback);
-    });
-  }
+  process.nextTick(function() {
+    performConnect(client, callback);
+  });
 
   return client;
 };
@@ -408,6 +414,11 @@ Client.prototype.disconnect = function(callback) {
 
   //just return if already disconnected or in the process of disconnecting
   if ( client.getState() === "disconnected" || client.getState() === "disconnecting" ){
+    process.nextTick(function() {
+      if (callback) {
+        callback(undefined);
+      }
+    });
     return client;
   }
 
@@ -428,7 +439,7 @@ Client.prototype.getId = function() {
 };
 
 /**
- * @returns {String} The URL of the service to which the client is currently connected (when the client is in 'connected' or 'retrying' state) - otherwise (for all other client
+ * @returns {String} The URL of the service to which the client is currently connected (when the client is in 'connected') - otherwise (for all other client
  *          states) undefined is returned.
  */
 Client.prototype.getService = function() {
