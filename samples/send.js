@@ -119,18 +119,18 @@ client.on('connected', function() {
         console.log("# sent message:");
         console.log(msg);
       }
-    });
-    // if there are more messages pending, send the next in <delay> seconds time
-    if (data.length > ++i) {
-      if (delay > 0) {
-        setTimeout(sendNextMessage, delay);
+      // if there are more messages pending, send the next in <delay> seconds
+      if (data.length > ++i) {
+        if (delay > 0) {
+          setTimeout(sendNextMessage, delay);
+        } else {
+          setImmediate(sendNextMessage);
+        }
       } else {
-        setImmediate(sendNextMessage);
+        // wait a short time before exiting
+        setTimeout(process.exit, 1500, 0);
       }
-    } else {
-      // wait a short time before exiting
-      setTimeout(process.exit, 1500, 0);
-    }
+    });
   };
 
   sendNextMessage();
