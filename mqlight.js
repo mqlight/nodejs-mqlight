@@ -545,28 +545,24 @@ Client.prototype.send = function(topic, data, options, callback) {
       protonMsg.contentType = 'application/json';
     }
     messenger.put(protonMsg);
+    messenger.send();
 
     // setup a timer to trigger the callback once the msg has been sent, or immediately if no message to be sent
     var untilSendComplete = function(protonMsg, sendCallback) {
-      messenger.send();
       if (messenger.hasSent(protonMsg)) {
-        messenger.send();
         if (sendCallback) {
-          process.nextTick(function() {
-            sendCallback(undefined, protonMsg);
-          });
+          setImmediate(sendCallback, undefined, protonMsg);
         }
         return;
       }
       // if msg not yet sent and still running, check again in a second or so
       if (!messenger.stopped) {
+        messenger.send();
         setImmediate(untilSendComplete, protonMsg, callbackOption);
       }
     };
-    // if a callback is set, start the timer to trigger it
-    if (callbackOption) {
-      setImmediate(untilSendComplete, protonMsg, callbackOption);
-    }
+    // start the timer to trigger it to keep sending until msg has sent
+    setImmediate(untilSendComplete, protonMsg, callbackOption);
   } catch (e) {
     var client = this;
     var err = new Error(e.message);

@@ -34,6 +34,7 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <limits>
 #include <vector>
 
 #include "messenger.hpp"
@@ -84,8 +85,8 @@ ProtonMessenger::ProtonMessenger(std::string name) : ObjectWrap()
     messenger = pn_messenger(name.c_str());
   }
   pn_messenger_set_blocking(messenger, false);
-  pn_messenger_set_outgoing_window(messenger, 1024);
-  pn_messenger_set_incoming_window(messenger, 1024);
+  pn_messenger_set_outgoing_window(messenger, std::numeric_limits<int>::max());
+  pn_messenger_set_incoming_window(messenger, std::numeric_limits<int>::max());
 }
 
 ProtonMessenger::~ProtonMessenger()
