@@ -77,8 +77,6 @@ if (parsed.address) {
   }
 }
 
-console.log("topic is: " + topic);
-
 var service = "amqp://" + hostname + ":" + port;
 
 // create client to connect to broker with
@@ -104,7 +102,8 @@ client.connect(function(err) {
 
 // once connection is acquired, send messages
 client.on('connected', function() {
-  console.log("Connected to service:" + service + " using client-id " + client.getId());
+  console.log("Connected to %s using client-id %s", service, client.getId());
+  console.log("Publishing to: %s", topic);
 
   // queue all messages for sending
   var i = 0;

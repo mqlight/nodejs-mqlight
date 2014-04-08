@@ -80,7 +80,6 @@ var opts = {
   id : "recv.js"
 };
 var client = mqlight.createClient(opts);
-console.log("Calling connect for client service: " + client.getId() + " current state is: " + client.getState());
 
 // Make the connection
 client.connect(function(err) {
@@ -91,7 +90,7 @@ client.connect(function(err) {
 
 // once connection is acquired, receive messages from the required topic
 client.on('connected', function() {
-  console.log("Connected to " + client.getService() + " using client-id " + client.getId());
+  console.log("Connected to %s using client-id %s", service, client.getId());
 
   // now subscribe to topic for publications
   var destination = client.subscribe(topic, function(err, address) {
@@ -100,14 +99,14 @@ client.on('connected', function() {
       process.exit(0);
     }
     if (address) {
-      console.log("Subscribed to " + address);
+      console.log("Subscribed to %s", address);
     }
   });
 
   // listen to new message events and process them
   var i = 0;
   destination.on('message', function(msg) {
-    console.log('# received message (' + (++i) + ')');
+    console.log('# received message (%d)', (++i));
     console.log(msg);
   });
 });
