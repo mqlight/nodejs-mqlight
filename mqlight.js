@@ -533,7 +533,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   try {
     protonMsg = new proton.ProtonMessage();
     protonMsg.address = this.getService();
-    if (topic) protonMsg.address += '/' + topic;
+    if (topic) protonMsg.address += '/' + encodeURI(topic);
     if (typeof data === 'string') {
       protonMsg.body = data;
       protonMsg.contentType = 'text/plain';
