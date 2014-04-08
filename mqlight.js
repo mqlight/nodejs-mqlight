@@ -562,7 +562,12 @@ Client.prototype.send = function(topic, data, options, callback) {
     var untilSendComplete = function(protonMsg, sendCallback) {
       if (messenger.hasSent(protonMsg)) {
         if (sendCallback) {
-          setImmediate(sendCallback, undefined, protonMsg);
+          var message = {
+            address : decodeURI(protonMsg.address),
+            contentType : protonMsg.contentType,
+            body : protonMsg.body
+          };
+          setImmediate(sendCallback, undefined, message);
         }
         return;
       }
