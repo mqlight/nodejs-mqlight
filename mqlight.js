@@ -555,7 +555,16 @@ Client.prototype.send = function(topic, data, options, callback) {
   try {
     protonMsg = new proton.ProtonMessage();
     protonMsg.address = this.getService();
-    if (topic) protonMsg.address += '/' + encodeURI(topic);
+    if (topic) {
+      // need to encode the topic component but / have meaning that shouldn't be encoded
+      var topicLevels = topic.split("/");
+      var encodedTopicLevels = topicLevels.map(function(tLevel) {
+          return encodeURIComponent(tLevel);
+        }); 
+      var encodedTopic = encodedTopicLevels.join("/");
+      protonMsg.address += '/' + encodedTopic;
+
+    }
     if (typeof data === 'string') {
       protonMsg.body = data;
       protonMsg.contentType = 'text/plain';
@@ -574,7 +583,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       if (messenger.hasSent(protonMsg)) {
         if (sendCallback) {
           var message = {
-            address : decodeURI(protonMsg.address),
+            address : decodeURIComponent(protonMsg.address),
             contentType : protonMsg.contentType,
             body : protonMsg.body
           };
