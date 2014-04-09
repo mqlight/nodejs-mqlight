@@ -211,7 +211,7 @@ var Client = function(service, id, user, password) {
   // currently client ids are restricted to a fixed char set, reject those not in it
   for ( var i in id) {
     if (validClientIdChars.indexOf(id[i]) == -1) {
-      var err = "Client Identifier '" + id + "' contains invalid char: " + clientId[i];
+      var err = "Client Identifier '" + id + "' contains invalid char: " + id[i];
       throw new Error(err);
     }
   }
