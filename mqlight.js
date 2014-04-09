@@ -36,6 +36,8 @@ try {
   var uuid = require(require.resolve('npm') + '/../../node_modules/request/node_modules/node-uuid');
 }
 
+var url = require('url');
+
 var validClientIdChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%/._';
 /** @constant {number} */
 exports.QOS_AT_MOST_ONCE = 0;
@@ -118,30 +120,39 @@ var generateServiceList = function(service) {
   // Expected format for each URL is: amqp://host:port or amqps://host:port (port is optional, defaulting to 5672)
   var serviceList = [];
   for ( var i = 0; i < inputServiceList.length; i++) {
-    // Validate that a protocol has been specified, and is supported
-    var protocolCheck = inputServiceList[i].split("://");
+    var serviceUrl = url.parse(inputServiceList[i]);
+    var protocol = serviceUrl.protocol;
+    var host = serviceUrl.hostname;
+    var port = serviceUrl.port;
+    var path = serviceUrl.path;
+    var auth = serviceUrl.auth;
     var msg;
-    if (protocolCheck.length == 1) {
-      msg = "Invalid URL '" + inputServiceList[i] + "' specified for service. Service URLs must start with amqp:// or amqps://";
-      throw new Error(msg);
-    } else if (protocolCheck[0] != "amqp" && protocolCheck[0] != "amqps") {
+ 
+    // check for auth details
+    if ( auth ) {
+      msg = "Unsupported URL, auth details e.g user:pass@localhost should be supplied as options for createClient";
+      throw new Error(msg); 
+    } 
+    // Check we are trying to use the amqp protocol 
+    if ( !protocol || (protocol !== "amqp:" && protocol !== "amqps:" ) ) {
       msg = "Unsupported URL '" + inputServiceList[i] + "' specified for service. Only the amqp or amqps protocol are supported.";
       throw new Error(msg);
     }
-
-    var protocol = protocolCheck[0];
-    var hostport = inputServiceList[i].substring(protocol.length + 3);
-    var index = hostport.indexOf(":");
-    var host, port;
-    if (index == -1) {
-      host = hostport;
-      port = "5672";
-    } else {
-      host = hostport.substring(0, index);
-      port = hostport.substring(index + 1);
+    // Check we have a hostname
+    if ( !host ) {
+      msg = "Unsupported URL ' "+ inputServiceList[i] + "' specified for service. Must supply a hostname.";
+      throw new Error(msg);
     }
-
-    serviceList[i] = protocol + "://" + host + ":" + port;
+    // Set default port if not supplied
+    if ( !port ) {
+      port = "5672";
+    } 
+    // Check for no path
+    if ( path ) {
+      msg = "Unsupported URL '" + inputServiceList[i] + "' paths ("+ path +" )can't be part of a service URL.";
+      throw new Error(msg);
+    }
+    serviceList[i] = protocol + "//" + host + ":" + port; 
   }
 
   return serviceList;
