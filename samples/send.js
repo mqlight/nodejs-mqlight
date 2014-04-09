@@ -60,10 +60,7 @@ if (parsed.address) {
   var addr = parsed.address;
   if (addr.indexOf('amqp://') === 0) {
     hostname = addr.replace("amqp://", '');
-  } else {
-    hostname = addr;
   }
-
   if (hostname.indexOf('/') > -1) {
     topic = hostname.substring(hostname.indexOf('/') + 1);
     hostname = hostname.substring(0, hostname.indexOf('/'));
