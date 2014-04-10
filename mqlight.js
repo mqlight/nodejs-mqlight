@@ -511,7 +511,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   // Validate the passed parameters
-  if (topic === undefined) {
+  if (!topic) {
     throw new Error('Cannot send to undefined topic');
   } else if (typeof topic !== 'string') {
     throw new TypeError('topic must be a string type');
@@ -647,8 +647,8 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   }
 
   // Validate the pattern parameter
-  if (pattern === undefined) {
-    throw new Error('Cannot subscribe to undefined pattern');
+  if (!pattern) {
+    throw new Error('Cannot subscribe to undefined pattern.');
   } else if (typeof pattern !== 'string') {
     throw new TypeError('pattern must be a string type');
   }
