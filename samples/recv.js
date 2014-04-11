@@ -93,7 +93,7 @@ client.on('connected', function() {
   console.log("Connected to %s using client-id %s", service, client.getId());
 
   // now subscribe to topic for publications
-  var destination = client.subscribe(topic, function(err, address) {
+  client.subscribe(topic, function(err, address) {
     if (err) {
       console.error('Problem with subscribe request: ' + err.message);
       process.exit(0);
@@ -105,7 +105,7 @@ client.on('connected', function() {
 
   // listen to new message events and process them
   var i = 0;
-  destination.on('message', function(data, delivery) {
+  client.on('message', function(data, delivery) {
     console.log('# received message (%d)', (++i));
     console.log(data);
     console.log(delivery);

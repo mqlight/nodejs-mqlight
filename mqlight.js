@@ -339,6 +339,46 @@ Client.prototype.connect = function(callback) {
       });
     }
 
+    var messenger = client.messenger;
+    var check_for_messages = function() {
+      var messages = messenger.receive(50);
+      if (messages.length > 0) {
+        for ( var i = 0, tot = messages.length; i < tot; i++) {
+          var protonMsg = messages[i];
+          // if body is a JSON'ified object, try to parse it back to a js obj
+          var data;
+          if (protonMsg.contentType === 'application/json') {
+            try {
+              data = JSON.parse(protonMsg.body);
+            } catch (_) {
+              console.warn(_);
+            }
+          } else {
+            data = protonMsg.body;
+          }
+
+          var topic = url.parse(protonMsg.address).path.substring(1);
+          var delivery = {
+            message: {
+              properties: {
+                contentType : protonMsg.contentType,
+              },
+              topic: topic,
+            }
+          };
+          client.emit('message', data, delivery);
+        }
+      }
+      if (!messenger.stopped) {
+        setImmediate(check_for_messages);
+      }
+    };
+    process.nextTick(function() {
+      if (!messenger.stopped) {
+        check_for_messages();
+      }
+    });
+
     return;
   };
 
@@ -727,47 +767,6 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
       client.disconnect();
     }
   });
-
-  if (!err) {
-    var check_for_messages = function() {
-      var messages = messenger.receive(50);
-      if (messages.length > 0) {
-        for ( var i = 0, tot = messages.length; i < tot; i++) {
-          var protonMsg = messages[i];
-          // if body is a JSON'ified object, try to parse it back to a js obj
-          var data;
-          if (protonMsg.contentType === 'application/json') {
-            try {
-              data = JSON.parse(protonMsg.body);
-            } catch (_) {
-              console.warn(_);
-            }
-          } else {
-            data = protonMsg.body;
-          }
-
-          var topic = url.parse(protonMsg.address).path.substring(1);
-          var delivery = {
-            message: {
-              properties: {
-                contentType : protonMsg.contentType,
-              },
-              topic: topic,
-            }
-          };
-          client.emit('message', data, delivery);
-        }
-      }
-      if (!messenger.stopped) {
-        setImmediate(check_for_messages);
-      }
-    };
-    process.nextTick(function() {
-      if (!messenger.stopped) {
-        check_for_messages();
-      }
-    });
-  }
 
   return client;
 };

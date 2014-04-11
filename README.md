@@ -36,26 +36,27 @@ var client = mqlight.createClient({
   clientId: 'client-id1'
 });
 
-client.connect();
-
 var topic = "public";
 client.on('connected', function() {
   client.send(topic, "Hello World!");
 });
 
+client.connect();
+
 var client = mqlight.createClient({
   clientId: 'client-id2'
 });
 
-client.connect();
-
 var address = "public";
 client.on('connected', function() {
-  var destination = client.subscribe(address);
-  destination.on('message', function(msg) {
-    console.log(msg);
+  client.subscribe(address);
+  client.on('message', function(data, delivery) {
+    console.log(data);
   });
 });
+
+client.connect();
+
 ```
 
 ## API
