@@ -105,8 +105,9 @@ client.on('connected', function() {
 
   // listen to new message events and process them
   var i = 0;
-  destination.on('message', function(msg) {
+  destination.on('message', function(data, delivery) {
     console.log('# received message (%d)', (++i));
-    console.log(msg);
+    console.log(data);
+    console.log(delivery);
   });
 });

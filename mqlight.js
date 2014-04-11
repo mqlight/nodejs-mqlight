@@ -582,12 +582,17 @@ Client.prototype.send = function(topic, data, options, callback) {
     var untilSendComplete = function(protonMsg, sendCallback) {
       if (messenger.hasSent(protonMsg)) {
         if (sendCallback) {
-          var message = {
-            address : decodeURIComponent(protonMsg.address),
-            contentType : protonMsg.contentType,
-            body : protonMsg.body
+          var topic =
+            url.parse(decodeURIComponent(protonMsg.address)).path.substring(1);
+          var delivery = {
+            message: {
+              properties: {
+                contentType : protonMsg.contentType,
+              },
+              topic: topic,
+            }
           };
-          setImmediate(sendCallback, undefined, message);
+          setImmediate(sendCallback, undefined, protonMsg.body, delivery);
         }
         return;
       }
@@ -729,22 +734,28 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
       if (messages.length > 0) {
         for ( var i = 0, tot = messages.length; i < tot; i++) {
           var protonMsg = messages[i];
-          var message = {
-            address : protonMsg.address,
-            contentType : protonMsg.contentType,
-            body : protonMsg.body
-          };
-
           // if body is a JSON'ified object, try to parse it back to a js obj
-          if (message.contentType === 'application/json') {
+          var data;
+          if (protonMsg.contentType === 'application/json') {
             try {
-              var obj = JSON.parse(message.body);
-              message.body = obj;
+              data = JSON.parse(protonMsg.body);
             } catch (_) {
-              console.log(_);
+              console.warn(_);
             }
+          } else {
+            data = protonMsg.body;
           }
-          client.emit('message', message);
+
+          var topic = url.parse(protonMsg.address).path.substring(1);
+          var delivery = {
+            message: {
+              properties: {
+                contentType : protonMsg.contentType,
+              },
+              topic: topic,
+            }
+          };
+          client.emit('message', data, delivery);
         }
       }
       if (!messenger.stopped) {

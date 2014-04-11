@@ -85,7 +85,7 @@ var client = mqlight.createClient(opts);
 
 // get message body data to send
 var remain = parsed.argv.remain;
-var data = (remain.length > 0) ? remain : [ "Hello World!" ];
+var messages = (remain.length > 0) ? remain : [ "Hello World!" ];
 
 // insert a delay between sends if requested
 var delay = parsed.delay * 1000 || 0;
@@ -105,18 +105,19 @@ client.on('connected', function() {
   // queue all messages for sending
   var i = 0;
   var sendNextMessage = function() {
-    var body = data[i];
-    client.send(topic, body, function(err, msg) {
+    var body = messages[i];
+    client.send(topic, body, function(err, data, delivery) {
       if (err) {
         console.error('Problem with send request: ' + err.message);
         process.exit(0);
       }
-      if (msg) {
+      if (data) {
         console.log("# sent message:");
-        console.log(msg);
+        console.log(data);
+        console.log(delivery);
       }
       // if there are more messages pending, send the next in <delay> seconds
-      if (data.length > ++i) {
+      if (messages.length > ++i) {
         if (delay > 0) {
           setTimeout(sendNextMessage, delay);
         } else {
