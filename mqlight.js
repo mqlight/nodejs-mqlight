@@ -369,14 +369,12 @@ Client.prototype.connect = function(callback) {
           client.emit('message', data, delivery);
         }
       }
-      if (!messenger.stopped) {
+      if (client.state === 'connected') {
         setImmediate(check_for_messages);
       }
     };
     process.nextTick(function() {
-      if (!messenger.stopped) {
-        check_for_messages();
-      }
+      check_for_messages();
     });
 
     return;
@@ -770,5 +768,5 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
 
   return client;
 };
-
+ 
 /* ------------------------------------------------------------------------- */
