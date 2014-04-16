@@ -1,6 +1,6 @@
 {
     "name": "mqlight",
-    "version": "0.1.@#_NODEVER_#@",
+    "version": "0.1.0000000000",
     "description": "IBM MQ Light Client Module",
     "main": "mqlight.js",
     "private": true,
