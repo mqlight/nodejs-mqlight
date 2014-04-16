@@ -14,7 +14,7 @@
                   }
                 },
                 "include_dirs+": [".", "<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/qpid-proton-0.6/proton-c/include"],
-                "libraries": ["<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/build/proton-c/Release/qpid-proton.lib"],
+                "libraries": ["<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/build/proton-c/Release/qpid-proton.lib", "<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/build64/proton-c/Release/qpid-proton.lib"],
             }],
             ["OS=='linux'", {
                 "cflags_cc+": ["-Wall", "-Wno-comment", "-g"],
