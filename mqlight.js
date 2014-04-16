@@ -39,12 +39,19 @@ try {
 var url = require('url');
 
 var validClientIdChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%/._';
+
+
 /** @constant {number} */
 exports.QOS_AT_MOST_ONCE = 0;
+
+
 /** @constant {number} */
 exports.QOS_AT_LEAST_ONCE = 1;
+
+
 /** @constant {number} */
 exports.QOS_EXACTLY_ONCE = 2;
+
 
 /**
  * Constructs a new Client object in the disconnected state.
@@ -56,7 +63,7 @@ exports.QOS_EXACTLY_ONCE = 2;
  * function is invoked each time the client wants to establish a connection (e.g. for any of the state transitions, on the state diagram shown earlier on this page, which lead to
  * the 'connected' state). The function must return either an instance of String or Array, which are treated in the manner described previously.</li>
  * <li>id - Optional; an identifier that is used to identify this client. Two different instances of Client can have the same id, however only one instance can be connected
- * to the MQ Light service at a given moment in time. If two instances of Client have the same id and both try to connect then the first instance to establish its connection 
+ * to the MQ Light service at a given moment in time. If two instances of Client have the same id and both try to connect then the first instance to establish its connection
  * is diconnected in favour of the second instance. If this property is not specified then the client will generate a probabalistically unique ID.</li>
  * <li>user - Optional; the user name to use for authentication to the MQ Light service.</li>
  * <li>password - Optional; the password to use for authentication.</li>
@@ -64,7 +71,7 @@ exports.QOS_EXACTLY_ONCE = 2;
  *
  * @param {Object}
  *          options - (optional) map of options for the client.
- * @returns {Object} The created Client object.
+ * @return {Object} The created Client object.
  */
 exports.createClient = function(options) {
   var opt = (typeof options == 'object') ? options : {};
@@ -81,12 +88,13 @@ exports.createClient = function(options) {
   return client;
 };
 
+
 /**
  * Function to take a single service URL, or array of service URLs, validate them, returning an array of service URLs.
  *
  * @param {String|Array}
  *          service - Required; when an instance of String this is a URL to connect to. When an instance of Array this is an array of URLs to connect to
- * @returns {Array} Valid service URLs, with port number added as appropriate.
+ * @return {Array} Valid service URLs, with port number added as appropriate.
  * @throws TypeError
  *           If service is not a string or array type.
  * @throws Error
@@ -102,24 +110,24 @@ var generateServiceList = function(service) {
   // Ensure the service is an Array
   var inputServiceList = [];
   if (!service) {
-    throw new Error("service is undefined");
+    throw new Error('service is undefined');
   } else if (service instanceof Function) {
-    throw new TypeError("service cannot be a function");
+    throw new TypeError('service cannot be a function');
   } else if (service instanceof Array) {
     if (service.length === 0) {
-      throw new Error("service array is empty");
+      throw new Error('service array is empty');
     }
     inputServiceList = service;
   } else if (typeof service === 'string') {
     inputServiceList[0] = service;
   } else {
-    throw new TypeError("service must be a string or array type");
+    throw new TypeError('service must be a string or array type');
   }
 
   // Validate the list of URLs for the service, inserting default values as necessary
   // Expected format for each URL is: amqp://host:port or amqps://host:port (port is optional, defaulting to 5672)
   var serviceList = [];
-  for ( var i = 0; i < inputServiceList.length; i++) {
+  for (var i = 0; i < inputServiceList.length; i++) {
     var serviceUrl = url.parse(inputServiceList[i]);
     var protocol = serviceUrl.protocol;
     var host = serviceUrl.hostname;
@@ -127,36 +135,38 @@ var generateServiceList = function(service) {
     var path = serviceUrl.path;
     var auth = serviceUrl.auth;
     var msg;
- 
+
     // check for auth details
-    if ( auth ) {
-      msg = "Unsupported URL, auth details e.g user:pass@localhost should be supplied as options for createClient";
-      throw new Error(msg); 
-    } 
-    // Check we are trying to use the amqp protocol 
-    if ( !protocol || (protocol !== "amqp:" && protocol !== "amqps:" ) ) {
+    if (auth) {
+      msg = 'Unsupported URL, auth details e.g user:pass@localhost should be supplied as options for createClient';
+      throw new Error(msg);
+    }
+    // Check we are trying to use the amqp protocol
+    if (!protocol || (protocol !== 'amqp:' && protocol !== 'amqps:')) {
       msg = "Unsupported URL '" + inputServiceList[i] + "' specified for service. Only the amqp or amqps protocol are supported.";
       throw new Error(msg);
     }
     // Check we have a hostname
-    if ( !host ) {
-      msg = "Unsupported URL ' "+ inputServiceList[i] + "' specified for service. Must supply a hostname.";
+    if (!host) {
+      msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for service. Must supply a hostname.";
       throw new Error(msg);
     }
     // Set default port if not supplied
-    if ( !port ) {
-      port = "5672";
-    } 
+    if (!port) {
+      port = '5672';
+    }
     // Check for no path
-    if ( path ) {
-      msg = "Unsupported URL '" + inputServiceList[i] + "' paths ("+ path +" )can't be part of a service URL.";
+    if (path) {
+      msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path + " )can't be part of a service URL.";
       throw new Error(msg);
     }
-    serviceList[i] = protocol + "//" + host + ":" + port; 
+    serviceList[i] = protocol + '//' + host + ':' + port;
   }
 
   return serviceList;
 };
+
+
 
 /**
  * Represents an MQ Light client instance.
@@ -195,7 +205,7 @@ var Client = function(service, id, user, password) {
   }
 
   // If client id has not been specified then generate an id
-  if (!id) id = "AUTO_" + uuid.v4().substring(0, 7);
+  if (!id) id = 'AUTO_' + uuid.v4().substring(0, 7);
 
   // If the client id is incorrectly formatted then throw an error
   if (id.length > 48) {
@@ -205,11 +215,11 @@ var Client = function(service, id, user, password) {
 
   // If client id is not a string then throw an error
   if (typeof id !== 'string') {
-    throw new TypeError("Client identifier must be a string type");
+    throw new TypeError('Client identifier must be a string type');
   }
 
   // currently client ids are restricted to a fixed char set, reject those not in it
-  for ( var i in id) {
+  for (var i in id) {
     if (validClientIdChars.indexOf(id[i]) == -1) {
       var err = "Client Identifier '" + id + "' contains invalid char: " + id[i];
       throw new Error(err);
@@ -218,10 +228,10 @@ var Client = function(service, id, user, password) {
 
   // Validate user and password parameters, when specified
   if (user && typeof user !== 'string') {
-    throw new TypeError("user must be a string type");
+    throw new TypeError('user must be a string type');
   }
   if (password && typeof password !== 'string') {
-    throw new TypeError("password must be a string type");
+    throw new TypeError('password must be a string type');
   }
 
   // Save the required data as client fields
@@ -231,7 +241,7 @@ var Client = function(service, id, user, password) {
 
   // Initialize ProtonMessenger with auth details
   if (user) {
-    var pw = password ? password : "";
+    var pw = password ? password : '';
     this.messenger = new proton.ProtonMessenger(id, user, pw);
   } else {
     this.messenger = new proton.ProtonMessenger(id);
@@ -248,6 +258,7 @@ util.inherits(Client, EventEmitter);
  * @param {String}
  *          err - an error message if a problem occurred.
  */
+
 
 /**
  * Attempts to connect the client to the MQ Light service - as per the options specified when the client object was created by the mqlight.createClient() method. Connects to the MQ
@@ -268,7 +279,7 @@ util.inherits(Client, EventEmitter);
  *
  * @param {connectCallback}
  *          callback - (optional) callback to be notified of errors and completion.
- * @returns {Object} The instance of client that it is invoked on - allowing for chaining of other method calls on the client object.
+ * @return {Object} The instance of client that it is invoked on - allowing for chaining of other method calls on the client object.
  * @throws {TypeError}
  *           If callback is specified and is not a function.
  */
@@ -278,14 +289,14 @@ Client.prototype.connect = function(callback) {
   if (arguments.length > 1) {
     throw new Error('Too many arguments');
   }
-  
+
   // Performs the connect
   var performConnect = function(client, callback) {
 
     var currentState = client.getState();
     // if we are not disconnected or disconnecting return with the client object
-    if ( currentState !== "disconnected" ){ 
-      if ( currentState === "disconnecting" ){
+    if (currentState !== 'disconnected') {
+      if (currentState === 'disconnecting') {
         process.nextTick(function() {
           stillDisconnecting(client, callback);
         });
@@ -298,8 +309,8 @@ Client.prototype.connect = function(callback) {
         return client;
       }
     }
-  
-    client.state = "connecting";
+
+    client.state = 'connecting';
     client.messenger.start();
 
     // Obtain the list of services for connect
@@ -343,7 +354,7 @@ Client.prototype.connect = function(callback) {
     var check_for_messages = function() {
       var messages = messenger.receive(50);
       if (messages.length > 0) {
-        for ( var i = 0, tot = messages.length; i < tot; i++) {
+        for (var i = 0, tot = messages.length; i < tot; i++) {
           var protonMsg = messages[i];
           // if body is a JSON'ified object, try to parse it back to a js obj
           var data;
@@ -361,9 +372,9 @@ Client.prototype.connect = function(callback) {
           var delivery = {
             message: {
               properties: {
-                contentType : protonMsg.contentType,
+                contentType: protonMsg.contentType
               },
-              topic: topic,
+              topic: topic
             }
           };
           client.emit('message', data, delivery);
@@ -381,13 +392,13 @@ Client.prototype.connect = function(callback) {
   };
 
   if (callback && !(callback instanceof Function)) {
-    throw new TypeError("callback must be a function");
+    throw new TypeError('callback must be a function');
   }
 
   var client = this;
 
-  var stillDisconnecting = function(client, callback){
-    if ( client.getState() === "disconnecting" ){
+  var stillDisconnecting = function(client, callback) {
+    if (client.getState() === 'disconnecting') {
       process.nextTick(function() {
         stillDisconnecting(client, callback);
       });
@@ -411,6 +422,7 @@ Client.prototype.connect = function(callback) {
  *          err - an error message if a problem occurred.
  */
 
+
 /**
  * Disconnects the client from the MQ Light service, implicitly closing any subscriptions that the client has open. The 'disconnected' event will be emitted once the client has
  * disconnected.
@@ -423,7 +435,7 @@ Client.prototype.connect = function(callback) {
  *
  * @param {disconnectCallback}
  *          callback - (optional) callback to be notified of errors and completion.
- * @returns {Object} The instance of client that it is invoked on - allowing for chaining of other method calls on the client object.
+ * @return {Object} The instance of client that it is invoked on - allowing for chaining of other method calls on the client object.
  * @throws {TypeError}
  *           If callback is specified and is not a function.
  */
@@ -456,11 +468,11 @@ Client.prototype.disconnect = function(callback) {
   };
 
   if (callback && !(callback instanceof Function)) {
-    throw new TypeError("callback must be a function");
+    throw new TypeError('callback must be a function');
   }
 
   //just return if already disconnected or in the process of disconnecting
-  if ( client.getState() === "disconnected" || client.getState() === "disconnecting" ){
+  if (client.getState() === 'disconnected' || client.getState() === 'disconnecting') {
     process.nextTick(function() {
       if (callback) {
         callback(undefined);
@@ -476,8 +488,9 @@ Client.prototype.disconnect = function(callback) {
   return client;
 };
 
+
 /**
- * @returns {String} The identifier associated with the client. This will either be: a) the identifier supplied as the id property of the options object supplied to the
+ * @return {String} The identifier associated with the client. This will either be: a) the identifier supplied as the id property of the options object supplied to the
  *          mqlight.createClient() method, or b) an automatically generated identifier if the id property was not specified when the client was created.
  */
 Client.prototype.getId = function() {
@@ -485,8 +498,9 @@ Client.prototype.getId = function() {
   return id;
 };
 
+
 /**
- * @returns {String} The URL of the service to which the client is currently connected (when the client is in 'connected') - otherwise (for all other client
+ * @return {String} The URL of the service to which the client is currently connected (when the client is in 'connected') - otherwise (for all other client
  *          states) undefined is returned.
  */
 Client.prototype.getService = function() {
@@ -498,16 +512,18 @@ Client.prototype.getService = function() {
   }
 };
 
+
 /**
- * @returns {String} The current state of the client - can will be one of the following string values: 'connected', 'connecting', 'disconnected', 'disconnecting', or 'retrying'.
+ * @return {String} The current state of the client - can will be one of the following string values: 'connected', 'connecting', 'disconnected', 'disconnecting', or 'retrying'.
  */
 Client.prototype.getState = function() {
   var state = this.state;
   return state;
 };
 
+
 /**
- * @returns {Boolean} <code>true</code> if a connection has been made (i.e. state is connected), <code>false</code> otherwise.
+ * @return {Boolean} <code>true</code> if a connection has been made (i.e. state is connected), <code>false</code> otherwise.
  */
 Client.prototype.hasConnected = function() {
   return this.state === 'connected';
@@ -519,6 +535,7 @@ Client.prototype.hasConnected = function() {
  *          err - an error message if a problem occurred. message - the message that was sent. ?????
  */
 
+
 /**
  * Sends a message to the MQ Light service.
  *
@@ -529,7 +546,7 @@ Client.prototype.hasConnected = function() {
  *          immutable as they pass through the MQ Light service. E.g. if the sender sends a String, the receiver receives a String. undefined and Function objects will be rejected
  *          with an error.
  * @param {Object}
- *          options (Optional) Used to specify options that affect how the MQ Light service processes the message. 
+ *          options (Optional) Used to specify options that affect how the MQ Light service processes the message.
  * @param {sendCallback}
  *          callback - (Optional) callback to be notified of errors and completion. The callback function accepts a single Error argument which is used to indicate whether the
  *          message was successfully delivered to the MQ Light service. The callback may be omitted if a qos of 0 (at most once) is used - however it must be present if a qos of 1
@@ -593,11 +610,11 @@ Client.prototype.send = function(topic, data, options, callback) {
     protonMsg.address = this.getService();
     if (topic) {
       // need to encode the topic component but / have meaning that shouldn't be encoded
-      var topicLevels = topic.split("/");
+      var topicLevels = topic.split('/');
       var encodedTopicLevels = topicLevels.map(function(tLevel) {
-          return encodeURIComponent(tLevel);
-        }); 
-      var encodedTopic = encodedTopicLevels.join("/");
+        return encodeURIComponent(tLevel);
+      });
+      var encodedTopic = encodedTopicLevels.join('/');
       protonMsg.address += '/' + encodedTopic;
 
     }
@@ -619,13 +636,13 @@ Client.prototype.send = function(topic, data, options, callback) {
       if (messenger.hasSent(protonMsg)) {
         if (sendCallback) {
           var topic =
-            url.parse(decodeURIComponent(protonMsg.address)).path.substring(1);
+              url.parse(decodeURIComponent(protonMsg.address)).path.substring(1);
           var delivery = {
             message: {
               properties: {
-                contentType : protonMsg.contentType,
+                contentType: protonMsg.contentType
               },
-              topic: topic,
+              topic: topic
             }
           };
           setImmediate(sendCallback, undefined, protonMsg.body, delivery);
@@ -661,20 +678,21 @@ Client.prototype.send = function(topic, data, options, callback) {
  *          address - the address that was subscribed to.
  */
 
+
 /**
  * Constructs a subscription object and starts the emission of message events each time a message arrives, at the MQ Light service, that matches pattern.
  *
  * @param {String}
  *          pattern used to match against the <code>address</code> attribute of messages to determine if a copy of the message should be delivered to the <code>Destination</code>.
  * @param {String}
- *          share. (Optional) Specifies whether to create or join a shared subscription for which messages are anycast amongst the present subscribers. If this argument is omitted
+ *          share (Optional) Specifies whether to create or join a shared subscription for which messages are anycast amongst the present subscribers. If this argument is omitted
  *          then the subscription will be unshared (e.g. private to the client).
  * @param {Object}
- *          [options] (optional) The options argument accepts an object with properties to set.
+ *          options (optional) The options argument accepts an object with properties to set.
  * @param {destCallback}
  *          callback - (optional) Invoked when the subscription request has been processed. A single Error parameter is passed to this function to indicate whether the subscription
  *          request was successful, and if not: why not.
- * @returns {@link Client} the instance of the client this was called on which will emit 'message' events on arrival.
+ * @return {@link Client} the instance of the client this was called on which will emit 'message' events on arrival.
  * @throws {TypeError}
  *           If one of the specified parameters is of the wrong type.
  * @throws {Error}
@@ -698,12 +716,12 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   var shareOption, optionsOption, callbackOption;
   if (share) {
     if (typeof share === 'string') {
-      shareOption = "share:" + share + ":";
+      shareOption = 'share:' + share + ':';
     } else if (share instanceof Function) {
-      shareOption = "private:";
+      shareOption = 'private:';
       callbackOption = share;
     } else if (share instanceof Object) {
-      shareOption = "private:";
+      shareOption = 'private:';
       optionsOption = share;
     } else {
       throw new TypeError('share must be a string type');
@@ -736,7 +754,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
       }
     }
   } else {
-    shareOption = "private:";
+    shareOption = 'private:';
   }
 
   // Ensure we have attempted a connect
@@ -758,7 +776,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
     if (callbackOption) {
       callbackOption(err, address);
     }
-    if (err){
+    if (err) {
       client.emit('error', err);
       client.disconnect();
     }
@@ -766,5 +784,5 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
 
   return client;
 };
- 
+
 /* ------------------------------------------------------------------------- */
