@@ -123,6 +123,8 @@ client.on('connected', function() {
         } else {
           setImmediate(sendNextMessage);
         }
+      } else {
+        client.disconnect();
       }
     });
   };
