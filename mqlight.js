@@ -756,7 +756,7 @@ Client.prototype.send = function(topic, data, options, callback) {
  * @param {String}
  *          err - an error message if a problem occurred.
  * @param {String}
- *          address - the address that was subscribed to.
+ *          pattern - the pattern that was subscribed to.
  */
 
 
@@ -868,7 +868,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
 
   setImmediate(function() {
     if (callbackOption) {
-      callbackOption(err, address);
+      callbackOption(err, pattern);
     }
     if (err) {
       client.emit('error', err);

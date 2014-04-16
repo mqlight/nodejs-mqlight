@@ -93,13 +93,13 @@ client.on('connected', function() {
   console.log("Connected to %s using client-id %s", service, client.getId());
 
   // now subscribe to topic for publications
-  client.subscribe(topic, function(err, address) {
+  client.subscribe(topic, function(err, pattern) {
     if (err) {
       console.error('Problem with subscribe request: ' + err.message);
       process.exit(0);
     }
-    if (address) {
-      console.log("Subscribed to %s", address);
+    if (pattern) {
+      console.log("Subscribed to: %s", pattern);
     }
   });
 
