@@ -123,9 +123,6 @@ client.on('connected', function() {
         } else {
           setImmediate(sendNextMessage);
         }
-      } else {
-        // wait a short time before exiting
-        setTimeout(process.exit, 1500, 0);
       }
     });
   };
