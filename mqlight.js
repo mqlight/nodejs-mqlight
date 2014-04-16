@@ -72,8 +72,8 @@ exports.createClient = function(options) {
 
   process.setMaxListeners(0);
   process.once('exit', function() {
-    if (client.messenger) client.messenger.send();
     if (client && client.getState() == 'connected') {
+      client.messenger.send();
       client.disconnect();
     }
   });
@@ -228,8 +228,14 @@ var Client = function(service, id, user, password) {
   this.serviceFunction = serviceFunction;
   this.serviceList = serviceList;
   this.id = id;
-  this.user = user;
-  this.password = password;
+
+  // Initialize ProtonMessenger with auth details
+  if (user) {
+    var pw = password ? password : "";
+    this.messenger = new proton.ProtonMessenger(id, user, pw);
+  } else {
+    this.messenger = new proton.ProtonMessenger(id);
+  }
 
   // Set the initial state to disconnected
   this.state = 'disconnected';
@@ -294,12 +300,6 @@ Client.prototype.connect = function(callback) {
     }
   
     client.state = "connecting";
-    if (client.user) {
-      var password = !client.password ? "" : client.password;
-      client.messenger = new proton.ProtonMessenger(client.id, client.user, password);
-    } else {
-      client.messenger = new proton.ProtonMessenger(client.id);
-    }
     client.messenger.start();
 
     // Obtain the list of services for connect
@@ -440,8 +440,6 @@ Client.prototype.disconnect = function(callback) {
     client.state = 'disconnecting';
     if (client.messenger) {
       client.messenger.stop();
-      delete client.messenger;
-      client.messenger = undefined;
     }
 
     // Indicate that we've disconnected
