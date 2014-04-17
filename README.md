@@ -22,7 +22,7 @@ Current Features:
 Install it in node.js:
 
 ```
-npm install node-mqlight
+npm install mqlight
 
 OR
 
