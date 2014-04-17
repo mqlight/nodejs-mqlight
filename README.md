@@ -1,4 +1,4 @@
-# node-mqlight (alpha)
+# node-mqlight (beta)
 
 MQ Light is designed to allow applications to exchange discrete pieces of
 information in the form of messages. This might sound a lot like TCP/IP
@@ -6,7 +6,7 @@ networking, and MQ Light does use TCP/IP under the covers, but MQ Light takes
 away much of the complexity and provides a higher level set of abstractions to
 build your applications with.
 
-This Node.js module provides the high-level API by which you can interact 
+This Node.js module provides the high-level API by which you can interact
 with the MQ Light runtime.
 
 Current Features:
@@ -109,7 +109,7 @@ will be delivered to a particular `Destination`.
 * `options` - (Object) (optional) map of additional options for the destination.
 * `callback` - (Function) callback to be notified of errors & completion.
 
-Returns the `Client` object that the subscribe was called on which will emit 
+Returns the `Client` object that the subscribe was called on which will emit
 `message` events on arrival.
 
 ### mqlight.Client.getId()
@@ -169,6 +169,7 @@ Options:
 
 ### 0.1.0
 
-* Initial alpha release
+* Initial beta release.
 * Support for sending and receiving 'at-most-once' messages.
+* Support for shared subscriptions.
 
