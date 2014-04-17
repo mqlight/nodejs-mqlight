@@ -37,26 +37,31 @@ Then create some clients to send and receive messages:
 
 ```javascript
 var recvClient = mqlight.createClient({
+  service: 'amqp://localhost',
   id: 'recv-client-1'
 });
 
-var address = "public";
+var address = 'public';
 recvClient.on('connected', function() {
   recvClient.subscribe(address);
   recvClient.on('message', function(data, delivery) {
-    console.log(data);
+    console.log('Recv: %s', data);
   });
 });
 
 recvClient.connect();
 
 var sendClient = mqlight.createClient({
+  service: 'amqp://localhost',
   id: 'send-client-1'
 });
 
-var topic = "public";
+var topic = 'public';
 sendClient.on('connected', function() {
-  sendClient.send(topic, "Hello World!");
+  sendClient.send(topic, 'Hello World!', function (err, data) {
+    console.log('Sent: %s', data);
+    sendClient.disconnect();
+  });
 });
 
 sendClient.connect();
