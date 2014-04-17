@@ -73,48 +73,53 @@ Creates an MQ Light client instance.
 
   *  **service**, (String) (required), the URL for the service to connect to.
   *  **id** (String, default: AUTO_[0-9a-f]{7}), a unique identifier for
-     this client.
-  *  **user** (String) (optional) user name for authentication
-  *  **password** (String) (optional) password for authentication
+     this client. A client with a duplicate `id` will be prevented from
+     connecting to the messaging service.
 
-Returns `Client` object representing the client instance.
+Returns a `Client` object representing the client instance. The client is an
+event emitter and listeners can be registered for the following events:
+`connect`, `disconnect`, `error`, and `message`.
 
 ### mqlight.Client.connect([`callback`])
+
 Connects the MQ Light client instance to the service.
 * `callback` - (Function) (optional) callback to be notified of errors &
   completion
 
-### mqlight.Client.send(`topic`, `message` [, `options` [, `callback`]])
+### mqlight.Client.send(`topic`, `message`, [`options`], [`callback`])
 
-Sends the given MQ Light message object to its address. String and Buffer
-messages will be sent and received as-is. Any other Object will be converted to
-JSON before sending and automatically parsed back into the same Object type
-when received.
+Sends the given MQ Light message object to the specified topic. String and
+Buffer messages will be sent and received as-is. Any other Object will be
+converted to JSON before sending and automatically parsed back into the same
+Object type when received.
 
 * `topic` - (String) the topic to which the message will be sent.
 * `message` - (String | Buffer | Object) the message body to be sent
 * `options` - (Object) (optional) map of additional options for the send.
+  There are no options that can be set in this beta.
 * `callback` - (Function) (optional) callback to be notified of errors &
   completion
 
-### mqlight.Client.subscribe(`pattern` [, `share` [,`options` [, `callback`]]])
+### mqlight.Client.subscribe(`pattern`, [`share`], [`options`], [`callback`])
 
-Create a `subscription` and associates it with a `pattern`.
+Create a `Destination` and associates it with a `pattern`.
 
-The `pattern` is matched against the `address` attribute of messages sent to
-the IBM MQ Light messaging service to determine whether a particular message
-will be delivered to a particular `Destination`.
+The `pattern` argument is matched against the `topic` that messages are
+sent to, allowing the messaging service to determine whether a paricular
+message will be delivered to a particular `Destination`, and hence
+`subscription`.
 
-* `pattern` - (String) used to match against the `address` attribute of
-  messages to determine if a copy of the message should be received.
+* `pattern` - (String) used to match against the `topic` specified when a
+   message is sent to the messaging service.
 * `share` - (String) (optional) name for creating or joining a shared
   subscription for which messages are anycast between connected subscribers. If
- omitted defaults to unshared (e.g. private).
+  omitted defaults to unshared (e.g. private to the client).
 * `options` - (Object) (optional) map of additional options for the destination.
+  There are no options that can be set in this beta.
 * `callback` - (Function) callback to be notified of errors & completion.
 
-Returns the `Client` object that the subscribe was called on which will emit
-`message` events on arrival.
+Returns the `Client` object that the subscribe was called on.  `message` events
+will be emitted when messages arrive.
 
 ### mqlight.Client.getId()
 
@@ -137,6 +142,39 @@ Disconnects this Client from the messaging server and frees the system
 resources that it uses. Calling this method also implicitly closes any
 subscriptions that have been created using the client's
 `Client.subscribe` method.
+
+### Event: 'message'
+
+Emitted when a message is delivered from a destination matching one of the
+client's subscriptions.
+
+* `data` - (String | Buffer | Object) the message body.
+* `delivery` - (Object) additional information about why the event was emitted.
+  Properties include:
+  *  **message**, (Object) additional information about the message.  Properties
+     include:
+    *  **topic**, (Object) the topic that the message was sent to.
+  *  **subscription**, (Object) information about the `Client.subscribe` method
+     call that caused the client to receive this message (note: this isn't
+     implemented yet!)
+
+### Event: 'connect'
+
+This event is emitted when a client successfully connects to the messaging
+service.
+
+### Event: 'disconnect'
+
+This event is emitted when a client disconnects from the messaging service,
+either explicitly, or because the connection between the client and the
+service is interrupted.
+
+### Event: 'error'
+
+Emitted when an error is detected that prevents or interrupts a client's
+connection to the messaging service.
+
+* `error` (Error) the error.
 
 ## Samples
 
@@ -175,5 +213,6 @@ Options:
 
 * Initial beta release.
 * Support for sending and receiving 'at-most-once' messages.
+* Support for wildcard subscriptions
 * Support for shared subscriptions.
 
