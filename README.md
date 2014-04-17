@@ -9,19 +9,23 @@ build your applications with.
 This Node.js module provides the high-level API by which you can interact
 with the MQ Light runtime.
 
+See https://www.ibmdw.net/messaging/mq-light/ for more details.
+
 Current Features:
 
-* Send and receive arbitrary String and JSON objects between Node.js
+* Send and receive arbitrary String, Buffer and JSON objects between Node.js
   applications using an at-most-once quality of service.
 * Includes samples to demonstrate API usage.
-
-More functionality coming soon.
 
 ## Getting Started
 
 Install it in node.js:
 
 ```
+npm install node-mqlight
+
+OR
+
 npm install https://ibm.biz/node-mqlight
 ```
 
@@ -32,30 +36,30 @@ var mqlight = require('mqlight');
 Then create some clients to send and receive messages:
 
 ```javascript
-var client = mqlight.createClient({
-  clientId: 'client-id1'
-});
-
-var topic = "public";
-client.on('connected', function() {
-  client.send(topic, "Hello World!");
-});
-
-client.connect();
-
-var client = mqlight.createClient({
-  clientId: 'client-id2'
+var recvClient = mqlight.createClient({
+  id: 'recv-client-1'
 });
 
 var address = "public";
-client.on('connected', function() {
-  client.subscribe(address);
-  client.on('message', function(data, delivery) {
+recvClient.on('connected', function() {
+  recvClient.subscribe(address);
+  recvClient.on('message', function(data, delivery) {
     console.log(data);
   });
 });
 
-client.connect();
+recvClient.connect();
+
+var sendClient = mqlight.createClient({
+  id: 'send-client-1'
+});
+
+var topic = "public";
+sendClient.on('connected', function() {
+  sendClient.send(topic, "Hello World!");
+});
+
+sendClient.connect();
 
 ```
 
