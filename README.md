@@ -38,7 +38,7 @@ Then create some clients to send and receive messages:
 ```javascript
 var recvClient = mqlight.createClient({
   service: 'amqp://localhost',
-  id: 'recv-client-1'
+  id: 'recv_client_1'
 });
 
 var address = 'public';
@@ -53,7 +53,7 @@ recvClient.connect();
 
 var sendClient = mqlight.createClient({
   service: 'amqp://localhost',
-  id: 'send-client-1'
+  id: 'send_client_1'
 });
 
 var topic = 'public';
@@ -218,6 +218,6 @@ Options:
 
 * Initial beta release.
 * Support for sending and receiving 'at-most-once' messages.
-* Support for wildcard subscriptions
+* Support for wildcard subscriptions.
 * Support for shared subscriptions.
 
