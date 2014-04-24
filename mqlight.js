@@ -376,7 +376,8 @@ Client.prototype.connect = function(callback) {
         serviceList = client.serviceList;
       }
     } catch (e) {
-      //if there is an error getting the service list disconnect
+      // if there is an error getting the service list then ensure state is
+      // disconnected
       client.disconnect();
       var err = new Error(e.message);
       process.nextTick(function() {
@@ -388,8 +389,26 @@ Client.prototype.connect = function(callback) {
       return;
     }
 
-    client.service = serviceList[0];
-
+    // Connect to one of the listed services 
+    try {
+      // TODO - select a service (for now just select the first one)
+      var service = serviceList[0];
+      client.messenger.connect(service);
+      client.service = service;
+    } catch (e) {
+      // if there is an error connecting to the service then ensure state is
+      // disconnected
+      client.disconnect();
+      var err = new Error(e.message);
+      process.nextTick(function() {
+        if (callback) {
+          callback(err);
+        }
+        client.emit('error', err);
+      });
+      return;
+    }
+    
     // Indicate that we're connected
     client.state = 'connected';
     process.nextTick(function() {
@@ -405,6 +424,8 @@ Client.prototype.connect = function(callback) {
       });
     }
 
+    // Function to check for messages, outputting the contents of each to the
+    // event emitter 
     var messenger = client.messenger;
     var check_for_messages = function() {
       var messages = messenger.receive(50);
@@ -439,6 +460,9 @@ Client.prototype.connect = function(callback) {
         setImmediate(check_for_messages);
       }
     };
+    
+    // Setup the check for messages such that each received messages is output
+    // to the event emitter
     process.nextTick(function() {
       check_for_messages();
     });
