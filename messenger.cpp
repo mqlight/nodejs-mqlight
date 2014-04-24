@@ -63,6 +63,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "send", Send);
   NODE_SET_PROTOTYPE_METHOD(constructor, "start", Start);
   NODE_SET_PROTOTYPE_METHOD(constructor, "stop", Stop);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "connect", Connect);
   NODE_SET_PROTOTYPE_METHOD(constructor, "subscribe", Subscribe);
   NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
   NODE_SET_PROTOTYPE_METHOD(constructor, "hasSent", HasSent);
@@ -208,6 +209,26 @@ Handle<Value> ProtonMessenger::Start(const Arguments& args) {
 
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   pn_messenger_start(obj->messenger);
+
+  return Boolean::New(true);
+}
+
+Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
+  HandleScope scope;
+
+  // throw exception if not enough args
+  if (args.Length() < 1) {
+    THROW_EXCEPTION("Missing required address argument.");
+  }
+
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  String::Utf8Value param(args[0]->ToString());
+  std::string address = std::string(*param);
+
+  int status = pn_messenger_connect(obj->messenger, address.c_str());
+  if (pn_messenger_errno(obj->messenger)) {
+	THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)));
+  }
 
   return Boolean::New(true);
 }
