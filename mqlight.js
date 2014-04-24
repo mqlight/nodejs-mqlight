@@ -831,6 +831,9 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   var shareOption, optionsOption, callbackOption;
   if (share) {
     if (typeof share === 'string') {
+      if (share.indexOf(':') >= 0) {
+        throw new Error("share argument value '" + share + "' is invalid because it contains a colon (\':\') character");
+      }
       shareOption = 'share:' + share + ':';
     } else if (share instanceof Function) {
       shareOption = 'private:';
