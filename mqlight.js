@@ -96,8 +96,10 @@ exports.createClient = function(options) {
   process.setMaxListeners(0);
   process.once('exit', function() {
     if (client && client.getState() == 'connected') {
-      client.messenger.send();
-      client.disconnect();
+      try {
+        client.messenger.send();
+        client.disconnect();
+      } catch (_) {}
     }
   });
 
@@ -370,8 +372,8 @@ Client.prototype.connect = function(callback) {
     var serviceList;
     try {
       if (client.serviceFunction) {
-        var service = client.serviceFunction();
-        serviceList = generateServiceList(service);
+        var serviceFunction = client.serviceFunction();
+        serviceList = generateServiceList(serviceFunction);
       } else {
         serviceList = client.serviceList;
       }
@@ -389,7 +391,7 @@ Client.prototype.connect = function(callback) {
       return;
     }
 
-    // Connect to one of the listed services 
+    // Connect to one of the listed services
     try {
       // TODO - select a service (for now just select the first one)
       var service = serviceList[0];
@@ -408,7 +410,7 @@ Client.prototype.connect = function(callback) {
       });
       return;
     }
-    
+
     // Indicate that we're connected
     client.state = 'connected';
     process.nextTick(function() {
@@ -425,42 +427,50 @@ Client.prototype.connect = function(callback) {
     }
 
     // Function to check for messages, outputting the contents of each to the
-    // event emitter 
+    // event emitter
     var messenger = client.messenger;
     var check_for_messages = function() {
-      var messages = messenger.receive(50);
-      if (messages.length > 0) {
-        for (var i = 0, tot = messages.length; i < tot; i++) {
-          var protonMsg = messages[i];
-          // if body is a JSON'ified object, try to parse it back to a js obj
-          var data;
-          if (protonMsg.contentType === 'application/json') {
-            try {
-              data = JSON.parse(protonMsg.body);
-            } catch (_) {
-              console.warn(_);
+      try {
+        var messages = messenger.receive(50);
+        if (messages.length > 0) {
+          for (var i = 0, tot = messages.length; i < tot; i++) {
+            var protonMsg = messages[i];
+            // if body is a JSON'ified object, try to parse it back to a js obj
+            var data;
+            if (protonMsg.contentType === 'application/json') {
+              try {
+                data = JSON.parse(protonMsg.body);
+              } catch (_) {
+                console.warn(_);
+              }
+            } else {
+              data = protonMsg.body;
             }
-          } else {
-            data = protonMsg.body;
-          }
 
-          var topic = url.parse(protonMsg.address).path.substring(1);
-          var delivery = {
-            message: {
-              properties: {
-                contentType: protonMsg.contentType
-              },
-              topic: topic
-            }
-          };
-          client.emit('message', data, delivery);
+            var topic = url.parse(protonMsg.address).path.substring(1);
+            var delivery = {
+              message: {
+                properties: {
+                  contentType: protonMsg.contentType
+                },
+                topic: topic
+              }
+            };
+            client.emit('message', data, delivery);
+          }
         }
+      } catch (e) {
+        var err = new Error(e.message);
+        client.disconnect();
+        process.nextTick(function() {
+          if (err) client.emit('error', err);
+        });
       }
       if (client.state === 'connected') {
         setImmediate(check_for_messages);
       }
     };
-    
+
     // Setup the check for messages such that each received messages is output
     // to the event emitter
     process.nextTick(function() {
@@ -707,7 +717,8 @@ Client.prototype.send = function(topic, data, options, callback) {
   if (!this.hasConnected()) throw new Error('not connected');
 
   // Send the data as a message to the specified topic
-  var messenger = this.messenger;
+  var client = this;
+  var messenger = client.messenger;
   var protonMsg;
   try {
     protonMsg = new proton.ProtonMessage();
@@ -738,32 +749,42 @@ Client.prototype.send = function(topic, data, options, callback) {
     // setup a timer to trigger the callback once the msg has been sent, or
     // immediately if no message to be sent
     var untilSendComplete = function(protonMsg, sendCallback) {
-      if (messenger.hasSent(protonMsg)) {
-        if (sendCallback) {
-          var decoded = decodeURIComponent(protonMsg.address);
-          var topic = url.parse(decoded).path.substring(1);
-          var delivery = {
-            message: {
-              properties: {
-                contentType: protonMsg.contentType
-              },
-              topic: topic
-            }
-          };
-          setImmediate(sendCallback, undefined, protonMsg.body, delivery);
+      try {
+        if (messenger.hasSent(protonMsg)) {
+          if (sendCallback) {
+            var decoded = decodeURIComponent(protonMsg.address);
+            var topic = url.parse(decoded).path.substring(1);
+            var delivery = {
+              message: {
+                properties: {
+                  contentType: protonMsg.contentType
+                },
+                topic: topic
+              }
+            };
+            setImmediate(sendCallback, undefined, protonMsg.body, delivery);
+          }
+          return;
         }
-        return;
-      }
-      // if msg not yet sent and still running, check again in a second or so
-      if (!messenger.stopped) {
-        messenger.send();
-        setImmediate(untilSendComplete, protonMsg, callbackOption);
+        // if msg not yet sent and still running, check again in a second or so
+        if (!messenger.stopped) {
+          messenger.send();
+          setImmediate(untilSendComplete, protonMsg, callbackOption);
+        }
+      } catch (e) {
+        var err = new Error(e.message);
+        client.disconnect();
+        process.nextTick(function() {
+          if (callbackOption) {
+            callbackOption(err, protonMsg);
+          }
+          if (err) client.emit('error', err);
+        });
       }
     };
     // start the timer to trigger it to keep sending until msg has sent
     setImmediate(untilSendComplete, protonMsg, callbackOption);
   } catch (e) {
-    var client = this;
     var err = new Error(e.message);
     client.disconnect();
     process.nextTick(function() {
@@ -832,7 +853,8 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   if (share) {
     if (typeof share === 'string') {
       if (share.indexOf(':') >= 0) {
-        throw new Error("share argument value '" + share + "' is invalid because it contains a colon (\':\') character");
+        throw new Error("share argument value '" + share + "' is invalid " +
+                        "because it contains a colon (\':\') character");
       }
       shareOption = 'share:' + share + ':';
     } else if (share instanceof Function) {
