@@ -42,6 +42,7 @@ class ProtonMessenger : public node::ObjectWrap {
 public:
     static v8::Persistent<v8::FunctionTemplate> constructor;
     static void Init(v8::Handle<v8::Object> target);
+    static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
     ProtonMessenger(std::string name);
     ~ProtonMessenger();
 

@@ -35,10 +35,24 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 
 using namespace v8;
 
+Handle<Value> CreateMessage(const Arguments& args) {
+  HandleScope scope;
+  return scope.Close(ProtonMessage::NewInstance(args));
+}
+
+Handle<Value> CreateMessenger(const Arguments& args) {
+  HandleScope scope;
+  return scope.Close(ProtonMessenger::NewInstance(args));
+}
+
 void RegisterModule(Handle<Object> target)
 {
   ProtonMessenger::Init(target);
   ProtonMessage::Init(target);
+  target->Set(String::NewSymbol("createMessage"),
+              FunctionTemplate::New(CreateMessage)->GetFunction());
+  target->Set(String::NewSymbol("createMessenger"),
+              FunctionTemplate::New(CreateMessenger)->GetFunction());
 }
 
 NODE_MODULE(proton, RegisterModule);

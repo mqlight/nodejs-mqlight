@@ -41,8 +41,9 @@
 
 class ProtonMessage : public node::ObjectWrap {
 public:
-    static v8::Persistent<v8::Function> constructor;
+    static v8::Persistent<v8::FunctionTemplate> constructor;
     static void Init(v8::Handle<v8::Object> target);
+    static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
     ProtonMessage();
     ~ProtonMessage();
 
@@ -51,6 +52,7 @@ public:
 
 protected:
     static v8::Handle<v8::Value> New(const v8::Arguments &args);
+    static v8::Handle<v8::Value> Destroy(const v8::Arguments& args);
     static v8::Handle<v8::Value> GetAddress(v8::Local<v8::String> property,
                                             const v8::AccessorInfo &args);
     static void SetAddress(v8::Local<v8::String> property,

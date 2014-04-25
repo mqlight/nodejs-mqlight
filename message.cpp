@@ -45,27 +45,28 @@ using namespace node;
     Local<Value> e = Exception::TypeError(String::New(msg)); \
     return ThrowException(e);
 
-Persistent<Function> ProtonMessage::constructor;
+Persistent<FunctionTemplate> ProtonMessage::constructor;
 
 void ProtonMessage::Init(Handle<Object> target)
 {
   HandleScope scope;
 
   Local<FunctionTemplate> tpl = FunctionTemplate::New(New);
-  Persistent<FunctionTemplate> tpp = Persistent<FunctionTemplate>::New(tpl);
-  tpp->InstanceTemplate()->SetInternalFieldCount(1);
+  constructor = Persistent<FunctionTemplate>::New(tpl);
+  constructor->InstanceTemplate()->SetInternalFieldCount(1);
   Local<String> name = String::NewSymbol("ProtonMessage");
-  tpp->SetClassName(name);
+  constructor->SetClassName(name);
 
-  tpp->InstanceTemplate()->SetAccessor(String::New("body"),
+  NODE_SET_PROTOTYPE_METHOD(constructor, "destroy", Destroy);
+
+  tpl->InstanceTemplate()->SetAccessor(String::New("body"),
       GetBody, PutBody);
-  tpp->InstanceTemplate()->SetAccessor(String::New("contentType"),
+  tpl->InstanceTemplate()->SetAccessor(String::New("contentType"),
       GetContentType, SetContentType);
-  tpp->InstanceTemplate()->SetAccessor(String::New("address"),
+  tpl->InstanceTemplate()->SetAccessor(String::New("address"),
       GetAddress, SetAddress);
 
-  constructor = Persistent<Function>::New(tpp->GetFunction());
-  target->Set(name, tpp->GetFunction());
+  target->Set(name, constructor->GetFunction());
 }
 
 ProtonMessage::ProtonMessage() : ObjectWrap()
@@ -79,6 +80,18 @@ ProtonMessage::~ProtonMessage()
   {
     pn_message_free(message);
   }
+  handle_->SetInternalField(0, Undefined());
+  handle_.Dispose();
+  handle_.Clear();
+}
+
+Handle<Value> ProtonMessage::NewInstance(const Arguments& args)
+{
+  HandleScope scope;
+
+  Local<Object> instance = constructor->GetFunction()->NewInstance();
+
+  return scope.Close(instance);
 }
 
 Handle<Value> ProtonMessage::New(const Arguments& args)
@@ -95,6 +108,18 @@ Handle<Value> ProtonMessage::New(const Arguments& args)
   msg->Wrap(args.This());
 
   return args.This();
+}
+
+Handle<Value> ProtonMessage::Destroy(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessage *msg;
+
+  msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  msg->~ProtonMessage();
+  delete msg;
+
+  return Undefined();
 }
 
 Handle<Value> ProtonMessage::GetAddress(Local<String> property,

@@ -285,9 +285,9 @@ var Client = function(service, id, user, password) {
   // Initialize ProtonMessenger with auth details
   if (user) {
     var pw = password ? password : '';
-    this.messenger = new proton.ProtonMessenger(id, user, pw);
+    this.messenger = proton.createMessenger(id, user, pw);
   } else {
-    this.messenger = new proton.ProtonMessenger(id);
+    this.messenger = proton.createMessenger(id);
   }
 
   // Set the initial state to disconnected
@@ -457,6 +457,7 @@ Client.prototype.connect = function(callback) {
               }
             };
             client.emit('message', data, delivery);
+            protonMsg.destroy();
           }
         }
       } catch (e) {
@@ -721,7 +722,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   var messenger = client.messenger;
   var protonMsg;
   try {
-    protonMsg = new proton.ProtonMessage();
+    protonMsg = proton.createMessage();
     protonMsg.address = this.getService();
     if (topic) {
       // need to encode the topic component but / has meaning that shouldn't be
@@ -764,6 +765,7 @@ Client.prototype.send = function(topic, data, options, callback) {
             };
             setImmediate(sendCallback, undefined, protonMsg.body, delivery);
           }
+          protonMsg.destroy();
           return;
         }
         // if msg not yet sent and still running, check again in a second or so

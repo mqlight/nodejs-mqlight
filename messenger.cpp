@@ -37,6 +37,13 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 #include <limits>
 #include <vector>
 
+#ifdef _WIN32
+typedef __int32 int32_t;
+typedef unsigned __int32 uint32_t;
+#else
+#include <stdint.h>
+#endif
+
 #include "messenger.hpp"
 #include "message.hpp"
 
@@ -98,6 +105,21 @@ ProtonMessenger::~ProtonMessenger()
   }
 }
 
+Handle<Value> ProtonMessenger::NewInstance(const Arguments& args)
+{
+  HandleScope scope;
+
+  const unsigned argc = args.Length();
+  Handle<Value> *argv = new Handle<Value>[argc];
+  for (uint32_t i = 0; i < argc; i++) {
+    argv[i] = args[i];
+  }
+  Local<Object> instance = constructor->GetFunction()->NewInstance(argc, argv);
+
+  return scope.Close(instance);
+}
+
+
 Handle<Value> ProtonMessenger::New(const Arguments& args)
 {
   HandleScope scope;
@@ -117,12 +139,14 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
     String::Utf8Value param(args[0]->ToString());
     name = std::string(*param);
 
-    //look for the username and password parameters
-    if ( !args[1]->IsUndefined()){
+    // look for the username and password parameters
+    if (!args[1]->IsUndefined())
+    {
       String::Utf8Value userparam(args[1]->ToString());
       username = std::string(*userparam);
 
-      if ( !args[2]->IsUndefined() ){
+      if (!args[2]->IsUndefined())
+      {
         String::Utf8Value passwordparam(args[2]->ToString());
         password = std::string(*passwordparam);
       }
@@ -132,7 +156,7 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
   // create a new instance of this type and wrap it in 'this' v8 Object
   ProtonMessenger *obj = new ProtonMessenger(name);
 
-  //if we have a username make sure we set a route to force auth
+  // if we have a username make sure we set a route to force auth
   std::string authPattern;
   if ( username.length() > 0){
     int errno;
@@ -141,7 +165,10 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
     } else {
       authPattern = "amqp://" + username + "@$1";
     }
-    //set the route so any address starting with amqp:// gets the supplied user and password added
+    /*
+     * set the route so any address starting with amqp:// gets the supplied
+     * user and password added
+     */
     errno = pn_messenger_route(obj->messenger, "amqp://*", authPattern.c_str());
     if (errno){
         THROW_EXCEPTION("Failed to set messenger route");
@@ -180,7 +207,7 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args) {
   pn_tracker_t tracker = pn_messenger_outgoing_tracker(obj->messenger);
   msg->tracker = tracker;
 
-  return Boolean::New(true);
+  return scope.Close(Boolean::New(true));
 }
 
 Handle<Value> ProtonMessenger::Send(const Arguments& args) {
@@ -201,7 +228,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args) {
     THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)))
   }
 
-  return Boolean::New(true);
+  return scope.Close(Boolean::New(true));
 }
 
 Handle<Value> ProtonMessenger::Start(const Arguments& args) {
@@ -210,7 +237,7 @@ Handle<Value> ProtonMessenger::Start(const Arguments& args) {
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   pn_messenger_start(obj->messenger);
 
-  return Boolean::New(true);
+  return scope.Close(Boolean::New(true));
 }
 
 Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
@@ -227,10 +254,10 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
 
   int status = pn_messenger_connect(obj->messenger, address.c_str());
   if (pn_messenger_errno(obj->messenger)) {
-	THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)));
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)));
   }
 
-  return Boolean::New(true);
+  return scope.Close(Integer::New(status));
 }
 
 Handle<Value> ProtonMessenger::Stop(const Arguments& args) {
@@ -239,7 +266,7 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args) {
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   pn_messenger_stop(obj->messenger);
 
-  return Boolean::New(true);
+  return scope.Close(Boolean::New(true));
 }
 
 Handle<Value> ProtonMessenger::Stopped(Local<String> property,
@@ -273,7 +300,7 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
     THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)))
   }
 
-  return Boolean::New(true);
+  return scope.Close(Boolean::New(true));
 }
 
 /* XXX: this may need to be wrapped in a uv_async queued operation? */
@@ -300,7 +327,8 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
   while (pn_messenger_incoming(obj->messenger))
   {
     Local<Value> argv[1] = { args[0] };
-    Local<Object> msgObj = ProtonMessage::constructor->NewInstance(0, argv);
+    Local<Object> msgObj = ProtonMessage::constructor->GetFunction()
+                             ->NewInstance(0, argv);
     ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(msgObj);
 
     pn_messenger_get(obj->messenger, msg->message);
