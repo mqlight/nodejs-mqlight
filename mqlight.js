@@ -21,11 +21,11 @@ var os = require('os');
 var _system = os.platform() + '-' + process.arch;
 if (process.env.NODE_ENV === 'unittest') {
   var proton = require('./tests/stubs/stubproton.js').createProtonStub();
-  /**
-   * Unit test only method for setting the proton property of mqlight
-   * @param {Object} newProton - the new proton object to use.
-   */
-  exports.setProton = function(newProton) { proton = newProton; };
+  Object.defineProperty(exports, 'proton', {
+    set: function(value) {
+      proton = value;
+    }
+  });
 } else {
   try {
     var proton = require('./lib/' + _system + '/proton');
@@ -307,7 +307,8 @@ var Client = function(service, id, user, password) {
 util.inherits(Client, EventEmitter);
 
 /**
- * @param {function} connectCallback
+ * @param {function(object)}
+ *          connectCallback - callback, passed an Error if something goes wrong
  * @param {String}
  *          err - an error message if a problem occurred.
  */
@@ -513,7 +514,9 @@ Client.prototype.connect = function(callback) {
 };
 
 /**
- * @param {function} disconnectCallback
+ * @param {function(object)}
+ *          disconnectCallback - callback, passed an error object if someting
+ *          goes wrong.
  * @param {String}
  *          err - an error message if a problem occurred.
  */
@@ -641,7 +644,9 @@ Client.prototype.hasConnected = function() {
 };
 
 /**
- * @param {function} sendCallback
+ * @param {function(object)}
+ *          sendCallback - a callback which is called with an Error object
+ *          if something goes wrong.
  * @param {String}
  *          err - an error message if a problem occurred
  * @param {String | Buffer | Object}
@@ -809,7 +814,9 @@ Client.prototype.send = function(topic, data, options, callback) {
 };
 
 /**
- * @param {function} destCallback
+ * @param {function(object)}
+ *          destCallback - callback, invoked with an Error object if something
+ *          goes wrong.
  * @param {String}
  *          err - an error message if a problem occurred.
  * @param {String}
