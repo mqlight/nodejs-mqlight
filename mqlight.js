@@ -24,6 +24,9 @@ if (process.env.NODE_ENV === 'unittest') {
   Object.defineProperty(exports, 'proton', {
     set: function(value) {
       proton = value;
+    },
+    get: function() {
+      return proton;
     }
   });
 } else {
