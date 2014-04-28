@@ -13,7 +13,7 @@
                     'PreprocessorDefinitions': [ '_WIN32_WINNT=0x0600', 'PN_NODEFINE_SSIZE_T' ]
                   }
                 },
-                "include_dirs+": [".", "<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/qpid-proton-0.6/proton-c/include"],
+                "include_dirs+": [".", "<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/qpid-proton-0.7/proton-c/include"],
                 "libraries": ["<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/build/proton-c/Release/qpid-proton.lib", "<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/build64/proton-c/Release/qpid-proton.lib"],
             }],
             ["OS=='linux'", {
