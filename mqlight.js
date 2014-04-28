@@ -444,6 +444,9 @@ Client.prototype.connect = function(callback) {
     // event emitter
     var messenger = client.messenger;
     var check_for_messages = function() {
+      if (client.state !== 'connected') {
+        return;
+      }
       try {
         var messages = messenger.receive(50);
         if (messages.length > 0) {
