@@ -19,7 +19,7 @@
 
 var testCase = require('nodeunit').testCase;
 
-var mqlight = require('mqlight');
+var mqlight = require('../mqlight');
 
 module.exports = testCase({
   

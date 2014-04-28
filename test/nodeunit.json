@@ -1,0 +1,12 @@
+{
+	/* Disable nodeunit's use of ANSI escape codes for colouring output   */
+	/* - as this looks really ugly when the output is captured to a file. */
+    "error_prefix": "",
+    "error_suffix": "",
+    "ok_prefix": "",
+    "ok_suffix": "",
+    "bold_prefix": "",
+    "bold_suffix": "",
+    "assertion_prefix": "",
+    "assertion_suffix": ""
+}
