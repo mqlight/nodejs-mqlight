@@ -19,14 +19,24 @@
 
 var os = require('os');
 var _system = os.platform() + '-' + process.arch;
-try {
-  var proton = require('./lib/' + _system + '/proton');
-} catch (_) {
-  if ('MODULE_NOT_FOUND' === _.code) {
-    throw new Error('mqlight.js is not currently supported on ' + _system);
+if (process.env.NODE_ENV === 'unittest') {
+  var proton = require('./tests/stubs/stubproton.js').createProtonStub();
+  /**
+   * Unit test only method for setting the proton property of mqlight
+   * @param {Object} newProton - the new proton object to use.
+   */
+  exports.setProton = function(newProton) { proton = newProton; };
+} else {
+  try {
+    var proton = require('./lib/' + _system + '/proton');
+  } catch (_) {
+    if ('MODULE_NOT_FOUND' === _.code) {
+      throw new Error('mqlight.js is not currently supported on ' + _system);
+    }
+    throw _;
   }
-  throw _;
 }
+
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 var uuid = require('node-uuid');
@@ -36,15 +46,15 @@ var validClientIdChars =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%/._';
 
 
-/** @constant {number} */
+/** @const {number} */
 exports.QOS_AT_MOST_ONCE = 0;
 
 
-/** @constant {number} */
+/** @const {number} */
 exports.QOS_AT_LEAST_ONCE = 1;
 
 
-/** @constant {number} */
+/** @const {number} */
 exports.QOS_EXACTLY_ONCE = 2;
 
 
@@ -297,7 +307,7 @@ var Client = function(service, id, user, password) {
 util.inherits(Client, EventEmitter);
 
 /**
- * @callback connectCallback
+ * @param {function} connectCallback
  * @param {String}
  *          err - an error message if a problem occurred.
  */
@@ -503,7 +513,7 @@ Client.prototype.connect = function(callback) {
 };
 
 /**
- * @callback disconnectCallback
+ * @param {function} disconnectCallback
  * @param {String}
  *          err - an error message if a problem occurred.
  */
@@ -631,7 +641,7 @@ Client.prototype.hasConnected = function() {
 };
 
 /**
- * @callback sendCallback
+ * @param {function} sendCallback
  * @param {String}
  *          err - an error message if a problem occurred
  * @param {String | Buffer | Object}
@@ -678,25 +688,25 @@ Client.prototype.send = function(topic, data, options, callback) {
 
   // Validate the passed parameters
   if (!topic) {
-    throw new Error('Cannot send to undefined topic');
+    throw new TypeError('Cannot send to undefined topic');
   } else if (typeof topic !== 'string') {
     throw new TypeError('topic must be a string type');
   }
   if (data === undefined) {
-    throw new Error('Cannot send undefined data');
+    throw new TypeError('Cannot send undefined data');
   } else if (data instanceof Function) {
     throw new TypeError('Cannot send a function');
   }
 
   // Validate the remaining optional parameters, assigning local variables to
   // the appropriate parameter
-  var optionsOption, callbackOption;
+  var /*optionsOption,*/ callbackOption;
   if (options) {
     if (options instanceof Function) {
       callbackOption = options;
     } else {
       if (options instanceof Object) {
-        optionsOption = options;
+        //optionsOption = options;
       } else {
         throw new TypeError('options must be an object type');
       }
@@ -799,7 +809,7 @@ Client.prototype.send = function(topic, data, options, callback) {
 };
 
 /**
- * @callback destCallback
+ * @param {function} destCallback
  * @param {String}
  *          err - an error message if a problem occurred.
  * @param {String}

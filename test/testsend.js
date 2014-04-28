@@ -17,6 +17,8 @@
  * </copyright>
  */
 
+process.env.NODE_ENV = 'unittest';
+
 var testCase = require('nodeunit').testCase;
 
 var mqlight = require('../mqlight');
@@ -32,21 +34,22 @@ module.exports = testCase({
       
       var opts = { service : "amqp://localhost:5672"};
       var client = mqlight.createClient(opts);
-      client.connect();
-      var undefinedTopics = ["", undefined, null];
-      test.expect(undefinedTopics.length);
-      //Test you can't send to an undefined topic.
-      for ( var i = 0; i < undefinedTopics.length; i++ ) {
-        test.throws(function(s){
-          //console.log(undefinedTopics[i]);
-          client.send(undefinedTopics[i],"msg");
-        }, function(err) {
-          if ( err instanceof TypeError && /Cannot send to undefined topic/.test(err)){
-            return true;
-          } 
-        }, "undefined topic test ("+i+")"); 
-      }
-      test.done();
+      client.connect(function() {
+    	  var undefinedTopics = ["", undefined, null];
+    	  test.expect(undefinedTopics.length);
+    	  // Test you can't send to an undefined topic.
+    	  for ( var i = 0; i < undefinedTopics.length; i++ ) {
+    		  test.throws(function(s) {
+    			  client.send(undefinedTopics[i],"msg");
+    		  }, function(err) {
+    			  if ( err instanceof TypeError && /Cannot send to undefined topic/.test(err)){
+    				  return true;
+    			  } 
+    		  }, "undefined topic test ("+i+")"); 
+    	  }
+    	  client.disconnect();
+     	  test.done();
+      });
     }    
   })
 });

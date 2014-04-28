@@ -17,6 +17,8 @@
  * </copyright>
  */
 
+process.env.NODE_ENV = 'unittest';
+
 var testCase = require('nodeunit').testCase;
 
 var mqlight = require('../mqlight');
@@ -51,6 +53,7 @@ module.exports = testCase({
       client.on('connected', function(){
         test.equal("connected", client.getState(), "Client state equals connected once the connected event is emitted");
         test.equal(opts.service, client.getService(), "Supplied service matches result of getService after connect");
+        client.disconnect();
         test.done();
       });
     },
