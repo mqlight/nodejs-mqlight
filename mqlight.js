@@ -297,8 +297,10 @@ var Client = function(service, id, user, password) {
 
   // Initialize ProtonMessenger with auth details
   if (user) {
-    var pw = password ? password : '';
-    this.messenger = proton.createMessenger(id, user, pw);
+    // URI encode username and password before passing them to proton
+    var usr = encodeURIComponent(user);
+    var pw = password ? encodeURIComponent(password) : '';
+    this.messenger = proton.createMessenger(id, usr, pw);
   } else {
     this.messenger = proton.createMessenger(id);
   }
