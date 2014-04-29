@@ -18,17 +18,16 @@
  */
 
 var mqlight = require('mqlight');
-
-try {
-  var nopt = require('nopt');
-} catch (_) {
-  var nopt = require(require.resolve('npm') + '/../../node_modules/nopt');
-}
+var nopt = require('nopt');
+var uuid = require('node-uuid');
 
 // parse the commandline arguments
-var types = {};
+var types = {
+  share: String
+};
 var shorthands = {
-  h: ['--help']
+  h: ['--help'],
+  s: ['--share']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
@@ -40,6 +39,9 @@ if (parsed.help || remain.length > 1) {
   console.log('');
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
+  console.log('  -s, --share           specify an optional share name to ' +
+              'create or join a');
+  console.log('                        shared subscription for the given topic');
   console.log('');
   if (parsed.help) {
     process.exit(0);
@@ -77,7 +79,7 @@ var service = 'amqp://' + hostname + ':' + port;
 // connect client to broker
 var opts = {
   service: service,
-  id: 'recv.js'
+  id: 'recv_' + uuid.v4().substring(0, 7)
 };
 var client = mqlight.createClient(opts);
 
@@ -93,7 +95,7 @@ client.on('connected', function() {
   console.log('Connected to %s using client-id %s', service, client.getId());
 
   // now subscribe to topic for publications
-  client.subscribe(topic, function(err, pattern) {
+  client.subscribe(topic, parsed.share, function(err, pattern) {
     if (err) {
       console.error('Problem with subscribe request: ' + err.message);
       process.exit(0);

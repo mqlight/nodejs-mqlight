@@ -18,12 +18,8 @@
  */
 
 var mqlight = require('mqlight');
-
-try {
-  var nopt = require('nopt');
-} catch (_) {
-  var nopt = require(require.resolve('npm') + '/../../node_modules/nopt');
-}
+var nopt = require('nopt');
+var uuid = require('node-uuid');
 
 // parse the commandline arguments
 var types = {
@@ -80,7 +76,7 @@ var service = 'amqp://' + hostname + ':' + port;
 // create client to connect to broker with
 var opts = {
   service: service,
-  id: 'send.js'
+  id: 'send_' + uuid.v4().substring(0, 7)
 };
 var client = mqlight.createClient(opts);
 
