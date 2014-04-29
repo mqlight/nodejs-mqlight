@@ -16,71 +16,82 @@
  * IBM Corp.
  * </copyright>
  */
+// ***********************************************************************
+// Example unit test, that can be used as the starting point for new tests
+// ***********************************************************************
 
-// *********************************************************************** 
-// Example unit test, that can be used as the starting point for new tests 
-// *********************************************************************** 
 
+/** @const {string} enable unittest mode in mqlight.js */
 process.env.NODE_ENV = 'unittest';
+
 var mqlight = require('../mqlight');
 var testCase = require('nodeunit').testCase;
 
 // Individual test cases can be defined like this...
+
+
+
+/**
+ * @constructor
+ * @param {object} test the unittest interface
+ */
 module.exports.example_test1 = function(test) {
-  test.expect(1);   // How many assertion tests do we expect?
-  test.ok(true, "this should always work");
-  test.done();      // Test is done.  Did we run all the assertions?
+  test.expect(1);
+  // How many assertion tests do we expect?
+  test.ok(true, 'this should always work');
+  test.done();  // Test is done.  Did we run all the assertions?
 };
 
-// Groups of tests (bracketed by a setUp and tearDown function) work like 
+// Groups of tests (bracketed by a setUp and tearDown function) work like
 // this...
+
+
+
+/** @constructor */
 module.exports.example_test_group = {
   setUp: function(callback) {
     // Do some setup here..
     callback();
   },
-  
   tearDown: function(callback) {
     // Do the tear down here...
     callback();
   },
-  
   example_test2: function(test) {
     test.done();
   },
-
   example_test3: function(test) {
     test.done();
   }
-}
+};
 
 // Crib-sheet: see https://github.com/caolan/nodeunit
 //
 // Nodeunit provides the following functions for testing with:
 //
-//   ok(value, [message]) 
+//   ok(value, [message])
 //     - Tests if value is a true value.
-//   equal(actual, expected, [message]) 
-//     - Tests shallow, coercive equality with the equal comparison 
+//   equal(actual, expected, [message])
+//     - Tests shallow, coercive equality with the equal comparison
 //       operator ( == ).
 //   notEqual(actual, expected, [message])
-//     - Tests shallow, coercive non-equality with the not equal comparison 
+//     - Tests shallow, coercive non-equality with the not equal comparison
 //       operator ( != ).
-//   deepEqual(actual, expected, [message]) 
+//   deepEqual(actual, expected, [message])
 //     - Tests for deep equality.
 //   notDeepEqual(actual, expected, [message])
 //     - Tests for any deep inequality.
 //   strictEqual(actual, expected, [message])
-//     - Tests strict equality, as determined by the strict equality 
+//     - Tests strict equality, as determined by the strict equality
 //       operator ( === )
 //   notStrictEqual(actual, expected, [message])
-//     - Tests strict non-equality, as determined by the strict not equal 
+//     - Tests strict non-equality, as determined by the strict not equal
 //       operator ( !== )
-//   throws(block, [error], [message]) 
+//   throws(block, [error], [message])
 //     - Expects block to throw an error.
-//   doesNotThrow(block, [error], [message]) 
+//   doesNotThrow(block, [error], [message])
 //     - Expects block not to throw an error.
-//   ifError(value) 
+//   ifError(value)
 //     - Tests if value is not a false value, throws if it is a true value.
 //       Useful when testing the first argument, error in callbacks.
 //
@@ -89,6 +100,7 @@ module.exports.example_test_group = {
 //   expect(amount)
 //     - Specify how many assertions are expected to run within a test. Very
 //       useful for ensuring that all your callbacks and assertions are run.
-//   done() 
+//   done()
 //     - Finish the current test function, and move on to the next. ALL tests
 //       should call this!
+

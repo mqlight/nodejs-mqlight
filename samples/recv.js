@@ -28,19 +28,19 @@ try {
 // parse the commandline arguments
 var types = {};
 var shorthands = {
-  h : [ "--help" ]
+  h: ['--help']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
 
 if (parsed.help || remain.length > 1) {
-  console.log("Usage: recv.js [options] <address>");
-  console.log("                          address: amqp://<domain>/<name>");
-  console.log("                          (default amqp://localhost/public)");
-  console.log("");
-  console.log("Options:");
-  console.log("  -h, --help            show this help message and exit");
-  console.log("");
+  console.log('Usage: recv.js [options] <address>');
+  console.log('                          address: amqp://<domain>/<name>');
+  console.log('                          (default amqp://localhost/public)');
+  console.log('');
+  console.log('Options:');
+  console.log('  -h, --help            show this help message and exit');
+  console.log('');
   if (parsed.help) {
     process.exit(0);
   } else {
@@ -57,7 +57,7 @@ var topic = 'public';
 if (remain[0]) {
   var addr = remain[0];
   if (addr.indexOf('amqp://') === 0) {
-    hostname = addr.replace("amqp://", '');
+    hostname = addr.replace('amqp://', '');
   }
   if (hostname.indexOf('/') > -1) {
     topic = hostname.substring(hostname.indexOf('/') + 1);
@@ -72,12 +72,12 @@ if (remain[0]) {
   }
 }
 
-var service = "amqp://" + hostname + ":" + port;
+var service = 'amqp://' + hostname + ':' + port;
 
 // connect client to broker
 var opts = {
-  service : service,
-  id : "recv.js"
+  service: service,
+  id: 'recv.js'
 };
 var client = mqlight.createClient(opts);
 
@@ -90,7 +90,7 @@ client.connect(function(err) {
 
 // once connection is acquired, receive messages from the required topic
 client.on('connected', function() {
-  console.log("Connected to %s using client-id %s", service, client.getId());
+  console.log('Connected to %s using client-id %s', service, client.getId());
 
   // now subscribe to topic for publications
   client.subscribe(topic, function(err, pattern) {
@@ -99,7 +99,7 @@ client.on('connected', function() {
       process.exit(0);
     }
     if (pattern) {
-      console.log("Subscribed to: %s", pattern);
+      console.log('Subscribed to: %s', pattern);
     }
   });
 

@@ -16,32 +16,44 @@
  * IBM Corp.
  * </copyright>
  */
+
+
+/** @const {string} enable unittest mode in mqlight.js */
 process.env.NODE_ENV = 'unittest';
+
 var testCase = require('nodeunit').testCase;
 var childProcess = require('child_process');
 
-module.exports = testCase({
-  
-  "Test conformance to Google JavaScript Style Guide" : testCase({
 
-	  // Run gjslint against mqlight.js to check for coding / style errors
-	  "gjslint" : function(test) {
-		  var child = childProcess.spawn('gjslint', ['--jslint_error=all', 'mqlight.js'], { stdio: 'inherit' });
-		  child.on('exit', function(code, signal) {
-			  if (signal) {
-				  console.log('gjslint killed by signal: '+signal);
-			  } else {
-				  console.log('gjslint ended with return code: '+code);
-			  }
-			  test.equal(signal, undefined, 'expected gjslint not to be killed by signal: '+signal);
-			  test.equal(code, 0, 'expected gjslint to exit with rc=0, not rc='+code);
-			  test.done();
-		  }).on('error', function(err) {
-			  console.log('Unable to run gjslint for reason: ');
-			  console.log('  '+err);
-			  test.ok(false, 'Error running gjslint');
-			  test.done();
-		  });
-	  }
+
+/** @constructor */
+module.exports = testCase({
+  'Test conformance to Google JavaScript Style Guide': testCase({
+    'gjslint': function(test) {
+      var child = childProcess.spawn('gjslint', [
+        '--jslint_error=all',
+        'mqlight.js',
+        'samples/send.js',
+        'samples/recv.js'
+      ], { stdio: 'inherit' });
+      child.on('exit', function(code, signal) {
+        if (signal) {
+          console.log('gjslint killed by signal: ' + signal);
+        } else {
+          console.log('gjslint ended with return code: ' + code);
+        }
+        test.equal(signal, undefined, 'expected gjslint not to be killed by ' +
+                   'signal: ' + signal);
+        test.equal(code, 0, 'expected gjslint to exit with rc=0, not with ' +
+                   'rc=' + code);
+        test.done();
+      }).on('error', function(err) {
+        console.log('Unable to run gjslint for reason: ');
+        console.log('  ' + err);
+        test.ok(false, 'Error running gjslint');
+        test.done();
+      });
+    }
   })
 });
+

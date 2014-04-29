@@ -27,26 +27,27 @@ try {
 
 // parse the commandline arguments
 var types = {
-  address : String,
-  delay : Number
+  address: String,
+  delay: Number
 };
 var shorthands = {
-  a : [ "--address" ],
-  d : [ "--delay" ],
-  h : [ "--help" ]
+  a: ['--address'],
+  d: ['--delay'],
+  h: ['--help']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 
 if (parsed.help) {
-  console.log("Usage: send.js [options] <msg_1> ... <msg_n>");
-  console.log("");
-  console.log("Options:");
-  console.log("  -h, --help            show this help message and exit");
-  console.log("  -a ADDRESS, --address=ADDRESS");
-  console.log("                        address: amqp://<domain>/<name>");
-  console.log("                        (default amqp://localhost/public)");
-  console.log("  -d NUM, --delay=NUM   add a NUM seconds time delay between each request");
-  console.log("");
+  console.log('Usage: send.js [options] <msg_1> ... <msg_n>');
+  console.log('');
+  console.log('Options:');
+  console.log('  -h, --help            show this help message and exit');
+  console.log('  -a ADDRESS, --address=ADDRESS');
+  console.log('                        address: amqp://<domain>/<name>');
+  console.log('                        (default amqp://localhost/public)');
+  console.log('  -d NUM, --delay=NUM   add a NUM seconds time delay between' +
+              ' each request');
+  console.log('');
   process.exit(0);
 }
 
@@ -59,7 +60,7 @@ var topic = 'public';
 if (parsed.address) {
   var addr = parsed.address;
   if (addr.indexOf('amqp://') === 0) {
-    hostname = addr.replace("amqp://", '');
+    hostname = addr.replace('amqp://', '');
   }
   if (hostname.indexOf('/') > -1) {
     topic = hostname.substring(hostname.indexOf('/') + 1);
@@ -74,18 +75,18 @@ if (parsed.address) {
   }
 }
 
-var service = "amqp://" + hostname + ":" + port;
+var service = 'amqp://' + hostname + ':' + port;
 
 // create client to connect to broker with
 var opts = {
-  service : service,
-  id : "send.js"
+  service: service,
+  id: 'send.js'
 };
 var client = mqlight.createClient(opts);
 
 // get message body data to send
 var remain = parsed.argv.remain;
-var messages = (remain.length > 0) ? remain : [ "Hello World!" ];
+var messages = (remain.length > 0) ? remain : ['Hello World!'];
 
 // insert a delay between sends if requested
 var delay = parsed.delay * 1000 || 0;
@@ -99,8 +100,8 @@ client.connect(function(err) {
 
 // once connection is acquired, send messages
 client.on('connected', function() {
-  console.log("Connected to %s using client-id %s", service, client.getId());
-  console.log("Publishing to: %s", topic);
+  console.log('Connected to %s using client-id %s', service, client.getId());
+  console.log('Publishing to: %s', topic);
 
   // queue all messages for sending
   var i = 0;
@@ -112,7 +113,7 @@ client.on('connected', function() {
         process.exit(0);
       }
       if (data) {
-        console.log("# sent message:");
+        console.log('# sent message:');
         console.log(data);
         console.log(delivery);
       }
