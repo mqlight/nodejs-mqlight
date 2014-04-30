@@ -354,9 +354,12 @@ util.inherits(Client, EventEmitter);
  */
 Client.prototype.connect = function(callback) {
 
-  // Validate the parameter list length
+  // Validate the parameter
   if (arguments.length > 1) {
     throw new Error('Too many arguments');
+  }
+  if (callback && (typeof callback !== 'function')) {
+    throw new TypeError('Callback must be a function');
   }
 
   // Performs the connect
@@ -428,7 +431,7 @@ Client.prototype.connect = function(callback) {
     // Indicate that we're connected
     client.state = 'connected';
     process.nextTick(function() {
-      client.emit('connected', true);
+      client.emit('connected');
     });
 
     if (callback) {
@@ -436,7 +439,7 @@ Client.prototype.connect = function(callback) {
         throw new TypeError('callback must be a function');
       }
       process.nextTick(function() {
-        callback(undefined);
+        callback.apply(client);
       });
     }
 
@@ -569,11 +572,11 @@ Client.prototype.disconnect = function(callback) {
     // Indicate that we've disconnected
     client.state = 'disconnected';
     process.nextTick(function() {
-      client.emit('disconnected', true);
+      client.emit('disconnected');
     });
     if (callback) {
       process.nextTick(function() {
-        callback(undefined);
+        callback.apply(client);
       });
     }
     return;
@@ -588,7 +591,7 @@ Client.prototype.disconnect = function(callback) {
       client.getState() === 'disconnecting') {
     process.nextTick(function() {
       if (callback) {
-        callback(undefined);
+        callback.apply(client);
       }
     });
     return client;
