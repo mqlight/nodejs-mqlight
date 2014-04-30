@@ -117,7 +117,6 @@ Handle<Value> ProtonMessage::Destroy(const Arguments& args)
 
   msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
   msg->~ProtonMessage();
-  delete msg;
 
   return Undefined();
 }
