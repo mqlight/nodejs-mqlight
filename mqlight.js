@@ -103,8 +103,9 @@ exports.QOS_EXACTLY_ONCE = 2;
  * @return {Object} The created Client object.
  */
 exports.createClient = function(options) {
-  var opt = (typeof options == 'object') ? options : {};
-  var client = new Client(opt.service, opt.id, opt.user, opt.password);
+  if (!options) throw TypeError('options object missing');
+  var client = new Client(options.service, options.id,
+                          options.user, options.password);
 
   process.setMaxListeners(0);
   process.once('exit', function() {
@@ -194,7 +195,7 @@ var generateServiceList = function(service) {
     }
     // Set default port if not supplied
     if (!port) {
-      port = '5672';
+      port = (protocol === 'amqp:') ? '5672' : '5671';
     }
     // Check for no path
     if (path) {
@@ -268,10 +269,7 @@ var Client = function(service, id, user, password) {
     throw new RangeError(msg);
   }
 
-  // If client id is not a string then throw an error
-  if (typeof id !== 'string') {
-    throw new TypeError('Client identifier must be a string type');
-  }
+  id = String(id);
 
   // currently client ids are restricted, reject any invalid ones
   for (var i in id) {
@@ -282,13 +280,13 @@ var Client = function(service, id, user, password) {
     }
   }
 
-  // Validate user and password parameters, when specified
-  if (user && typeof user !== 'string') {
-    throw new TypeError('user must be a string type');
+  // User/password must either both be present, or both be absent.
+  if ((user && !password) || (!user && password)) {
+    throw new TypeError('both user and password properties ' +
+                        'must be specified together');
   }
-  if (password && typeof password !== 'string') {
-    throw new TypeError('password must be a string type');
-  }
+  user = String(user);
+  password = String(password);
 
   // Save the required data as client fields
   this.serviceFunction = serviceFunction;

@@ -18,134 +18,265 @@
  */
 
 
-/** @const {string} enable unittest mode in mqlight.js */
+/** NODE_ENV = 'unittest' loads a stub instead of the Proton library */
 process.env.NODE_ENV = 'unittest';
-
 var testCase = require('nodeunit').testCase;
 var mqlight = require('../mqlight');
 
 
-
-/** @constructor */
-module.exports = testCase({
-  'Test createClient': testCase({
-    'Test createClient - good options': function(test) {
-      test.expect(6);
-      var opts = {
-        service: 'amqp://myhost.1234:5672',
-        id: 'test'
-      };
-      var client = mqlight.createClient(opts);
-      test.ok(typeof client === 'object', 'CreateClient returns an object');
-      test.equal('test', client.getId(), 'Client id equals what was set');
-      test.equal('disconnected', client.getState(),
-                 'Initial state is disconnected');
-      test.equal(undefined, client.getService(),
-                 'Service is undefined before a connect call');
-      // when connect does something useful should move this out to a more
-      // suitable test
-      client.connect(function(err) {
-        if (err) {
-          //shoudln't get here
-          console.log('error on connection: ' + err);
-          test.ok(false);
-          test.done();
-        }
-      });
-      client.on('connected', function() {
-        test.equal('connected', client.getState(), 'Client state equals ' +
-                   'connected once the connected event is emitted');
-        test.equal(opts.service, client.getService(), 'Supplied service ' +
-                   'matches result of getService after connect');
-        client.disconnect();
-        test.done();
-      });
-    },
-    'Test createClient - bad options': function(test) {
-      test.expect(4);
-      //service as not a string
-      test.throws(function() {
-        var opts = {
-          service: 123,
-          id: 'test'
-        };
-        mqlight.createClient(opts);
-      }, function(err) {
-        if (err instanceof TypeError &&
-            /service must be a string or array type/.test(err)) {
-          return true;
-        }
-      }, 'Service parameter as non string/array test');
-      //id not as a string
-      test.throws(function() {
-        var opts = {
-          service: 'amqp://localhost:5672',
-          id: 1234
-        };
-        mqlight.createClient(opts);
-      }, function(err) {
-        if (err instanceof TypeError &&
-            /Client identifier must be a string type/.test(err)) {
-          return true;
-        }
-      }, 'Client identifier as a non string test');
-      //user not a string
-      test.throws(function() {
-        var opts = {
-          service: 'amqp://localhost:5672',
-          id: 'testid',
-          user: 124
-        };
-        mqlight.createClient(opts);
-      }, function(err) {
-        if (err instanceof TypeError &&
-            /user must be a string type/.test(err)) {
-          return true;
-        }
-      }, 'user parameter as a non string test');
-      //password not a string
-      test.throws(function() {
-        var opts = {
-          service: 'amqp://localhost:5672',
-          id: 'testid',
-          user: 'myuser',
-          password: function() {
-            console.log('rubbish function');
-          }
-        };
-        mqlight.createClient(opts);
-      }, function(err) {
-        if (err instanceof TypeError &&
-            /password must be a string type/.test(err)) {
-          return true;
-        }
-      }, 'password parameter as a non string test');
-      test.done();
-    },
-    'Test createClient - invalid URIs': function(test) {
-      var invalidUris = [
-        'amqp://amqp://Wrong',
-        'amqp://localhost:34:34',
-        'amqp://test:-34',
-        'amqp://here:34/path',
-        'amqp://rupert:password@NotThere',
-        'amqp://:34'
-      ];
-      test.expect(invalidUris.length);
-      for (var i = 0; i < invalidUris.length; i++) {
-        test.throws(function() {
-          var opts = {
-            service: invalidUris[i],
-            id: 'testid'
-          };
-          mqlight.createClient(opts);
-        }, function(err) {
-          if (err instanceof Error) {
-            return true;
-          }
-        }, 'invalid URI test (' + i + '): ' + invalidUris[i]);
-      }
+/**
+ * Tests the golden path through using a client.
+ * @param {object} test - test case.
+ */
+module.exports.test_golden_path = function(test) {
+  test.expect(6);
+  var opts = {service: 'amqp://myhost.1234:5672', id: 'test'};
+  var client = mqlight.createClient(opts);
+  test.ok(typeof client === 'object', 'CreateClient returns an object');
+  test.equal('test', client.getId(), 'Client id equals what was set');
+  test.equal('disconnected', client.getState(),
+             'Initial state is disconnected');
+  test.equal(undefined, client.getService(),
+             'Service is undefined before a connect call');
+  // TODO: split into its own test when connect actually connects...
+  client.connect(function(err) {
+    if (err) {
+      console.log('error on connection: ' + err);
+      test.ok(false);
       test.done();
     }
-  })
-});
+  });
+  client.on('connected', function() {
+    test.equal('connected', client.getState(),
+               'Client state equals connected once the connected event is ' +
+               'emitted');
+    test.equal(opts.service, client.getService(),
+               'Supplied service matches result of getService after connect');
+    client.disconnect();
+    test.done();
+  });
+};
+
+
+/**
+ * Test that a service name must be a string value.
+ * @param {object} test - test case.
+ */
+module.exports.test_service_not_a_string = function(test) {
+  test.throws(function() {
+    mqlight.createClient({service: 123});
+  }, function(err) {
+    if ((err instanceof TypeError) &&
+        /service must be a string or array type/.test(err)) {
+      return true;
+    }
+  }, 'Service parameter as non string/array test');
+  test.done();
+};
+
+
+/**
+ * Test that passing no values to createClient is not valid.
+ * @param {object} test - test case.
+ */
+module.exports.test_createClient_must_have_a_value = function(test) {
+  test.throws(function() {
+    mqlight.createClient();
+  }, function(err) {
+    if ((err instanceof TypeError) &&
+        /options object missing/.test(err)) {
+      return true;
+    }
+  }, 'somr properties myst be passed to createClient(...)');
+  test.done();
+};
+
+
+/**
+ * Test that omitting the 'service' property from createClient causes an error.
+ * @param {object} test - test case.
+ */
+module.exports.test_createClient_must_have_service_value = function(test) {
+  test.throws(function() {
+    mqlight.createClient({id: 'abc'});
+  }, function(err) {
+    if ((err instanceof Error) && /service is undefined/.test(err)) {
+      return true;
+    }
+  }, 'service property must be specified to createClient(...)');
+
+  test.done();
+};
+
+
+/**
+ * Test that, providing the thing passed into createClient(...) has a 'service'
+ * property - then it's happy...
+ * @param {object} test - test case.
+ */
+module.exports.test_createClient_ignores_unknown_properties = function(test) {
+  var oddOpts = function() {};  // for added craziness: not an object...
+  oddOpts.service = 'amqp://localhost';
+  oddOpts.fruit = 'avocado';
+  oddOpts.size = 3;
+  mqlight.createClient(oddOpts);
+  test.done();
+};
+
+
+/**
+ * Test a range of types / values for client IDs.
+ * @param {object} test - test case.
+ */
+module.exports.test_id_types_values = function(test) {
+  var testData = [{data: 1234, valid: true},
+                  {data: null, valid: true},
+                  {data: true, valid: true},
+                  {data: 'abc123', valid: true},
+                  {data: ':1234', valid: false},
+                  {data: '1234:', valid: false},
+                  {data: '12:34', valid: false},
+                  {data: '%.\_', valid: true}];
+  for (var i = 0; i < testData.length; ++i) {
+    try {
+      mqlight.createClient({
+        service: 'amqp://localhost:5672',
+        id: testData[i].data
+      });
+      test.ok(testData[i].valid, "Expected '" + testData[i].data +
+              "' to be invalid");
+    } catch (_) {
+      if (testData[i].valid) {
+        console.log(testData[i]);
+        throw _;
+      }
+    }
+  }
+  test.done();
+};
+
+
+/**
+ * Test that if the 'id' property is omitted then a client id will be
+ * generated.
+ * @param {object} test - test case.
+ */
+module.exports.test_id_autogenerated = function(test) {
+  var client = mqlight.createClient({service: 'amqp://localhost:5672'});
+  test.ok(/AUTO_[a-z0-9]{7}/.test(client.getId()), 'weird generated id: ' +
+          client.getId());
+  test.done();
+};
+
+
+/**
+ * Test a range of user and password types / values.
+ * @param {object} test - test case.
+ */
+module.exports.test_user_password_types_values = function(test) {
+  var testData = [{user: 'abc', password: undefined, valid: false},
+                  {user: undefined, password: 'abc', valid: false},
+                  {user: 'abc', password: '123', valid: true},
+                  {user: 1234, password: 'abc', valid: true},
+                  {user: 'abc', password: 1234, valid: true},
+                  {user: '!"$%^&*()-_=+[{]};:\'@#~|\<,>.?/',
+          password: '!"$%^&*()-_=+[{]};:\'@#~|\<,>.?/',
+          valid: true}];
+  for (var i = 0; i < testData.length; ++i) {
+    try {
+      mqlight.createClient({
+        service: 'amqp://localhost:5672',
+        user: testData[i].user,
+        password: testData[i].password
+      });
+      test.ok(testData[i].valid, "Expected '" + testData[i].user + '/' +
+              testData[i].password + "' to be invalid");
+    } catch (_) {
+      if (testData[i].valid) {
+        console.log(i);
+        throw _;
+      }
+    }
+  }
+  test.done();
+};
+
+
+/**
+ * Test that a clear-text password isn't trivially recoverable from the client
+ * object.
+ * @param {object} test - test case.
+ */
+module.exports.test_password_hidden = function(test) {
+  var opts = {
+    service: 'amqp://localhost:5672',
+    user: 'bob',
+    password: 's3cret'
+  };
+  var client = mqlight.createClient(opts);
+  var inspectedClient = require('util').inspect(client);
+  test.ok(!/s3cret/.test(inspectedClient), inspectedClient);
+  test.done();
+};
+
+
+/**
+ * Test a range of invalid URIs are rejected.
+ * @param {object} test - test case.
+ */
+module.exports.test_invalid_URIs = function(test) {
+  var invalidUris = ['amqp://amqp://Wrong',
+                     'amqp://localhost:34:34',
+                     'amqp://test:-34',
+                     'amqp://here:34/path',
+                     'amqp://rupert:password@NotThere',
+                     'amqp://:34'];
+  test.expect(invalidUris.length);
+  for (var i = 0; i < invalidUris.length; i++) {
+    test.throws(function() {
+      var opts = {
+        service: invalidUris[i],
+        id: 'testid'
+      };
+      mqlight.createClient(opts);
+    }, function(err) {
+      if (err instanceof Error) {
+        return true;
+      }
+    }, 'invalid URI test (' + i + '): ' + invalidUris[i]);
+  }
+  test.done();
+};
+
+
+/**
+ * Test that the value returned by client.getService() is a lower cased URL
+ * which always has a port number.
+ * @param {object} test - test case.
+ */
+module.exports.test_valid_URIs = function(test) {
+  var testData = [{uri: 'amqp://host', expected: 'amqp://host:5672'},
+                  {uri: 'amqps://host', expected: 'amqps://host:5671'},
+                  {uri: 'AmQp://HoSt', expected: 'amqp://host:5672'},
+                  {uri: 'aMqPs://hOsT', expected: 'amqps://host:5671'},
+                  {uri: 'amqp://host:1234', expected: 'amqp://host:1234'},
+                  {uri: 'amqps://host:4321', expected: 'amqps://host:4321'},
+                  {uri: 'aMqP://HoSt:1234', expected: 'amqp://host:1234'},
+                  {uri: 'AmQpS://hOsT:4321', expected: 'amqps://host:4321'}];
+  var count = 0;
+
+  var clientTest = function(uri, expected) {
+    var client = mqlight.createClient({service: uri});
+    client.connect(function(err) {
+      test.ok(!err);
+      test.equals(expected, client.getService());
+      client.disconnect();
+      ++count;
+      if (count == testData.length) test.done();
+    });
+  };
+
+  for (var i = 0; i < testData.length; ++i) {
+    clientTest(testData[i].uri, testData[i].expected);
+  }
+};
