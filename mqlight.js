@@ -772,10 +772,10 @@ Client.prototype.send = function(topic, data, options, callback) {
               }
             };
             setImmediate(function() {
-              // TODO: defect 59405 might mean we start passing arguments into this
-              // callback, again...
-              //sendCallback.apply(client, [undefined, protonMsg.body, delivery]);
-              sendCallback.apply(client);
+              // TODO: defect 59405 might mean we change what gets passed into
+              // the callback...
+              sendCallback.apply(client, [undefined, protonMsg.body, delivery]);
+              //sendCallback.apply(client);
             });
           }
           protonMsg.destroy();

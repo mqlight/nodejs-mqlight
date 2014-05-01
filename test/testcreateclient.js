@@ -290,6 +290,6 @@ module.exports.test_valid_URIs = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_createClient_too_many_arguments = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'}, 'wallflower');
+  mqlight.createClient({service: 'amqp://host'}, 'wallflower');
   test.done();
 };

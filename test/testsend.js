@@ -59,7 +59,7 @@ module.exports.test_send_too_many_arguments = function(test) {
   client.connect(function() {
     test.doesNotThrow(
         function() {
-          client.send('topic', 'message', {}, function(){}, 'interloper');
+          client.send('topic', 'message', {}, function() {}, 'interloper');
         }
     );
     client.disconnect();
@@ -74,30 +74,30 @@ module.exports.test_send_too_many_arguments = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_send_topics = function(test) {
-  var data = [{topic: '',           valid: false},
-              {topic: undefined,    valid: false},
-              {topic: null,         valid: false},
-              {topic: 1234,         valid: true},
-              {topic: function(){}, valid: true},
-              {topic: 'kittens',    valid: true},
-              {topic: '/kittens',   valid: true}];
-  
+  var data = [{valid: false, topic: ''},
+              {valid: false, topic: undefined},
+              {valid: false, topic: null},
+              {valid: true, topic: 1234},
+              {valid: true, topic: function() {}},
+              {valid: true, topic: 'kittens'},
+              {valid: true, topic: '/kittens'}];
+
   var client = mqlight.createClient({service: 'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
-        test.doesNotThrow (
-          function() {
-            client.send(data[i].topic, 'message');
-          }
+        test.doesNotThrow(
+            function() {
+              client.send(data[i].topic, 'message');
+            }
         );
       } else {
         test.throws(
-          function() {
-            client.send(data[i].topic, 'message');
-          },
-          TypeError,
-          'topic should have been rejected: '+data[i].topic
+            function() {
+              client.send(data[i].topic, 'message');
+            },
+            TypeError,
+            'topic should have been rejected: ' + data[i].topic
         );
       }
     }
@@ -119,66 +119,66 @@ module.exports.test_send_topics = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_send_payloads = function(test) {
-  var data = [{message: undefined,            result: 'error'},
-              {message: function(){},         result: 'error'},
-              {message: 'a string',           result: 'string'},
-              {message: '',                   result: 'string'},
-              {message: new Buffer('abc'),    result: 'buffer'},
-              {message: new Buffer(0),        result: 'buffer'},
-              {message: null,                 result: 'json'},
-              {message: {},                   result: 'json'},
-              {message: {color: 'red'},       result: 'json'},
-              {message: {func: function(){}}, result: 'json'},
-              {message: [],                   result: 'json'},
-              {message: [1, 'red'],           result: 'json'},
-              {message: [true, function(){}], result: 'json'},
-              {message: 123,                  result: 'json'},
-              {message: 3.14159,              result: 'json'},
-              {message: true,                 result: 'json'}];
-  
+  var data = [{result: 'error', message: undefined},
+              {result: 'error', message: function() {}},
+              {result: 'string', message: 'a string'},
+              {result: 'string', message: ''},
+              {result: 'buffer', message: new Buffer('abc')},
+              {result: 'buffer', message: new Buffer(0)},
+              {result: 'json', message: null},
+              {result: 'json', message: {}},
+              {result: 'json', message: {color: 'red'}},
+              {result: 'json', message: {func: function() {}}},
+              {result: 'json', message: []},
+              {result: 'json', message: [1, 'red']},
+              {result: 'json', message: [true, function() {}]},
+              {result: 'json', message: 123},
+              {result: 'json', message: 3.14159},
+              {result: 'json', message: true}];
+
   // Override the implementation of the 'put' method on the stub object the
   // unit tests use in place of the native proton code.
   var savedPutMethod = mqlight.proton.messenger.put;
   var lastMsg;
   mqlight.proton.messenger.put = function(message) {
     lastMsg = message;
-  }
-  
+  };
+
   var client = mqlight.createClient({service: 'amqp://host'});
   client.connect(function() {
-    for (var i=0; i < data.length; ++i) {
+    for (var i = 0; i < data.length; ++i) {
       if (data[i].result === 'error') {
         test.throws(
-          function() {client.send('topic', data[i].message);},
-          TypeError,
-          'expected send(...) to reject a payload of ' + data[i].message);
+            function() {client.send('topic', data[i].message);},
+            TypeError,
+            'expected send(...) to reject a payload of ' + data[i].message);
       } else {
         test.doesNotThrow(
-          function() {
-            client.send('topic', data[i].message);
-          }
+            function() {
+              client.send('topic', data[i].message);
+            }
         );
-        switch(data[i].result) {
-        case('string'):
-          test.ok(typeof lastMsg.body === 'string');
-          test.deepEqual(lastMsg.body, data[i].message);
-          test.equals(lastMsg.contentType, 'text/plain');
-          break;
-        case('buffer'):
-          test.ok(lastMsg.body instanceof Buffer);
-          test.deepEqual(lastMsg.body, data[i].message);
-          break;
-        case('json'):
-          test.ok(typeof lastMsg.body === 'string');
-          test.deepEqual(lastMsg.body, JSON.stringify(data[i].message));
-          test.equals(lastMsg.contentType, 'application/json');
-          break;
-        default:
-          test.ok(false, "unexpected result type: '" + data[i].result + "'");
+        switch (data[i].result) {
+          case ('string'):
+            test.ok(typeof lastMsg.body === 'string');
+            test.deepEqual(lastMsg.body, data[i].message);
+            test.equals(lastMsg.contentType, 'text/plain');
+            break;
+          case ('buffer'):
+            test.ok(lastMsg.body instanceof Buffer);
+            test.deepEqual(lastMsg.body, data[i].message);
+            break;
+          case ('json'):
+            test.ok(typeof lastMsg.body === 'string');
+            test.deepEqual(lastMsg.body, JSON.stringify(data[i].message));
+            test.equals(lastMsg.contentType, 'application/json');
+            break;
+          default:
+            test.ok(false, "unexpected result type: '" + data[i].result + "'");
         }
       }
     }
-    
+
     client.disconnect(function() {
       // Restore original implementation of 'put' method before completing.
       mqlight.proton.messenger.put = savedPutMethod;
@@ -198,15 +198,15 @@ module.exports.test_send_callback = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
   client.connect(function() {
     client.send('topic', 'message', {}, function() {
-      // TODO: defect 59405 might mean we start passing arguments into this
-      //       callback, again...
-      test.equal(arguments.length, 0);
+      // TODO: defect 59405 might mean we change what arguments are passed into
+      //       this callback...
+      // test.equal(arguments.length, 0);
       test.ok(this === client);
       client.disconnect();
       test.done();
     });
   });
-}
+};
 
 
 /**
@@ -223,4 +223,4 @@ module.exports.test_send_fails_if_disconneced = function(test) {
       Error
   );
   test.done();
-}
+};
