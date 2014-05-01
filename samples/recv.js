@@ -41,7 +41,8 @@ if (parsed.help || remain.length > 1) {
   console.log('  -h, --help            show this help message and exit');
   console.log('  -s, --share           specify an optional share name to ' +
               'create or join a');
-  console.log('                        shared subscription for the given topic');
+  console.log('                        shared subscription for the given ' +
+              'topic');
   console.log('');
   if (parsed.help) {
     process.exit(0);

@@ -285,9 +285,6 @@ var Client = function(service, id, user, password) {
     throw new TypeError('both user and password properties ' +
                         'must be specified together');
   }
-  user = String(user);
-  password = String(password);
-
   // Save the required data as client fields
   this.serviceFunction = serviceFunction;
   this.serviceList = serviceList;
@@ -296,8 +293,8 @@ var Client = function(service, id, user, password) {
   // Initialize ProtonMessenger with auth details
   if (user) {
     // URI encode username and password before passing them to proton
-    var usr = encodeURIComponent(user);
-    var pw = password ? encodeURIComponent(password) : '';
+    var usr = encodeURIComponent(String(user));
+    var pw = encodeURIComponent(String(password));
     this.messenger = proton.createMessenger(id, usr, pw);
   } else {
     this.messenger = proton.createMessenger(id);
@@ -354,12 +351,9 @@ util.inherits(Client, EventEmitter);
  */
 Client.prototype.connect = function(callback) {
 
-  // Validate the parameter
+  // Validate the parameter list length
   if (arguments.length > 1) {
     throw new Error('Too many arguments');
-  }
-  if (callback && (typeof callback !== 'function')) {
-    throw new TypeError('Callback must be a function');
   }
 
   // Performs the connect
@@ -431,7 +425,7 @@ Client.prototype.connect = function(callback) {
     // Indicate that we're connected
     client.state = 'connected';
     process.nextTick(function() {
-      client.emit('connected');
+      client.emit('connected', true);
     });
 
     if (callback) {
@@ -439,7 +433,7 @@ Client.prototype.connect = function(callback) {
         throw new TypeError('callback must be a function');
       }
       process.nextTick(function() {
-        callback.apply(client);
+        callback(undefined);
       });
     }
 
@@ -572,11 +566,11 @@ Client.prototype.disconnect = function(callback) {
     // Indicate that we've disconnected
     client.state = 'disconnected';
     process.nextTick(function() {
-      client.emit('disconnected');
+      client.emit('disconnected', true);
     });
     if (callback) {
       process.nextTick(function() {
-        callback.apply(client);
+        callback(undefined);
       });
     }
     return;
@@ -591,7 +585,7 @@ Client.prototype.disconnect = function(callback) {
       client.getState() === 'disconnecting') {
     process.nextTick(function() {
       if (callback) {
-        callback.apply(client);
+        callback(undefined);
       }
     });
     return client;
