@@ -761,6 +761,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       try {
         if (messenger.hasSent(protonMsg)) {
           if (sendCallback) {
+            var body = protonMsg.body;
             var decoded = decodeURIComponent(protonMsg.address);
             var topic = url.parse(decoded).path.substring(1);
             var delivery = {
@@ -774,7 +775,7 @@ Client.prototype.send = function(topic, data, options, callback) {
             setImmediate(function() {
               // TODO: defect 59405 might mean we change what gets passed into
               // the callback...
-              sendCallback.apply(client, [undefined, protonMsg.body, delivery]);
+              sendCallback.apply(client, [undefined, body, delivery]);
               //sendCallback.apply(client);
             });
           }
@@ -883,38 +884,38 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
     } else {
       throw new TypeError('share must be a string type');
     }
-    if (options) {
-      if (callbackOption) {
-        throw new TypeError('Invalid third argument, callback already ' +
-                            'matched for second argument');
-      }
-      if (options instanceof Function) {
-        callbackOption = options;
-      } else {
-        if (optionsOption) {
-          throw new TypeError('Invalid third argument, options already ' +
-                              'matched for second argument');
-        }
-        if (options instanceof Object) {
-          optionsOption = options;
-        } else {
-          throw new TypeError('options must be an object type');
-        }
-      }
-      if (callback) {
-        if (callbackOption) {
-          throw new TypeError('Invalid forth argument, callback already ' +
-                              'matched for third argument');
-        }
-        if (callback instanceof Function) {
-          callbackOption = callback;
-        } else {
-          throw new TypeError('callback must be a function type');
-        }
-      }
-    }
   } else {
     shareOption = 'private:';
+  }
+  if (options) {
+    if (callbackOption) {
+      throw new TypeError('Invalid third argument, callback already ' +
+                          'matched for second argument');
+    }
+    if (options instanceof Function) {
+      callbackOption = options;
+    } else {
+      if (optionsOption) {
+        throw new TypeError('Invalid third argument, options already ' +
+                            'matched for second argument');
+      }
+      if (options instanceof Object) {
+        optionsOption = options;
+      } else {
+        throw new TypeError('options must be an object type');
+      }
+    }
+  }
+  if (callback) {
+    if (callbackOption) {
+      throw new TypeError('Invalid forth argument, callback already ' +
+                          'matched for third argument');
+    }
+    if (callback instanceof Function) {
+      callbackOption = callback;
+    } else {
+      throw new TypeError('callback must be a function type');
+    }
   }
 
   // Ensure we have attempted a connect
@@ -934,7 +935,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
 
   setImmediate(function() {
     if (callbackOption) {
-      callbackOption(err, pattern);
+      callbackOption.apply(client, [err, pattern]);
     }
     if (err) {
       client.emit('error', err);
