@@ -26,44 +26,54 @@ module.exports.createProtonStub = function() {
   var started = false;
   
 	return {
+	   messenger : {
+	    send: function() {
+	      if (DEBUG) console.log('stub send function called');
+	    },
+	    start: function() {
+	      if (DEBUG) console.log('stub start function called');
+	      start = true;
+	    },
+	    connect: function() {
+	      if (DEBUG) console.log('stub connect function called');
+	    },
+	    receive: function() {
+	      // Commented - as generates a lot of output...
+	      // if (DEBUG) console.log('stub receive function called');
+	      return [];
+	    },
+	    stop: function() {
+	      if (DEBUG) console.log('stub stop function called');
+	      started = false;
+	    },
+	    put: function() {
+	      if (DEBUG) console.log('stub put function called');
+	    },
+	    hasSent: function() {
+	      if (DEBUG) console.log('stub hasSent function called');
+	      return true;
+	    },
+	    stopped: function() {
+	      if (DEBUG) console.log('stub stopped function called');
+	      return !started;
+	    },
+	    subscribe: function() {
+	      if (DEBUG) console.log('stub subscribe function called');
+	    }
+	  },
+	  
 	  createMessenger : function() {
 			if (DEBUG) console.log('stub createMessenger function called');
-			return 	{
-				send: function() {
-				  if (DEBUG) console.log('stub send function called');
-				},
-				start: function() {
-				  if (DEBUG) console.log('stub start function called');
-				  start = true;
-				},
-				connect: function() {
-				  if (DEBUG) console.log('stub connect function called');
-				},
-				receive: function() {
-				  // Commented - as generates a lot of output...
-					// if (DEBUG) console.log('stub receive function called');
-					return [];
-				},
-				stop: function() {
-				  if (DEBUG) console.log('stub stop function called');
-				  started = false;
-				},
-				put: function() {
-				  if (DEBUG) console.log('stub put function called');
-				},
-				hasSent: function() {
-				  if (DEBUG) console.log('stub hasSent function called');
-				  return true;
-				},
-				stopped: function() {
-				  if (DEBUG) console.log('stub stopped function called');
-				  return !started;
-				},
-				subscribe: function() {
-				  if (DEBUG) console.log('stub subscribe function called');
-				}
-			}
-		}
+			return this.messenger;
+		},
 		
+	  createMessage : function() {
+	    if (DEBUG) console.log('stub createMessage function called');
+	    return {
+	      destroy: function() {
+	        if (DEBUG) console.log('stub destroy function called');
+	      }
+	    }
+	  }
 	}
 };

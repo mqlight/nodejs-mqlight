@@ -282,3 +282,14 @@ module.exports.test_valid_URIs = function(test) {
     clientTest(testData[i].uri, testData[i].expected);
   }
 };
+
+
+/**
+ * Test that if too many arguments are supplied to createClient - then they are
+ * ignored.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_createClient_too_many_arguments = function(test) {
+  var client = mqlight.createClient({service: 'amqp://host'}, 'wallflower');
+  test.done();
+};
