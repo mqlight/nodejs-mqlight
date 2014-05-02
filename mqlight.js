@@ -853,69 +853,58 @@ Client.prototype.send = function(topic, data, options, callback) {
  */
 Client.prototype.subscribe = function(pattern, share, options, callback) {
 
-  // Validate the parameter list length
-  if (arguments.length > 4) {
-    throw new Error('Too many arguments');
+  // Must accept at least one option - and first option is always a pattern.
+  if (arguments.length == 0) {
+    throw new TypeError('Must specify at least a pattern!');
   }
-
-  // Validate the pattern parameter
   if (!pattern) {
-    throw new Error('Cannot subscribe to undefined pattern.');
-  } else if (typeof pattern !== 'string') {
-    throw new TypeError('pattern must be a string type');
+    throw new TypeError('Must specify at least a pattern!');
+  }
+  pattern = String(pattern);
+
+  // Two or three arguments are the interesting cases - the rules we use to
+  // disambiguate are:
+  //   1) If the last argument is a function - it's the callback
+  //   2) If we are unsure if something is the share or the options then
+  //      a) It's the share if it's a String
+  //      b) It's the options if it's an Object
+  //      c) If it's neither of the above, then it's the share
+  //         (and convert it to a String).
+  if (arguments.length === 2) {
+    if (arguments[1] instanceof Function) {
+      callback = share;
+      share = undefined;
+    } else if (!(arguments[1] instanceof String) &&
+               (arguments[1] instanceof Object)) {
+      options = share;
+      share = undefined;
+    }
+  } else if (arguments.length === 3) {
+    if (arguments[2] instanceof Function) {
+      callback = arguments[2];
+      if (!(arguments[1] instanceof String) &&
+          (arguments[1] instanceof Object)) {
+        options = arguments[1];
+        share = undefined;
+      } else {
+        options = undefined;
+      }
+    }
   }
 
-  // Validate the remaining optional parameters, assigning local variables to
-  // the appropriate parameter
-  var shareOption, optionsOption, callbackOption;
   if (share) {
-    if (typeof share === 'string') {
-      if (share.indexOf(':') >= 0) {
-        throw new Error("share argument value '" + share + "' is invalid " +
-                        "because it contains a colon (\':\') character");
-      }
-      shareOption = 'share:' + share + ':';
-    } else if (share instanceof Function) {
-      shareOption = 'private:';
-      callbackOption = share;
-    } else if (share instanceof Object) {
-      shareOption = 'private:';
-      optionsOption = share;
-    } else {
-      throw new TypeError('share must be a string type');
+    share = String(share);
+    if (share.indexOf(':') >= 0) {
+      throw new Error("share argument value '" + share + "' is invalid " +
+                      "because it contains a colon (\':\') character");
     }
+    share = 'share:' + share + ':';
   } else {
-    shareOption = 'private:';
+    share = 'private:';
   }
-  if (options) {
-    if (callbackOption) {
-      throw new TypeError('Invalid third argument, callback already ' +
-                          'matched for second argument');
-    }
-    if (options instanceof Function) {
-      callbackOption = options;
-    } else {
-      if (optionsOption) {
-        throw new TypeError('Invalid third argument, options already ' +
-                            'matched for second argument');
-      }
-      if (options instanceof Object) {
-        optionsOption = options;
-      } else {
-        throw new TypeError('options must be an object type');
-      }
-    }
-  }
-  if (callback) {
-    if (callbackOption) {
-      throw new TypeError('Invalid forth argument, callback already ' +
-                          'matched for third argument');
-    }
-    if (callback instanceof Function) {
-      callbackOption = callback;
-    } else {
-      throw new TypeError('callback must be a function type');
-    }
+
+  if (callback && !(callback instanceof Function)) {
+    throw new TypeError('callback must be a function type');
   }
 
   // Ensure we have attempted a connect
@@ -923,7 +912,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
 
   // Subscribe using the specified pattern and share options
   var messenger = this.messenger;
-  var address = this.getService() + '/' + shareOption + pattern;
+  var address = this.getService() + '/' + share + pattern;
   var client = this;
 
   var err;
@@ -934,8 +923,8 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   }
 
   setImmediate(function() {
-    if (callbackOption) {
-      callbackOption.apply(client, [err, pattern]);
+    if (callback) {
+      callback.apply(client, [err, pattern]);
     }
     if (err) {
       client.emit('error', err);
