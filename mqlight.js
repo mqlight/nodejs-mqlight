@@ -855,10 +855,10 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
 
   // Must accept at least one option - and first option is always a pattern.
   if (arguments.length == 0) {
-    throw new TypeError('Must specify at least a pattern!');
+    throw new TypeError("You must specify a 'pattern' argument");
   }
   if (!pattern) {
-    throw new TypeError('Must specify at least a pattern!');
+    throw new TypeError("You must specify a 'pattern' argument");
   }
   pattern = String(pattern);
 
