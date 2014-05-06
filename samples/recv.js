@@ -87,7 +87,8 @@ var client = mqlight.createClient(opts);
 // Make the connection
 client.connect(function(err) {
   if (err) {
-    console.log(err);
+    console.error(err.message);
+    process.exit(1);
   }
 });
 
@@ -98,8 +99,8 @@ client.on('connected', function() {
   // now subscribe to topic for publications
   client.subscribe(topic, parsed.share, function(err, pattern) {
     if (err) {
-      console.error('Problem with subscribe request: ' + err.message);
-      process.exit(0);
+      console.error('Problem with subscribe request: %s', err.message);
+      process.exit(1);
     }
     if (pattern) {
       console.log('Subscribed to: %s', pattern);

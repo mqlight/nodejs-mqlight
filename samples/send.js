@@ -90,7 +90,8 @@ var delay = parsed.delay * 1000 || 0;
 // Make the connection
 client.connect(function(err) {
   if (err) {
-    console.log(err);
+    console.error(err.message);
+    process.exit(1);
   }
 });
 
@@ -105,8 +106,8 @@ client.on('connected', function() {
     var body = messages[i];
     client.send(topic, body, function(err, data, delivery) {
       if (err) {
-        console.error('Problem with send request: ' + err.message);
-        process.exit(0);
+        console.error('Problem with send request: %s', err.message);
+        process.exit(1);
       }
       if (data) {
         console.log('# sent message:');
