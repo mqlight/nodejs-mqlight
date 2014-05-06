@@ -376,7 +376,6 @@ Client.prototype.connect = function(callback) {
     }
 
     client.state = 'connecting';
-    client.messenger.start();
 
     // Obtain the list of services for connect
     var serviceList;

@@ -67,7 +67,6 @@ void ProtonMessenger::Init(Handle<Object> target)
 
   NODE_SET_PROTOTYPE_METHOD(constructor, "put", Put);
   NODE_SET_PROTOTYPE_METHOD(constructor, "send", Send);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "start", Start);
   NODE_SET_PROTOTYPE_METHOD(constructor, "stop", Stop);
   NODE_SET_PROTOTYPE_METHOD(constructor, "connect", Connect);
   NODE_SET_PROTOTYPE_METHOD(constructor, "subscribe", Subscribe);
@@ -226,15 +225,6 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args) {
   {
     THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)))
   }
-
-  return scope.Close(Boolean::New(true));
-}
-
-Handle<Value> ProtonMessenger::Start(const Arguments& args) {
-  HandleScope scope;
-
-//  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-//  pn_messenger_start(obj->messenger);
 
   return scope.Close(Boolean::New(true));
 }
