@@ -50,9 +50,8 @@ typedef unsigned __int32 uint32_t;
 using namespace v8;
 
 #define THROW_EXCEPTION(error) \
-    const char *msg = error; \
-    Local<Value> e = Exception::TypeError(String::New(msg)); \
-    return ThrowException(e);
+    ThrowException(Exception::TypeError(String::New(error == NULL ? "unknown error" : error))); \
+    return scope.Close(Undefined());
 
 Persistent<FunctionTemplate> ProtonMessenger::constructor;
 
@@ -234,8 +233,8 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args) {
 Handle<Value> ProtonMessenger::Start(const Arguments& args) {
   HandleScope scope;
 
-  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  pn_messenger_start(obj->messenger);
+//  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+//  pn_messenger_start(obj->messenger);
 
   return scope.Close(Boolean::New(true));
 }
@@ -252,9 +251,21 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   String::Utf8Value param(args[0]->ToString());
   std::string address = std::string(*param);
 
-  int status = pn_messenger_connect(obj->messenger, address.c_str());
-  if (pn_messenger_errno(obj->messenger)) {
-    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)));
+  // Create a dummy route for validation
+  int status = pn_messenger_route(obj->messenger, address.c_str(), address.c_str());
+  if (status) {
+      THROW_EXCEPTION("Failed to set messenger route");
+  }
+
+  // Indicate that routes should be validated
+  if (pn_messenger_set_flags(obj->messenger, PN_FLAGS_CHECK_ROUTES)) {
+	THROW_EXCEPTION("Invalid set flags call");
+  }
+
+  // Start the messenger. This will fail if the route is invalid
+  status = pn_messenger_start(obj->messenger);
+  if (status) {
+      THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)));
   }
 
   return scope.Close(Integer::New(status));
