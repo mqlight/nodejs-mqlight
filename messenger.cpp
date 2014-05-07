@@ -342,6 +342,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
     vector.push_back(msgObj);
     pn_tracker_t tracker = pn_messenger_incoming_tracker(obj->messenger);
     pn_messenger_accept(obj->messenger, tracker, 0);
+    pn_messenger_settle(obj->messenger, tracker, 0);
   }
 
   Local<Array> messages = Array::New(vector.size());
@@ -381,6 +382,11 @@ Handle<Value> ProtonMessenger::HasSent(const Arguments& args)
 
   bool isAccepted = (pn_messenger_status(obj->messenger,
                                          msg->tracker) == PN_STATUS_ACCEPTED);
+  if (isAccepted)
+  {
+    pn_messenger_settle(obj->messenger, msg->tracker, 0);
+  }
+
   return scope.Close(Boolean::New(isAccepted));
 }
 
