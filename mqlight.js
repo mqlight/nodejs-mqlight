@@ -705,19 +705,20 @@ Client.prototype.send = function(topic, data, options, callback) {
       if (options instanceof Object) {
         //optionsOption = options;
       } else {
-        throw new TypeError('options must be an object type');
+        throw new TypeError('options must be an object type not a ' +
+                            (typeof options) + ')');
       }
     }
-    if (callback) {
-      if (callbackOption) {
-        throw new TypeError('Invalid forth argument, callback already matched' +
-                            'for third argument');
-      }
-      if (callback instanceof Function) {
-        callbackOption = callback;
-      } else {
-        throw new TypeError('callback must be a function type');
-      }
+  }
+  if (callback) {
+    if (callbackOption) {
+      throw new TypeError('Invalid forth argument, callback already matched' +
+                          'for third argument');
+    }
+    if (callback instanceof Function) {
+      callbackOption = callback;
+    } else {
+      throw new TypeError('callback must be a function type');
     }
   }
 
@@ -853,7 +854,7 @@ Client.prototype.send = function(topic, data, options, callback) {
 Client.prototype.subscribe = function(pattern, share, options, callback) {
 
   // Must accept at least one option - and first option is always a pattern.
-  if (arguments.length == 0) {
+  if (arguments.length === 0) {
     throw new TypeError("You must specify a 'pattern' argument");
   }
   if (!pattern) {

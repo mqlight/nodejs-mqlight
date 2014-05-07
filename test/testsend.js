@@ -195,16 +195,34 @@ module.exports.test_send_payloads = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_send_callback = function(test) {
+  var timeout = setTimeout(function() {
+    test.ok(false, 'test timed out before all callbacks were triggered.');
+    test.done();
+  }, 5000);
+  var testData = [{topic: 'topic1', data: 'data1', options: {}},
+                  {topic: 'topic2', data: 'data2', options: undefined}];
+  test.expect(testData.length * 2);
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.connect(function() {
-    client.send('topic', 'message', {}, function() {
-      // TODO: defect 59405 might mean we change what arguments are passed into
-      //       this callback...
-      // test.equal(arguments.length, 0);
-      test.ok(this === client);
+  var count = 0;
+  var callback = function() {
+    // TODO: defect 59405 might mean we change what arguments are passed
+    //       into this callback...
+    // test.equal(arguments.length, 0);
+    test.ok(this === client);
+    ++count;
+    if (count === testData.length) {
       client.disconnect();
+      clearTimeout(timeout);
       test.done();
-    });
+    }
+  };
+  client.connect(function() {
+    for (var i = 0; i < testData.length; ++i) {
+      test.doesNotThrow(function() {
+        client.send(testData[i].topic, testData[i].data, testData[i].options,
+                    callback);
+      });
+    }
   });
 };
 
