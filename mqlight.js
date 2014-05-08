@@ -17,7 +17,70 @@
  * </copyright>
  */
 
+/*
+ * Set up logging to stderr. The level of output is configured by the
+ * value of the MQLIGHT_NODE_LOG environment variable. The default is
+ * 'ffdc'.
+ */
+var moment = require('moment');
+var NO_CLIENT_ID = '*';
+log = function(lvl, id, message) {
+  if (logger.levels[logger.level] <= logger.levels[lvl]) {
+    logger.heading = moment(new Date()).format('HH:mm:ss.SSS') +
+                     ' [' + process.pid + ']';
+    logger.log.apply(this, arguments);
+  }
+};
+
+var logger = require('npmlog');
+logger.addLevel('all', -Infinity, { inverse: true }, 'all         ');
+logger.addLevel('debug', 800, { fg: 'green', bg: 'black' }, 'debug       ');
+logger.addLevel('detail', 1000, { fg: 'blue', bg: 'black' }, 'detail      ');
+logger.addLevel('data', 1500, { fg: 'blue', bg: 'black' }, 'data        ');
+logger.addLevel('parms', 3000, { fg: 'yellow', bg: 'black' }, 'parms       ');
+logger.addLevel('exit', 3000, { fg: 'yellow', bg: 'black' }, 'exit        ');
+logger.addLevel('entry', 3000, { fg: 'yellow', bg: 'black' }, 'entry       ');
+logger.addLevel('entry_exit', 3000, { fg: 'yellow', bg: 'black' },
+                'entry_exit  ');
+logger.addLevel('ffdc', 10000, { fg: 'red', bg: 'black' }, 'ffdc        ');
+
+
+/** @const {string} */
+logger.level = process.env.MQLIGHT_NODE_LOG || 'ffdc';
+log('debug', NO_CLIENT_ID, 'logger.level =', logger.level);
+if (logger.levels[logger.level] <= logger.levels.data) {
+  log('debug', NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
+  /** @const {string} */
+  process.env.PN_TRACE_FRM = '1';
+  if (logger.levels[logger.level] <= logger.levels.detail) {
+    log('debug', NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
+    /** @const {string} */
+    process.env.PN_TRACE_RAW = '1';
+  }
+}
+
+/*
+ * Set up a signal handler that will cause an ffdc to be generated when
+ * the signal is caught. Set the environment variable MQLIGHT_NODE_NO_HANDLER
+ * to stop the signal handler being registered.
+ */
+var pkg = require('./package.json');
 var os = require('os');
+var isWin = (os.platform() === 'win32');
+if (!process.env.MQLIGHT_NODE_NO_HANDLER) {
+  if (isWin) {
+    log('debug', NO_CLIENT_ID, 'Registering signal handler for SIGBREAK');
+    process.on('SIGBREAK', function() {
+      ffdc('SIGBREAK', 255, null, null);
+    });
+  } else {
+    log('debug', NO_CLIENT_ID, 'Registering signal handler for SIGUSR2');
+    process.on('SIGUSR2', function() {
+      ffdc('SIGUSR2', 255, null, null);
+    });
+  }
+}
+
 var _system = os.platform() + '-' + process.arch;
 if (process.env.NODE_ENV === 'unittest') {
   var proton = require('./tests/stubs/stubproton.js').createProtonStub();
@@ -103,6 +166,8 @@ exports.QOS_EXACTLY_ONCE = 2;
  * @return {Object} The created Client object.
  */
 exports.createClient = function(options) {
+  log('entry', NO_CLIENT_ID, 'createClient >');
+
   if (!options) throw TypeError('options object missing');
   var client = new Client(options.service, options.id,
                           options.user, options.password);
@@ -116,6 +181,8 @@ exports.createClient = function(options) {
       } catch (_) {}
     }
   });
+
+  log('exit', client.id, 'createClient <', client);
 
   return client;
 };
@@ -136,6 +203,8 @@ exports.createClient = function(options) {
  *           if an unsupported or invalid URL specified.
  */
 var generateServiceList = function(service) {
+  log('entry', NO_CLIENT_ID, 'generateServiceList >');
+  log('parms', NO_CLIENT_ID, 'service:', service);
 
   // Validate the parameter list length
   if (arguments.length > 1) {
@@ -206,6 +275,8 @@ var generateServiceList = function(service) {
     serviceList[i] = protocol + '//' + host + ':' + port;
   }
 
+  log('exit', NO_CLIENT_ID, 'generateServiceList <', serviceList);
+
   return serviceList;
 };
 
@@ -249,6 +320,12 @@ var generateServiceList = function(service) {
  * @constructor
  */
 var Client = function(service, id, user, password) {
+  log('entry', NO_CLIENT_ID, 'constructor >');
+  log('parms', NO_CLIENT_ID, 'service:', service);
+  log('parms', NO_CLIENT_ID, 'id:', id);
+  log('parms', NO_CLIENT_ID, 'user:', user);
+  log('parms', NO_CLIENT_ID, 'password:', password ? '********' : password);
+
   EventEmitter.call(this);
 
   // Ensure the service is an Array or Function
@@ -303,6 +380,8 @@ var Client = function(service, id, user, password) {
   // Set the initial state to disconnected
   this.state = 'disconnected';
   this.service = undefined;
+
+  log('exit', this.id, 'constructor <', this);
 };
 util.inherits(Client, EventEmitter);
 
@@ -350,6 +429,7 @@ util.inherits(Client, EventEmitter);
  *           If callback is specified and is not a function.
  */
 Client.prototype.connect = function(callback) {
+  log('entry', this.id, 'connect >');
 
   if (callback && (typeof callback !== 'function')) {
     throw new TypeError('Callback must be a function');
@@ -511,6 +591,8 @@ Client.prototype.connect = function(callback) {
     performConnect(client, callback);
   });
 
+  log('exit', this.id, 'connect <', client);
+
   return client;
 };
 
@@ -547,6 +629,7 @@ Client.prototype.connect = function(callback) {
  *           If callback is specified and is not a function.
  */
 Client.prototype.disconnect = function(callback) {
+  log('entry', this.id, 'disconnect >');
 
   var client = this;
 
@@ -588,6 +671,8 @@ Client.prototype.disconnect = function(callback) {
   process.nextTick(function() {
     performDisconnect(client, callback);
   });
+
+  log('exit', this.id, 'disconnect <', client);
 
   return client;
 };
@@ -682,6 +767,7 @@ Client.prototype.hasConnected = function() {
  *           If the topic or data parameter is undefined.
  */
 Client.prototype.send = function(topic, data, options, callback) {
+  log('entry', this.id, 'send >');
 
   // Validate the passed parameters
   if (!topic) {
@@ -689,11 +775,13 @@ Client.prototype.send = function(topic, data, options, callback) {
   } else {
     topic = String(topic);
   }
+  log('parms', this.id, 'topic:', topic);
   if (data === undefined) {
     throw new TypeError('Cannot send undefined data');
   } else if (data instanceof Function) {
     throw new TypeError('Cannot send a function');
   }
+  log('parms', this.id, 'data:', data);
 
   // Validate the remaining optional parameters, assigning local variables to
   // the appropriate parameter
@@ -704,6 +792,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     } else {
       if (options instanceof Object) {
         //optionsOption = options;
+        log('parms', this.id, 'options:', options);
       } else {
         throw new TypeError('options must be an object type not a ' +
                             (typeof options) + ')');
@@ -810,6 +899,8 @@ Client.prototype.send = function(topic, data, options, callback) {
       if (err) client.emit('error', err);
     });
   }
+
+  log('exit', this.id, 'send <');
 };
 
 /**
@@ -852,6 +943,8 @@ Client.prototype.send = function(topic, data, options, callback) {
  *           If the pattern parameter is undefined.
  */
 Client.prototype.subscribe = function(pattern, share, options, callback) {
+  log('entry', this.id, 'subscribe >');
+  log('parms', this.id, 'pattern:', pattern);
 
   // Must accept at least one option - and first option is always a pattern.
   if (arguments.length === 0) {
@@ -903,6 +996,9 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
     share = 'private:';
   }
 
+  log('parms', this.id, 'share:', share);
+  log('parms', this.id, 'options:', options);
+
   if (callback && !(callback instanceof Function)) {
     throw new TypeError('callback must be a function type');
   }
@@ -932,7 +1028,66 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
     }
   });
 
+  log('exit', this.id, 'subscribe <', client);
+
   return client;
+};
+
+var ffdcSequence = 0;
+ffdc = function(fnc, probeId, client, data) {
+  var clientId = client ? client.id : NO_CLIENT_ID;
+
+  log('ffdc', clientId, '+--------------------------------------' +
+      '---------------------------------------+');
+  log('ffdc', clientId, '| IBM MQ Light Node.js Client Module - ' +
+      'First Failure Data Capture');
+  log('ffdc', clientId, '| =====================================' +
+      '==========================');
+  log('ffdc', clientId, '|');
+  log('ffdc', clientId, '| Date/Time         :- ' +
+      moment(new Date()).format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
+  log('ffdc', clientId, '| Host Name         :- ' + os.hostname());
+  log('ffdc', clientId, '| Operating System  :- ' + os.type(), os.release());
+  log('ffdc', clientId, '| Architecture      :- ' + os.platform(), os.arch());
+  log('ffdc', clientId, '| Node Version      :- ' + process.version);
+  log('ffdc', clientId, '| Node Path         :- ' + process.execPath);
+  log('ffdc', clientId, '| Node Arguments    :- ' + process.execArgs);
+  log('ffdc', clientId, '| Program Arguments :- ' + process.argv);
+  if (!isWin) {
+    log('ffdc', clientId, '| User Id            :- ' + process.getuid());
+    log('ffdc', clientId, '| Group Id           :- ' + process.getgid());
+  }
+  log('ffdc', clientId, '| Name              :- ' + pkg.name);
+  log('ffdc', clientId, '| Version           :- ' + pkg.version);
+  log('ffdc', clientId, '| Description       :- ' + pkg.description);
+  log('ffdc', clientId, '| Installation Path :- ' + __dirname);
+  log('ffdc', clientId, '| Uptime            :- ' + process.uptime());
+  log('ffdc', clientId, '| Function          :- ' + fnc);
+  log('ffdc', clientId, '| Probe Id          :- ' + probeId);
+  log('ffdc', clientId, '| FDCSequenceNumber :- ' + ffdcSequence++);
+  log('ffdc', clientId, '+--------------------------------------' +
+      '---------------------------------------+');
+  log('ffdc', clientId, '');
+  log('ffdc', clientId, new Error().stack);
+  if (client) {
+    log('ffdc', clientId, '');
+    log('ffdc', clientId, 'Client');
+    log('ffdc', clientId, client);
+  }
+  if (data) {
+    log('ffdc', clientId, '');
+    log('ffdc', clientId, 'Data');
+    log('ffdc', clientId, data);
+  }
+  log('ffdc', clientId, '');
+  log('ffdc', clientId, 'Memory Usage');
+  log('ffdc', clientId, process.memoryUsage());
+  if ((ffdcSequence === 1) || (probeId === 255)) {
+    log('ffdc', clientId, '');
+    log('ffdc', clientId, 'Environment Variables');
+    log('ffdc', clientId, process.env);
+  }
+  log('ffdc', clientId, '');
 };
 
 /* ------------------------------------------------------------------------- */

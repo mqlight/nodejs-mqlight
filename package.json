@@ -6,10 +6,12 @@
     "gypfile": true,
     "dependencies": {
         "node-uuid": "~1.4.0",
-        "nopt": "~2.2.0"
+        "nopt": "~2.2.0",
+        "npmlog": "0.0.6",
+        "moment": "2.5.0"
     },
     "devDependencies": {
-	    "nodeunit": "~0.8.6"
+        "nodeunit": "~0.8.6"
     },
     "engines": {
         "node": "~0.10.x"
