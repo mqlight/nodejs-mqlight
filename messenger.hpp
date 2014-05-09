@@ -37,6 +37,9 @@
 
 #include <proton/message.h>
 #include <proton/messenger.h>
+#include <proton/condition.h>
+#include <proton/terminus.h>
+#include <proton/link.h>
 
 class ProtonMessenger : public node::ObjectWrap {
 public:

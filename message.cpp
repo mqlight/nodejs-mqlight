@@ -65,6 +65,8 @@ void ProtonMessage::Init(Handle<Object> target)
       GetContentType, SetContentType);
   tpl->InstanceTemplate()->SetAccessor(String::New("address"),
       GetAddress, SetAddress);
+  tpl->InstanceTemplate()->SetAccessor(String::New("linkAddress"),
+      GetLinkAddress);
 
   target->Set(name, constructor->GetFunction());
 }
@@ -258,4 +260,16 @@ void ProtonMessage::SetContentType(Local<String> property,
   std::string type = std::string(*param);
 
   pn_message_set_content_type(msg->message, type.c_str());
+}
+
+Handle<Value> ProtonMessage::GetLinkAddress(Local<String> property,
+                                            const AccessorInfo &info)
+{
+  HandleScope scope;
+  Handle<Value> result;
+
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  result = (msg->linkAddr) ? String::New(msg->linkAddr) : Undefined();
+
+  return scope.Close(result);
 }

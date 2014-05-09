@@ -49,6 +49,7 @@ public:
 
     pn_message_t *message;
     pn_tracker_t tracker;
+    const char *linkAddr;
 
 protected:
     static v8::Handle<v8::Value> New(const v8::Arguments &args);
@@ -68,6 +69,8 @@ protected:
     static void SetContentType(v8::Local<v8::String> property,
                                v8::Local<v8::Value> value,
                                const v8::AccessorInfo &args);
+    static v8::Handle<v8::Value> GetLinkAddress(v8::Local<v8::String> property,
+                                                const v8::AccessorInfo &args);
 };
 
 #endif /* MESSAGE_HPP */

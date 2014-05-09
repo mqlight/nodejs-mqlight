@@ -548,6 +548,17 @@ Client.prototype.connect = function(callback) {
                 topic: topic
               }
             };
+            var linkAddress = protonMsg.linkAddress;
+            if (linkAddress) {
+              delivery.subscription = {};
+              var split = linkAddress.split(':', 3);
+              if (linkAddress.indexOf('share:') === 0) {
+                delivery.subscription.share = split[1];
+                delivery.subscription.pattern = split[2];
+              } else {
+                delivery.subscription.pattern = split[1];
+              }
+            }
             client.emit('message', data, delivery);
             protonMsg.destroy();
           }

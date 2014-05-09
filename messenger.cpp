@@ -341,6 +341,11 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
 
     vector.push_back(msgObj);
     pn_tracker_t tracker = pn_messenger_incoming_tracker(obj->messenger);
+    msg->tracker = tracker;
+    pn_link_t *link = pn_messenger_tracker_link(obj->messenger, tracker);
+    if (link) {
+      msg->linkAddr = pn_terminus_get_address(pn_link_remote_target(link));
+    }
     pn_messenger_accept(obj->messenger, tracker, 0);
     pn_messenger_settle(obj->messenger, tracker, 0);
   }
