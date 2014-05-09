@@ -67,7 +67,9 @@ void ProtonMessage::Init(Handle<Object> target)
       GetAddress, SetAddress);
   tpl->InstanceTemplate()->SetAccessor(String::New("linkAddress"),
       GetLinkAddress);
-
+  tpl->InstanceTemplate()->SetAccessor(String::New("deliveryAnnotations"),
+      GetDeliveryAnnotations);
+  
   target->Set(name, constructor->GetFunction());
 }
 
@@ -271,5 +273,121 @@ Handle<Value> ProtonMessage::GetLinkAddress(Local<String> property,
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
   result = (msg->linkAddr) ? String::New(msg->linkAddr) : Undefined();
 
+  return scope.Close(result);
+}
+
+// Retuns an array of objects, where each object has a set of properties
+// corresponding to a particular delivery annotation entry.  If the message
+// has no delivery annotations - returns undefined.
+// 
+// Note:
+// As we only care about a subset of possible delivery annotations - this
+// method only retuns annotations that have a symbol as a key and have a value
+// which is of one of the following types: symbol, string, or 32-bit signed integer.
+Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
+													const AccessorInfo &info)
+{
+  HandleScope scope;
+  
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  pn_data_t *da = pn_message_instructions(msg->message); // instructions === delivery annotations
+  
+  // Count the numner of delivery annotations that we are interested in returning
+  bool lval = pn_data_next(da);				// Move to Map
+  int elements = 0;
+  if (lval && pn_data_type(da) == PN_MAP) {   // Check it actuall is a Map
+    if (lval) lval = pn_data_enter(da);		// Enter the Map
+    if (lval) lval = pn_data_next(da);		// Poisition on first map key
+    if (lval) {
+      while(true) {
+        if (pn_data_type(da) == PN_SYMBOL) {
+     	  if (pn_data_next(da)) {
+   	        switch (pn_data_type(da)) {
+   	          case PN_SYMBOL:
+   	          case PN_STRING:
+   	          case PN_INT:
+   	            ++elements;
+   	          default:
+   	          break;
+   	        }
+   	        if (!pn_data_next(da)) break;
+   	      } else {
+   	        break;
+          }
+       	} // if PN_SYMBOL
+      } // while
+    } // if
+  } // if PN_MAP
+  pn_data_rewind(da);
+  
+  // Return early if there are no (interesting) delivery annotations
+  if (elements == 0) {
+    return scope.Close(Undefined());
+  }
+  
+  pn_data_next(da);			// Move to Map
+  pn_data_enter(da);		// Enter the Map
+  pn_data_next(da);			// Poisition on first map key
+  
+  // Build an array of objects, where each object has the following four properties:
+  //   key        : the key of the delivery annotation entry
+  //   key_type   : the type of the delivery annotation key (always 'symbol')
+  //   value      : the value of the delivery annotation entry
+  //   value_type : the type of the delivery annotation value ('symbol', 'string', or 'int32')
+  Local<Array> result = Array::New(elements);
+  int count = 0;
+  while(true) {
+
+    if (pn_data_type(da) == PN_SYMBOL) {
+      char *key = pn_data_get_symbol(da).start;
+      
+      if (pn_data_next(da)) {
+        char *value; 
+        const char *value_type;
+        char int_buffer[12];	// strlen("-2147483648") + '\0'
+        pn_type_t type = pn_data_type(da);
+        bool add_entry = true;
+        
+   	    switch (type) {
+   	      case PN_SYMBOL:
+   	        add_entry = true;
+   	        value_type = "symbol";
+   	        value = pn_data_get_symbol(da).start;
+   	        break;
+   	      case PN_STRING:
+   	        add_entry = true;
+   	        value_type = "string";
+   	        value = pn_data_get_string(da).start;
+   	        break;
+   	      case PN_INT:
+   	        add_entry = true;
+   	        value_type = "int32";
+   	        snprintf(int_buffer, sizeof(int_buffer), "%d", pn_data_get_atom(da).u.as_int);
+   	        value = int_buffer;
+   	        break;
+   	      default:
+   	        add_entry = false;
+   	        break;
+   	    }
+   	    
+   	    if (add_entry) {   
+   	        // e.g. {key: 'xopt-blah', key_type: 'symbol', value: 'blahblah', value_type: 'string'}
+   	    	Local<Object> obj = Object::New();
+   	     	obj->Set(String::NewSymbol("key"), String::NewSymbol(key));
+   	     	obj->Set(String::NewSymbol("key_type"), String::NewSymbol("symbol"));
+   	     	obj->Set(String::NewSymbol("value"), String::NewSymbol(value));
+   	     	obj->Set(String::NewSymbol("value_type"), String::NewSymbol(value_type));
+   	    	result->Set(Number::New(count++), obj);
+   	  	}
+   	  	
+   	    if (!pn_data_next(da)) break;
+   	  } else {
+   	    break;
+      }
+    } // if PN_SYMBOL
+  } // while  
+
+  pn_data_rewind(da);
+  
   return scope.Close(result);
 }
