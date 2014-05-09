@@ -45,6 +45,10 @@ using namespace node;
     Local<Value> e = Exception::TypeError(String::New(msg)); \
     return ThrowException(e);
 
+#ifdef _WIN32
+#define snprintf _snprintf
+#endif
+
 Persistent<FunctionTemplate> ProtonMessage::constructor;
 
 void ProtonMessage::Init(Handle<Object> target)
@@ -69,7 +73,7 @@ void ProtonMessage::Init(Handle<Object> target)
       GetLinkAddress);
   tpl->InstanceTemplate()->SetAccessor(String::New("deliveryAnnotations"),
       GetDeliveryAnnotations);
-  
+
   target->Set(name, constructor->GetFunction());
 }
 
@@ -279,7 +283,7 @@ Handle<Value> ProtonMessage::GetLinkAddress(Local<String> property,
 // Retuns an array of objects, where each object has a set of properties
 // corresponding to a particular delivery annotation entry.  If the message
 // has no delivery annotations - returns undefined.
-// 
+//
 // Note:
 // As we only care about a subset of possible delivery annotations - this
 // method only retuns annotations that have a symbol as a key and have a value
@@ -342,7 +346,7 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
       char *key = pn_data_get_symbol(da).start;
 
       if (pn_data_next(da)) {
-        char *value; 
+        char *value;
         const char *value_type;
         char int_buffer[12];	// strlen("-2147483648") + '\0'
         pn_type_t type = pn_data_type(da);
