@@ -72,7 +72,7 @@ protected:
     static v8::Handle<v8::Value> GetLinkAddress(v8::Local<v8::String> property,
                                                 const v8::AccessorInfo &args);
     static v8::Handle<v8::Value> GetDeliveryAnnotations(v8::Local<v8::String> property,
-							const v8::AccessorInfo &info);
+                                                        const v8::AccessorInfo &info);
 };
 
 #endif /* MESSAGE_HPP */
