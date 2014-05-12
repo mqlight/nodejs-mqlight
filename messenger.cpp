@@ -71,7 +71,8 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "connect", Connect);
   NODE_SET_PROTOTYPE_METHOD(constructor, "subscribe", Subscribe);
   NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "hasSent", HasSent);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
   tpl->InstanceTemplate()->SetAccessor(String::New("hasOutgoing"),
@@ -184,12 +185,27 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args) {
   ProtonMessage *msg;
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
-    THROW_EXCEPTION("Missing required message argument.");
+  if (args.Length() < 2 || args[0].IsEmpty() || args[1].IsEmpty() ) {
+    THROW_EXCEPTION("Missing required message or qos argument.");
   }
 
   obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  Local<Integer> integer = args[1]->ToInteger();
+  int qos = (int)integer->Value();
+
+  /* Set the required QoS, by setting the sender settler mode to settled (QoS = AMO) or unsettled (QoS = ALO).
+   * Note that the receiver settler mode is always set to first, as the MQ Light listener will negotiate down any receiver settler mode to first.
+   */
+  if (qos == 0) {
+	  pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
+	  pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
+  } else if (qos == 1) {
+	  pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
+	  pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
+  } else {
+	  THROW_EXCEPTION("Invalid qos argument.");
+  }
 
   /*
    * XXX: for now, we're using the simplified messenger api, but long term we
@@ -285,13 +301,28 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
   HandleScope scope;
 
   // throw exception if not enough args
-  if (args.Length() < 1) {
-    THROW_EXCEPTION("Missing required pattern argument.");
+  if (args.Length() < 2 || args[0].IsEmpty() || args[1].IsEmpty() ) {
+    THROW_EXCEPTION("Missing required pattern or qos argument.");
   }
 
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   String::Utf8Value param(args[0]->ToString());
   std::string address = std::string(*param);
+  Local<Integer> integer = args[1]->ToInteger();
+  int qos = (int)integer->Value();
+
+  /* Set the required QoS, by setting the sender settler mode to settled (QoS = AMO) or unsettled (QoS = ALO).
+   * Note that our API client implementation will always specify a value of first - meaning "The Receiver will spontaneously settle all incoming transfers" - this equates to a maximum QoS of "at least once delivery".
+   */
+  if (qos == 0) {
+	  pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
+	  pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
+  } else if (qos == 1) {
+	  pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
+	  pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
+  } else {
+	  THROW_EXCEPTION("Invalid qos argument.");
+  }
 
   pn_messenger_subscribe(obj->messenger, address.c_str());
   pn_messenger_recv(obj->messenger, -1);
@@ -347,7 +378,6 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
       msg->linkAddr = pn_terminus_get_address(pn_link_remote_target(link));
     }
     pn_messenger_accept(obj->messenger, tracker, 0);
-    pn_messenger_settle(obj->messenger, tracker, 0);
   }
 
   Local<Array> messages = Array::New(vector.size());
@@ -371,7 +401,7 @@ Handle<Value> ProtonMessenger::HasOutgoing(Local<String> property,
   return scope.Close(Boolean::New(hasOutgoing));
 }
 
-Handle<Value> ProtonMessenger::HasSent(const Arguments& args)
+Handle<Value> ProtonMessenger::Status(const Arguments& args)
 {
   HandleScope scope;
 
@@ -385,14 +415,31 @@ Handle<Value> ProtonMessenger::HasSent(const Arguments& args)
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
 
-  bool isAccepted = (pn_messenger_status(obj->messenger,
-                                         msg->tracker) == PN_STATUS_ACCEPTED);
-  if (isAccepted)
+  int status = pn_messenger_status(obj->messenger, msg->tracker);
+
+  scope.Close(Number::New(status));
+};
+
+Handle<Value> ProtonMessenger::Settle(const Arguments& args)
+{
+  HandleScope scope;
+
+  // throw exception if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
+      || args[0]->IsUndefined())
   {
-    pn_messenger_settle(obj->messenger, msg->tracker, 0);
+    THROW_EXCEPTION("Missing required message argument.");
   }
 
-  return scope.Close(Boolean::New(isAccepted));
-}
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
 
+  int status = pn_messenger_settle(obj->messenger, msg->tracker, 0);
+  if (pn_messenger_errno(obj->messenger)) {
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)));
+  } else if (status != 0) {
+	THROW_EXCEPTION("Failed to settle.");
+  }
 
+  return scope.Close(Boolean::New(true));
+};
