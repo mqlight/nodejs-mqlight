@@ -585,7 +585,41 @@ Client.prototype.connect = function(callback) {
                 delivery.subscription.pattern = split[1];
               }
             }
-            client.emit('message', data, delivery);
+
+            var da = protonMsg.deliveryAnnotations;
+            var malformed = {};
+            malformed.MQMD = {};
+            for (var i = 0; da && (i < da.length); ++i) {
+              if (da[i] && da[i].key) {
+                switch (da[i].key) {
+                  case 'x-opt-message-malformed-condition':
+                    malformed.condition = da[i].value;
+                    break;
+                  case 'x-opt-message-malformed-description':
+                    malformed.description = da[i].value;
+                    break;
+                  case 'x-opt-message-malformed-MQMD.CodedCharSetId':
+                    malformed.MQMD.CodedCharSetId = Number(da[i].value);
+                    break;
+                  case 'x-opt-message-malformed-MQMD.Format':
+                    malformed.MQMD.Format = da[i].value;
+                    break;
+                  default:
+                    break;
+                }
+              }
+            }
+            if (malformed.condition) {
+              if (client.listeners('malformed').length > 0) {
+                delivery.malformed = malformed;
+                client.emit('malformed', protonMsg.body, delivery);
+              } else {
+                protonMsg.destroy();
+                throw new Error('No listener for "malformed" event.');
+              }
+            } else {
+              client.emit('message', data, delivery);
+            }
             if (autoSettle) {
               messenger.settle(protonMsg);
               protonMsg.destroy();
