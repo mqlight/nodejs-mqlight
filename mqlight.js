@@ -555,39 +555,25 @@ Client.prototype.connect = function(callback) {
             var topic = url.parse(protonMsg.address).path.substring(1);
             var index = client.manualSettleSubscriptions.indexOf(protonMsg.address);
             var autoSettle = index < 0;
-            var delivery;
-            if (autoSettle) {
-              delivery = {
-                message : {
-                  properties : {
-                    contentType : protonMsg.contentType
-                  },
-                  topic : topic,
-                  settleDelivery : function() {
-                    log('entry', this.id, 'message.settleDelivery (noop version) >');
-                    log('data', this.id, 'delivery:',delivery);
-                    log('exit', this.id, 'message.settleDelivery (noop version) <');
-                  }
+            var delivery = {
+              message : {
+                properties : {
+                  contentType : protonMsg.contentType
+                },
+                topic : topic,
+                settleDelivery : autoSettle ? function() {
+                  log('entry', this.id, 'message.settleDelivery (noop version) >');
+                  log('data', this.id, 'delivery:', delivery);
+                  log('exit', this.id, 'message.settleDelivery (noop version) <');
+                } : function() {
+                  log('entry', this.id, 'message.settleDelivery >');
+                  log('data', this.id, 'delivery:', delivery);
+                  messenger.settle(protonMsg);
+                  protonMsg.destroy();
+                  log('exit', this.id, 'message.settleDelivery <');
                 }
-              };
-            } else {
-              client.manualSettleSubscriptions.splice(index, 1);
-              delivery = {
-                message : {
-                  properties : {
-                    contentType : protonMsg.contentType
-                  },
-                  topic : topic,
-                  settleDelivery : function() {
-                    log('entry', this.id, 'message.settleDelivery >');
-                    log('data', this.id, 'delivery:',delivery);
-                    messenger.settle(protonMsg);
-                    protonMsg.destroy();
-                    log('exit', this.id, 'message.settleDelivery <');
-                  }
-                }
-              };
-            }
+              }
+            };
             var linkAddress = protonMsg.linkAddress;
             if (linkAddress) {
               delivery.subscription = {};
