@@ -125,14 +125,39 @@ exports.QOS_EXACTLY_ONCE = 2;
 
 
 /** Proton Messenger status values (returned from ProtonMessenger.Status()) */
-PN_STATUS_UNKNOWN  = 0; /** The status unknown. */
-PN_STATUS_PENDING  = 1; /** The message is in flight. */ 
-PN_STATUS_ACCEPTED = 2; /** The message was accepted. */
-PN_STATUS_REJECTED = 3; /** The message was rejected. */
-PN_STATUS_RELEASED = 4; /** The message was released. */
-PN_STATUS_MODIFIED = 5; /** The message was modified. */
-PN_STATUS_ABORTED  = 6; /** The message was aborted. */
-PN_STATUS_SETTLED  = 7; /** The remote party has settled the message. */
+
+
+/** The status unknown. */
+PN_STATUS_UNKNOWN = 0;
+
+
+/** The message is in flight. */
+PN_STATUS_PENDING = 1;
+
+
+/** The message was accepted. */
+PN_STATUS_ACCEPTED = 2;
+
+
+/** The message was rejected. */
+PN_STATUS_REJECTED = 3;
+
+
+/** The message was released. */
+PN_STATUS_RELEASED = 4;
+
+
+/** The message was modified. */
+PN_STATUS_MODIFIED = 5;
+
+
+/** The message was aborted. */
+PN_STATUS_ABORTED = 6;
+
+
+/** The remote party has settled the message. */
+PN_STATUS_SETTLED = 7;
+
 
 /**
  * Constructs a new Client object in the disconnected state.
@@ -390,8 +415,9 @@ var Client = function(service, id, user, password) {
   // Set the initial state to disconnected
   this.state = 'disconnected';
   this.service = undefined;
-  
-  // List of message subscriptions that the application is expected to call message.settleDelivery() for
+
+  // List of message subscriptions that the application is expected to call
+  // message.settleDelivery() for
   this.manualSettleSubscriptions = new Array();
 
   log('exit', this.id, 'constructor <', this);
@@ -553,18 +579,21 @@ Client.prototype.connect = function(callback) {
             }
 
             var topic = url.parse(protonMsg.address).path.substring(1);
-            var index = client.manualSettleSubscriptions.indexOf(protonMsg.address);
+            var index =
+                client.manualSettleSubscriptions.indexOf(protonMsg.address);
             var autoSettle = index < 0;
             var delivery = {
-              message : {
-                properties : {
-                  contentType : protonMsg.contentType
+              message: {
+                properties: {
+                  contentType: protonMsg.contentType
                 },
-                topic : topic,
-                settleDelivery : autoSettle ? function() {
-                  log('entry', this.id, 'message.settleDelivery (noop version) >');
+                topic: topic,
+                settleDelivery: autoSettle ? function() {
+                  log('entry', this.id,
+                      'message.settleDelivery (noop version) >');
                   log('data', this.id, 'delivery:', delivery);
-                  log('exit', this.id, 'message.settleDelivery (noop version) <');
+                  log('exit', this.id,
+                      'message.settleDelivery (noop version) <');
                 } : function() {
                   log('entry', this.id, 'message.settleDelivery >');
                   log('data', this.id, 'delivery:', delivery);
@@ -873,7 +902,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       }
     }
   }
-  
+
   var qos = exports.QOS_AT_MOST_ONCE;
   if (options) {
     if (options.qos) {
@@ -882,12 +911,12 @@ Client.prototype.send = function(topic, data, options, callback) {
       } else if (options.qos == exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
-        throw new TypeError("options:qos value '" + options.qos + "' is invalid " +
-                            "must evaluate to 0 or 1");
+        throw new TypeError("options:qos value '" + options.qos +
+                            "' is invalid must evaluate to 0 or 1");
       }
     }
   }
-  
+
   if (callback) {
     if (callbackOption) {
       throw new TypeError('Invalid forth argument, callback already matched' +
@@ -938,13 +967,13 @@ Client.prototype.send = function(topic, data, options, callback) {
     var untilSendComplete = function(protonMsg, sendCallback) {
       try {
         var complete = false;
-        switch(messenger.status(protonMsg)) {
-        case PN_STATUS_ACCEPTED:
-        case PN_STATUS_SETTLED:
-          messenger.settle(protonMsg);
-          complete = true;
-          break;
-        };
+        switch (messenger.status(protonMsg)) {
+          case PN_STATUS_ACCEPTED:
+          case PN_STATUS_SETTLED:
+            messenger.settle(protonMsg);
+            complete = true;
+            break;
+        }
         if (complete) {
           if (sendCallback) {
             var body = protonMsg.body;
@@ -1002,7 +1031,8 @@ Client.prototype.send = function(topic, data, options, callback) {
 
 /**
  * @param {function(object)}
- *          destCallback - callback, invoked with an Error object if something
+ *          destCallback - callback, invoked with an Error object if
+ *          something
  *          goes wrong.
  * @param {String}
  *          err - an error message if a problem occurred.
@@ -1102,8 +1132,8 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
       } else if (options.qos == exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
-        throw new TypeError("options:qos value '" + options.qos + "' is invalid " +
-                            "must evaluate to 0 or 1");
+        throw new TypeError("options:qos value '" + options.qos +
+                            "' is invalid must evaluate to 0 or 1");
       }
     }
     if (options.autoSettle === true) {
@@ -1113,11 +1143,11 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
     } else if (options.autoSettle == undefined) {
       autoSettle = true;
     } else {
-      throw new TypeError("options:autoSettle value '" + options.autoSettle + "' is invalid " +
-                          "must evaluate to true or false");
+      throw new TypeError("options:autoSettle value '" + options.autoSettle +
+                          "' is invalid must evaluate to true or false");
     }
   }
-  
+
   log('parms', this.id, 'share:', share);
   log('parms', this.id, 'options:', options);
 
@@ -1133,14 +1163,17 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   var address = this.getService() + '/' + share + pattern;
   var client = this;
 
-  // If manual settle required then add address to manual settle list, otherwise ensure manual settle list does not contain the address
-  var index = client.manualSettleSubscriptions.indexOf(this.getService() + '/' + pattern);
+  // If manual settle required then add address to manual settle list,
+  // otherwise ensure manual settle list does not contain the address
+  var index = client.manualSettleSubscriptions.indexOf(this.getService() +
+                                                       '/' + pattern);
   if (qos === exports.QOS_AT_LEAST_ONCE && !autoSettle) {
-    if (index < 0) client.manualSettleSubscriptions.push(this.getService() + '/' + pattern);
+    if (index < 0) client.manualSettleSubscriptions.push(this.getService() +
+                                                         '/' + pattern);
   } else {
     if (index >= 0) client.manualSettleSubscriptions.splice(index, 1);
   }
-  
+
   var err;
   try {
     messenger.subscribe(address, qos);
