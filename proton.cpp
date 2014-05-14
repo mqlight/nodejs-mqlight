@@ -44,34 +44,51 @@ Persistent<Function> Proton::logLog;
 
 void Proton::Entry(const char *name, const char *id)
 {
+  Proton::Entry("entry", name, id);
+}
+
+void Proton::Entry(const char *lvl, const char *name, const char *id)
+{
   HandleScope scope;
-  Local<Value> args[2] = {Local<Value>::New(String::New(name)),
+  Local<Value> args[3] = {Local<Value>::New(String::New(lvl)),
+                          Local<Value>::New(String::New(name)),
                           Local<Value>::New(String::New(id ? id : NO_CLIENT_ID))};
-  Proton::logEntry->Call(Context::GetCurrent()->Global(), 2, args);
+  Proton::logEntry->Call(Context::GetCurrent()->Global(), 3, args);
   scope.Close(Undefined());
 }
 
 void Proton::Exit(const char *name, const char *id, int rc)
 {
-  if(rc)
-  {
-    char rcString[16];
-    sprintf(rcString, "%d", rc);
-    Proton::Exit(name, id, rcString);
-  }
-  else
-  {
-    Proton::Exit(name, id, "");
-  }
+  Proton::Exit("exit", name, id, rc);
 }
 
 void Proton::Exit(const char *name, const char *id, const char *rc)
 {
+  Proton::Exit("exit", name, id, rc);
+}
+
+void Proton::Exit(const char *lvl, const char *name, const char *id, int rc)
+{
+  if(rc)
+  {
+    char rcString[16];
+    sprintf(rcString, "%d", rc);
+    Proton::Exit(lvl, name, id, rcString);
+  }
+  else
+  {
+    Proton::Exit(lvl, name, id, "");
+  }
+}
+
+void Proton::Exit(const char *lvl, const char *name, const char *id, const char *rc)
+{
   HandleScope scope;
-  Local<Value> args[3] = {Local<Value>::New(String::New(name)),
+  Local<Value> args[4] = {Local<Value>::New(String::New(lvl)),
+                          Local<Value>::New(String::New(name)),
                           Local<Value>::New(String::New(id ? id : NO_CLIENT_ID)),
                           Local<Value>::New(String::New(rc ? rc : "null"))};
-  Proton::logExit->Call(Context::GetCurrent()->Global(), 3, args);
+  Proton::logExit->Call(Context::GetCurrent()->Global(), 4, args);
   scope.Close(Undefined());
 }
 
@@ -116,8 +133,8 @@ void RegisterModule(Handle<Object> exports)
 
   Local<Value> logVal = Context::GetCurrent()->Global()->Get(String::New("log"));
   Local<Object> logObj = Local<Object>::Cast(logVal);
-  Local<Function> entryFnc = Local<Function>::Cast(logObj->Get(String::New("entry")));
-  Local<Function> exitFnc = Local<Function>::Cast(logObj->Get(String::New("exit")));
+  Local<Function> entryFnc = Local<Function>::Cast(logObj->Get(String::New("entryLevel")));
+  Local<Function> exitFnc = Local<Function>::Cast(logObj->Get(String::New("exitLevel")));
   Local<Function> logFnc = Local<Function>::Cast(logObj->Get(String::New("log")));
   Proton::logEntry = Persistent<Function>::New(Local<Function>::Cast(entryFnc));
   Proton::logExit = Persistent<Function>::New(Local<Function>::Cast(exitFnc));

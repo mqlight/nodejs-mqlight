@@ -382,6 +382,7 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
 
   // Return early if there are no (interesting) delivery annotations
   if (elements == 0) {
+    Proton::Exit("ProtonMessage::GetDeliveryAnnotations", NULL, 0);
     return scope.Close(Undefined());
   }
 
@@ -449,6 +450,6 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
 
   pn_data_rewind(da);
 
-  Proton::Exit("ProtonMessage::GetDeliveryAnnotations", NULL, 0);
+  Proton::Exit("ProtonMessage::GetDeliveryAnnotations", NULL, 1);
   return scope.Close(result);
 }
