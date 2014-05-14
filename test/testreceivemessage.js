@@ -70,6 +70,8 @@ module.exports.test_receive_message = function(test) {
   });
 
   client.on('message', function(data, delivery) {
+    console.log('got here');
+    console.log(delivery);
     test.deepEqual(arguments.length, 2,
                    'expected 2 arguments to message event listener');
     test.deepEqual(data, 'Hello World!');
@@ -79,9 +81,9 @@ module.exports.test_receive_message = function(test) {
             "message object should have 'properties' property");
     test.deepEqual(delivery.message.properties.contentType, 'text/plain');
     test.deepEqual(delivery.message.topic, '/kittens/boots');
-    test.ok(delivery.subscription !== undefined,
-            "delivery object should have 'subscription' property");
-    test.deepEqual(delivery.subscription.pattern, '/kittens/#');
+    test.ok(delivery.destination !== undefined,
+            "delivery object should have 'destination' property");
+    test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
 
     test.done();
     client.disconnect();
@@ -151,9 +153,9 @@ module.exports.test_malformed_message = function(test) {
             "message object should have 'properties' property");
     test.deepEqual(delivery.message.properties.contentType, 'text/plain');
     test.deepEqual(delivery.message.topic, '/kittens/fang');
-    test.ok(delivery.subscription !== undefined,
-            "delivery object should have 'subscription' property");
-    test.deepEqual(delivery.subscription.pattern, '/kittens/#');
+    test.ok(delivery.destination !== undefined,
+            "delivery object should have 'destination' property");
+    test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
     test.ok(delivery.malformed !== undefined,
             "delivery object should have 'malformed' property");
     test.deepEqual(delivery.malformed.condition, 'PAYLOADNOTAMQP');

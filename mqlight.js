@@ -561,13 +561,13 @@ Client.prototype.connect = function(callback) {
             };
             var linkAddress = protonMsg.linkAddress;
             if (linkAddress) {
-              delivery.subscription = {};
+              delivery.destination = {};
               var split = linkAddress.split(':', 3);
               if (linkAddress.indexOf('share:') === 0) {
-                delivery.subscription.share = split[1];
-                delivery.subscription.pattern = split[2];
+                delivery.destination.share = split[1];
+                delivery.destination.topicPattern = split[2];
               } else {
-                delivery.subscription.pattern = split[1];
+                delivery.destination.topicPattern = split[1];
               }
             }
 
@@ -1036,18 +1036,19 @@ Client.prototype.send = function(topic, data, options, callback) {
  * @param {String}
  *          err - an error message if a problem occurred.
  * @param {String}
- *          pattern - the pattern that was subscribed to.
+ *          topicPattern - the topic pattern that was subscribed to
  */
 
 
 /**
  * Constructs a subscription object and starts the emission of message events
- * each time a message arrives, at the MQ Light service, that matches pattern.
+ * each time a message arrives, at the MQ Light service, that matches
+ * topic pattern.
  *
  * @param {String}
- *          pattern used to match against the <code>address</code> attribute of
- *          messages to determine if a copy of the message should be delivered
- *          to the <code>Destination</code>.
+ *          topicPattern used to match against the <code>address</code>
+ *          attribute of messages to determine if a copy of the message should
+ *          be delivered to the <code>Destination</code>.
  * @param {String}
  *          share (Optional) Specifies whether to create or join a shared
  *          subscription for which messages are anycast amongst the present
@@ -1066,20 +1067,21 @@ Client.prototype.send = function(topic, data, options, callback) {
  * @throws {TypeError}
  *           If one of the specified parameters is of the wrong type.
  * @throws {Error}
- *           If the pattern parameter is undefined.
+ *           If the topic pattern parameter is undefined.
  */
-Client.prototype.subscribe = function(pattern, share, options, callback) {
+Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   log.entry('Client.subscribe', this.id);
-  log.log('parms', this.id, 'pattern:', pattern);
+  log.log('parms', this.id, 'topicPattern:', topicPattern);
 
-  // Must accept at least one option - and first option is always a pattern.
+  // Must accept at least one option - and first option is always a
+  // topicPattern.
   if (arguments.length === 0) {
-    throw new TypeError("You must specify a 'pattern' argument");
+    throw new TypeError("You must specify a 'topicPattern' argument");
   }
-  if (!pattern) {
-    throw new TypeError("You must specify a 'pattern' argument");
+  if (!topicPattern) {
+    throw new TypeError("You must specify a 'topicPattern' argument");
   }
-  pattern = String(pattern);
+  topicPattern = String(topicPattern);
 
   // Two or three arguments are the interesting cases - the rules we use to
   // disambiguate are:
@@ -1157,18 +1159,18 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   // Ensure we have attempted a connect
   if (!this.hasConnected()) throw new Error('not connected');
 
-  // Subscribe using the specified pattern and share options
+  // Subscribe using the specified topic pattern and share options
   var messenger = this.messenger;
-  var address = this.getService() + '/' + share + pattern;
+  var address = this.getService() + '/' + share + topicPattern;
   var client = this;
 
   // If manual settle required then add address to manual settle list,
   // otherwise ensure manual settle list does not contain the address
   var index = client.manualSettleSubscriptions.indexOf(this.getService() +
-                                                       '/' + pattern);
+                                                       '/' + topicPattern);
   if (qos === exports.QOS_AT_LEAST_ONCE && !autoSettle) {
     if (index < 0) client.manualSettleSubscriptions.push(this.getService() +
-                                                         '/' + pattern);
+                                                         '/' + topicPattern);
   } else {
     if (index >= 0) client.manualSettleSubscriptions.splice(index, 1);
   }
@@ -1183,7 +1185,7 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
   setImmediate(function() {
     if (callback) {
       log.entry('Client.subscribe.callback', client.id);
-      callback.apply(client, [err, pattern]);
+      callback.apply(client, [err, topicPattern]);
       log.exit('Client.subscribe.callback', client.id, null);
     }
     if (err) {
