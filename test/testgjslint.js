@@ -33,6 +33,7 @@ module.exports = testCase({
       var child = childProcess.spawn('gjslint', [
         '--jslint_error=all',
         'mqlight.js',
+        'log.js',
         'samples/send.js',
         'samples/recv.js'
       ], { stdio: 'inherit' });
