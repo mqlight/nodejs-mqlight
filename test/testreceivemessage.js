@@ -70,8 +70,6 @@ module.exports.test_receive_message = function(test) {
   });
 
   client.on('message', function(data, delivery) {
-    console.log('got here');
-    console.log(delivery);
     test.deepEqual(arguments.length, 2,
                    'expected 2 arguments to message event listener');
     test.deepEqual(data, 'Hello World!');
