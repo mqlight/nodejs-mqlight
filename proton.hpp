@@ -1,10 +1,10 @@
-#ifndef MESSENGER_HPP
-#define MESSENGER_HPP
+#ifndef PROTON_HPP
+#define PROTON_HPP
 /**********************************************************************/
 /*   <copyright                                                       */
 /*   notice="oco-source"                                              */
 /*   pids="5755-P60"                                                  */
-/*   years="2013"                                                     */
+/*   years="2014"                                                     */
 /*   crc="2536674324" >                                               */
 /*   IBM Confidential                                                 */
 /*                                                                    */
@@ -12,7 +12,7 @@
 /*                                                                    */
 /*   5755-P60                                                         */
 /*                                                                    */
-/*   (C) Copyright IBM Corp. 2013                                     */
+/*   (C) Copyright IBM Corp. 2014                                     */
 /*                                                                    */
 /*   The source code for the program is not published                 */
 /*   or otherwise divested of its trade secrets,                      */
@@ -25,8 +25,8 @@
 /* Ensure that the content is correct and up-to-date.                 */
 /* All updates must be made in mixed case.                            */
 /*                                                                    */
-/* The functions in this file provide the wrapper functions around    */
-/* the Apache Qpid Proton C Messenger API for use by Node.js          */
+/* The functions in this file provide the initalisation functions     */
+/* used to register the module with Node.js                           */
 /**********************************************************************/
 /* End of text to be included in SRM                                  */
 /**********************************************************************/
@@ -35,39 +35,16 @@
 
 #include <node.h>
 
-#include <proton/message.h>
-#include <proton/messenger.h>
-#include <proton/condition.h>
-#include <proton/terminus.h>
-#include <proton/link.h>
-#include <proton/transport.h>
-#include <proton/connection.h>
-
-class ProtonMessenger : public node::ObjectWrap {
+class Proton {
 public:
-    static v8::Persistent<v8::FunctionTemplate> constructor;
-    static void Init(v8::Handle<v8::Object> target);
-    static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
-    ProtonMessenger(std::string name);
-    ~ProtonMessenger();
-
-protected:
-    static v8::Handle<v8::Value> New(const v8::Arguments& args);
-    static v8::Handle<v8::Value> Put(const v8::Arguments& args);
-    static v8::Handle<v8::Value> Send(const v8::Arguments& args);
-    static v8::Handle<v8::Value> Stop(const v8::Arguments& args);
-    static v8::Handle<v8::Value> Stopped(v8::Local<v8::String> property,
-                                         const v8::AccessorInfo &info);
-    static v8::Handle<v8::Value> Connect(const v8::Arguments& args);
-    static v8::Handle<v8::Value> Subscribe(const v8::Arguments& args);
-    static v8::Handle<v8::Value> Receive(const v8::Arguments& args);
-    static v8::Handle<v8::Value> Status(const v8::Arguments& args);
-    static v8::Handle<v8::Value> Settle(const v8::Arguments& args);
-    static v8::Handle<v8::Value> HasOutgoing(v8::Local<v8::String> property,
-                                             const v8::AccessorInfo &info);
-    static void Tracer(pn_transport_t *transport, const char *message);
-
-    pn_messenger_t *messenger;
+    static v8::Persistent<v8::Function> logEntry;
+    static v8::Persistent<v8::Function> logExit;
+    static v8::Persistent<v8::Function> logLog;
+    static void Entry(const char *name, const char *id);
+    static void Exit(const char *name, const char *id, int rc);
+    static void Exit(const char *name, const char *id, const char *rc);
+    static void Log(const char *lvl, const char *id, const char *prefix, const char *data);
+    static void Log(const char *lvl, const char *id, const char *prefix, int data);
 };
 
-#endif /* MESSENGER_HPP */
+#endif /* PROTON_HPP */
