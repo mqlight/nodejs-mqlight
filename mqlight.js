@@ -19,68 +19,11 @@
 
 /*
  * Set up logging to stderr. The level of output is configured by the
- * value of the MQLIGHT_NODE_LOG environment variable. The default is
- * 'ffdc'.
+ * value of the MQLIGHT_NODE_LOG environment variable. The default is 'ffdc'.
  */
-var moment = require('moment');
-var NO_CLIENT_ID = '*';
-log = function(lvl, id, message) {
-  if (logger.levels[logger.level] <= logger.levels[lvl]) {
-    logger.heading = moment(new Date()).format('HH:mm:ss.SSS') +
-                     ' [' + process.pid + ']';
-    logger.log.apply(this, arguments);
-  }
-};
+log = require('./log.js');
 
-var logger = require('npmlog');
-logger.addLevel('all', -Infinity, { inverse: true }, 'all         ');
-logger.addLevel('debug', 800, { fg: 'green', bg: 'black' }, 'debug       ');
-logger.addLevel('detail', 1000, { fg: 'blue', bg: 'black' }, 'detail      ');
-logger.addLevel('data', 1500, { fg: 'blue', bg: 'black' }, 'data        ');
-logger.addLevel('parms', 3000, { fg: 'yellow', bg: 'black' }, 'parms       ');
-logger.addLevel('exit', 3000, { fg: 'yellow', bg: 'black' }, 'exit        ');
-logger.addLevel('entry', 3000, { fg: 'yellow', bg: 'black' }, 'entry       ');
-logger.addLevel('entry_exit', 3000, { fg: 'yellow', bg: 'black' },
-                'entry_exit  ');
-logger.addLevel('ffdc', 10000, { fg: 'red', bg: 'black' }, 'ffdc        ');
-
-
-/** @const {string} */
-logger.level = process.env.MQLIGHT_NODE_LOG || 'ffdc';
-log('debug', NO_CLIENT_ID, 'logger.level =', logger.level);
-if (logger.levels[logger.level] <= logger.levels.data) {
-  log('debug', NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
-  /** @const {string} */
-  process.env.PN_TRACE_FRM = '1';
-  if (logger.levels[logger.level] <= logger.levels.detail) {
-    log('debug', NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
-    /** @const {string} */
-    process.env.PN_TRACE_RAW = '1';
-  }
-}
-
-/*
- * Set up a signal handler that will cause an ffdc to be generated when
- * the signal is caught. Set the environment variable MQLIGHT_NODE_NO_HANDLER
- * to stop the signal handler being registered.
- */
-var pkg = require('./package.json');
 var os = require('os');
-var isWin = (os.platform() === 'win32');
-if (!process.env.MQLIGHT_NODE_NO_HANDLER) {
-  if (isWin) {
-    log('debug', NO_CLIENT_ID, 'Registering signal handler for SIGBREAK');
-    process.on('SIGBREAK', function() {
-      ffdc('SIGBREAK', 255, null, null);
-    });
-  } else {
-    log('debug', NO_CLIENT_ID, 'Registering signal handler for SIGUSR2');
-    process.on('SIGUSR2', function() {
-      ffdc('SIGUSR2', 255, null, null);
-    });
-  }
-}
-
 var _system = os.platform() + '-' + process.arch;
 if (process.env.NODE_ENV === 'unittest') {
   var proton = require('./tests/stubs/stubproton.js').createProtonStub();
@@ -201,7 +144,7 @@ PN_STATUS_SETTLED = 7;
  * @return {Object} The created Client object.
  */
 exports.createClient = function(options) {
-  log('entry', NO_CLIENT_ID, 'createClient >');
+  log.entry('createClient', log.NO_CLIENT_ID);
 
   if (!options) throw TypeError('options object missing');
   var client = new Client(options.service, options.id,
@@ -217,8 +160,7 @@ exports.createClient = function(options) {
     }
   });
 
-  log('exit', client.id, 'createClient <', client);
-
+  log.exit('createClient', client.id, client);
   return client;
 };
 
@@ -238,8 +180,8 @@ exports.createClient = function(options) {
  *           if an unsupported or invalid URL specified.
  */
 var generateServiceList = function(service) {
-  log('entry', NO_CLIENT_ID, 'generateServiceList >');
-  log('parms', NO_CLIENT_ID, 'service:', service);
+  log.entry('generateServiceList', log.NO_CLIENT_ID);
+  log.log('parms', log.NO_CLIENT_ID, 'service:', service);
 
   // Validate the parameter list length
   if (arguments.length > 1) {
@@ -310,8 +252,7 @@ var generateServiceList = function(service) {
     serviceList[i] = protocol + '//' + host + ':' + port;
   }
 
-  log('exit', NO_CLIENT_ID, 'generateServiceList <', serviceList);
-
+  log.exit('generateServiceList', log.NO_CLIENT_ID, serviceList);
   return serviceList;
 };
 
@@ -355,11 +296,12 @@ var generateServiceList = function(service) {
  * @constructor
  */
 var Client = function(service, id, user, password) {
-  log('entry', NO_CLIENT_ID, 'constructor >');
-  log('parms', NO_CLIENT_ID, 'service:', service);
-  log('parms', NO_CLIENT_ID, 'id:', id);
-  log('parms', NO_CLIENT_ID, 'user:', user);
-  log('parms', NO_CLIENT_ID, 'password:', password ? '********' : password);
+  log.entry('Client.constructor', log.NO_CLIENT_ID);
+  log.log('parms', log.NO_CLIENT_ID, 'service:', service);
+  log.log('parms', log.NO_CLIENT_ID, 'id:', id);
+  log.log('parms', log.NO_CLIENT_ID, 'user:', user);
+  log.log('parms', log.NO_CLIENT_ID,
+          'password:', password ? '********' : password);
 
   EventEmitter.call(this);
 
@@ -402,6 +344,7 @@ var Client = function(service, id, user, password) {
   this.serviceList = serviceList;
   this.id = id;
 
+  log.entry('proton.createMessenger', this.id);
   // Initialize ProtonMessenger with auth details
   if (user) {
     // URI encode username and password before passing them to proton
@@ -411,6 +354,7 @@ var Client = function(service, id, user, password) {
   } else {
     this.messenger = proton.createMessenger(id);
   }
+  log.exit('proton.createMessenger', this.id, null);
 
   // Set the initial state to disconnected
   this.state = 'disconnected';
@@ -420,7 +364,7 @@ var Client = function(service, id, user, password) {
   // message.settleDelivery() for
   this.manualSettleSubscriptions = new Array();
 
-  log('exit', this.id, 'constructor <', this);
+  log.exit('Client.constructor', this.id, this);
 };
 util.inherits(Client, EventEmitter);
 
@@ -468,7 +412,7 @@ util.inherits(Client, EventEmitter);
  *           If callback is specified and is not a function.
  */
 Client.prototype.connect = function(callback) {
-  log('entry', this.id, 'connect >');
+  log.entry('Client.connect', this.id);
 
   if (callback && (typeof callback !== 'function')) {
     throw new TypeError('Callback must be a function');
@@ -476,6 +420,7 @@ Client.prototype.connect = function(callback) {
 
   // Performs the connect
   var performConnect = function(client, callback) {
+    log.entry('Client.connect.performConnect', client.id);
 
     var currentState = client.getState();
     // if we are not disconnected or disconnecting return with the client object
@@ -487,9 +432,13 @@ Client.prototype.connect = function(callback) {
       } else {
         process.nextTick(function() {
           if (callback) {
+            log.entry('Client.connect.performConnect.callback', client.id);
             callback(undefined);
+            log.exit('Client.connect.performConnect.callback', client.id, null);
           }
         });
+
+        log.exit('Client.connect.performConnect', client.id, client);
         return client;
       }
     }
@@ -511,11 +460,16 @@ Client.prototype.connect = function(callback) {
       client.disconnect();
       var err = new Error(e.message);
       process.nextTick(function() {
+        log.log('error', client.id, 'error', err);
         if (callback) {
+          log.entry('Client.connect.performConnect.callback', client.id);
           callback(err);
+          log.exit('Client.connect.performConnect.callback', client.id, null);
         }
         client.emit('error', err);
       });
+
+      log.exit('Client.connect.performConnect', client.id, null);
       return;
     }
 
@@ -531,17 +485,23 @@ Client.prototype.connect = function(callback) {
       client.disconnect();
       var err = new Error(e.message);
       process.nextTick(function() {
+        log.log('error', client.id, 'error', err);
         if (callback) {
+          log.entry('Client.connect.performConnect.callback', client.id);
           callback(err);
+          log.exit('Client.connect.performConnect.callback', client.id, null);
         }
         client.emit('error', err);
       });
+
+      log.exit('Client.connect.performConnect', client.id, null);
       return;
     }
 
     // Indicate that we're connected
     client.state = 'connected';
     process.nextTick(function() {
+      log.log('emit', client.id, 'connected');
       client.emit('connected');
     });
 
@@ -550,7 +510,9 @@ Client.prototype.connect = function(callback) {
         throw new TypeError('callback must be a function');
       }
       process.nextTick(function() {
+        log.entry('Client.connect.performConnect.callback', client.id);
         callback.apply(client);
+        log.exit('Client.connect.performConnect.callback', client.id, null);
       });
     }
 
@@ -589,17 +551,11 @@ Client.prototype.connect = function(callback) {
                 },
                 topic: topic,
                 settleDelivery: autoSettle ? function() {
-                  log('entry', this.id,
-                      'message.settleDelivery (noop version) >');
-                  log('data', this.id, 'delivery:', delivery);
-                  log('exit', this.id,
-                      'message.settleDelivery (noop version) <');
+                  log.log('data', this.id, 'delivery:', delivery);
                 } : function() {
-                  log('entry', this.id, 'message.settleDelivery >');
-                  log('data', this.id, 'delivery:', delivery);
+                  log.log('data', this.id, 'delivery:', delivery);
                   messenger.settle(protonMsg);
                   protonMsg.destroy();
-                  log('exit', this.id, 'message.settleDelivery <');
                 }
               }
             };
@@ -641,12 +597,15 @@ Client.prototype.connect = function(callback) {
             if (malformed.condition) {
               if (client.listeners('malformed').length > 0) {
                 delivery.malformed = malformed;
+                log.log('emit', client.id,
+                        'malformed', protonMsg.body, delivery);
                 client.emit('malformed', protonMsg.body, delivery);
               } else {
                 protonMsg.destroy();
                 throw new Error('No listener for "malformed" event.');
               }
             } else {
+              log.log('emit', client.id, 'message', data, delivery);
               client.emit('message', data, delivery);
             }
             if (autoSettle) {
@@ -659,7 +618,10 @@ Client.prototype.connect = function(callback) {
         var err = new Error(e.message);
         client.disconnect();
         process.nextTick(function() {
-          if (err) client.emit('error', err);
+          if (err) {
+            log.log('error', client.id, 'error', err);
+            client.emit('error', err);
+          }
         });
       }
       if (client.state === 'connected') {
@@ -673,12 +635,15 @@ Client.prototype.connect = function(callback) {
       check_for_messages();
     });
 
+    log.exit('Client.connect.performConnect', client.id, null);
     return;
   };
 
   var client = this;
 
   var stillDisconnecting = function(client, callback) {
+    log.entry('stillDisconnecting', client.id);
+
     if (client.getState() === 'disconnecting') {
       process.nextTick(function() {
         stillDisconnecting(client, callback);
@@ -688,14 +653,15 @@ Client.prototype.connect = function(callback) {
         performConnect(client, callback);
       });
     }
+
+    log.exit('stillDisconnecting', client.id, null);
   };
 
   process.nextTick(function() {
     performConnect(client, callback);
   });
 
-  log('exit', this.id, 'connect <', client);
-
+  log.exit('Client.connect', client.id, client);
   return client;
 };
 
@@ -732,12 +698,14 @@ Client.prototype.connect = function(callback) {
  *           If callback is specified and is not a function.
  */
 Client.prototype.disconnect = function(callback) {
-  log('entry', this.id, 'disconnect >');
+  log.entry('Client.disconnect', this.id);
 
   var client = this;
 
   // Performs the disconnect
   var performDisconnect = function(client, callback) {
+    log.entry('Client.disconnect.performDisconnect', client.id);
+
     client.state = 'disconnecting';
     if (client.messenger) {
       client.messenger.stop();
@@ -746,13 +714,19 @@ Client.prototype.disconnect = function(callback) {
     // Indicate that we've disconnected
     client.state = 'disconnected';
     process.nextTick(function() {
+      log.log('emit', client.id, 'disconnected');
       client.emit('disconnected');
     });
     if (callback) {
       process.nextTick(function() {
+        log.entry('Client.disconnect.performDisconnect.callback', client.id);
         callback.apply(client);
+        log.exit('Client.disconnect.performDisconnect.callback', client.id,
+                 null);
       });
     }
+
+    log.exit('Client.disconnect.performDisconnect', client.id, null);
     return;
   };
 
@@ -765,9 +739,13 @@ Client.prototype.disconnect = function(callback) {
       client.getState() === 'disconnecting') {
     process.nextTick(function() {
       if (callback) {
+        log.entry('Client.disconnect.callback', client.id);
         callback.apply(client);
+        log.exit('Client.disconnect.callback', client.id, null);
       }
     });
+
+    log.exit('Client.disconnect', client.id, client);
     return client;
   }
 
@@ -775,8 +753,7 @@ Client.prototype.disconnect = function(callback) {
     performDisconnect(client, callback);
   });
 
-  log('exit', this.id, 'disconnect <', client);
-
+  log.exit('Client.disconnect', client.id, client);
   return client;
 };
 
@@ -816,6 +793,7 @@ Client.prototype.getService = function() {
  */
 Client.prototype.getState = function() {
   var state = this.state;
+  log.log('data', this.id, 'Client.getState:', state);
   return state;
 };
 
@@ -870,7 +848,7 @@ Client.prototype.hasConnected = function() {
  *           If the topic or data parameter is undefined.
  */
 Client.prototype.send = function(topic, data, options, callback) {
-  log('entry', this.id, 'send >');
+  log.entry('Client.send', this.id);
 
   // Validate the passed parameters
   if (!topic) {
@@ -878,13 +856,13 @@ Client.prototype.send = function(topic, data, options, callback) {
   } else {
     topic = String(topic);
   }
-  log('parms', this.id, 'topic:', topic);
+  log.log('parms', this.id, 'topic:', topic);
   if (data === undefined) {
     throw new TypeError('Cannot send undefined data');
   } else if (data instanceof Function) {
     throw new TypeError('Cannot send a function');
   }
-  log('parms', this.id, 'data:', data);
+  log.log('parms', this.id, 'data:', data);
 
   // Validate the remaining optional parameters, assigning local variables to
   // the appropriate parameter
@@ -895,7 +873,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       options = undefined;
     } else {
       if (options instanceof Object) {
-        log('parms', this.id, 'options:', options);
+        log.log('parms', this.id, 'options:', options);
       } else {
         throw new TypeError('options must be an object type not a ' +
                             (typeof options) + ')');
@@ -937,7 +915,9 @@ Client.prototype.send = function(topic, data, options, callback) {
   var messenger = client.messenger;
   var protonMsg;
   try {
+    log.entry('proton.createMessage', client.id);
     protonMsg = proton.createMessage();
+    log.exit('proton.createMessage', client.id, protonMsg);
     protonMsg.address = this.getService();
     if (topic) {
       // need to encode the topic component but / has meaning that shouldn't be
@@ -965,6 +945,8 @@ Client.prototype.send = function(topic, data, options, callback) {
     // setup a timer to trigger the callback once the msg has been sent, or
     // immediately if no message to be sent
     var untilSendComplete = function(protonMsg, sendCallback) {
+      log.entry('Client.send.utilSendComplete', client.id);
+
       try {
         var complete = false;
         switch (messenger.status(protonMsg)) {
@@ -990,11 +972,16 @@ Client.prototype.send = function(topic, data, options, callback) {
             setImmediate(function() {
               // TODO: defect 59405 might mean we change what gets passed into
               // the callback...
+              log.entry('Client.send.utilSendComplete.callback', client.id);
               sendCallback.apply(client, [undefined, body, delivery]);
+              log.exit('Client.send.utilSendComplete.callback', client.id,
+                       null);
               //sendCallback.apply(client);
             });
           }
           protonMsg.destroy();
+
+          log.exit('Client.send.utilSendComplete', client.id, null);
           return;
         }
         // if msg not yet sent and still running, check again in a second or so
@@ -1007,11 +994,18 @@ Client.prototype.send = function(topic, data, options, callback) {
         client.disconnect();
         process.nextTick(function() {
           if (callbackOption) {
+            log.entry('Client.send.utilSendComplete.callback', client.id);
             callbackOption(err, protonMsg);
+            log.exit('Client.send.utilSendComplete.callback', client.id, null);
           }
-          if (err) client.emit('error', err);
+          if (err) {
+            log.log('error', client.id, 'error', err);
+            client.emit('error', err);
+          }
         });
       }
+
+      log.exit('Client.send.utilSendComplete', client.id, null);
     };
     // start the timer to trigger it to keep sending until msg has sent
     setImmediate(untilSendComplete, protonMsg, callbackOption);
@@ -1020,13 +1014,18 @@ Client.prototype.send = function(topic, data, options, callback) {
     client.disconnect();
     process.nextTick(function() {
       if (callbackOption) {
+        log.entry('Client.send.callback', client.id);
         callbackOption(err, protonMsg);
+        log.exit('Client.send.callback', client.id, null);
       }
-      if (err) client.emit('error', err);
+      if (err) {
+        log.log('error', client.id, 'error', err);
+        client.emit('error', err);
+      }
     });
   }
 
-  log('exit', this.id, 'send <');
+  log.exit('Client.send', this.id, null);
 };
 
 /**
@@ -1070,8 +1069,8 @@ Client.prototype.send = function(topic, data, options, callback) {
  *           If the pattern parameter is undefined.
  */
 Client.prototype.subscribe = function(pattern, share, options, callback) {
-  log('entry', this.id, 'subscribe >');
-  log('parms', this.id, 'pattern:', pattern);
+  log.entry('Client.subscribe', this.id);
+  log.log('parms', this.id, 'pattern:', pattern);
 
   // Must accept at least one option - and first option is always a pattern.
   if (arguments.length === 0) {
@@ -1148,8 +1147,8 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
     }
   }
 
-  log('parms', this.id, 'share:', share);
-  log('parms', this.id, 'options:', options);
+  log.log('parms', this.id, 'share:', share);
+  log.log('parms', this.id, 'options:', options);
 
   if (callback && !(callback instanceof Function)) {
     throw new TypeError('callback must be a function type');
@@ -1183,74 +1182,19 @@ Client.prototype.subscribe = function(pattern, share, options, callback) {
 
   setImmediate(function() {
     if (callback) {
+      log.entry('Client.subscribe.callback', client.id);
       callback.apply(client, [err, pattern]);
+      log.exit('Client.subscribe.callback', client.id, null);
     }
     if (err) {
+      log.log('error', client.id, 'error', err);
       client.emit('error', err);
       client.disconnect();
     }
   });
 
-  log('exit', this.id, 'subscribe <', client);
-
+  log.exit('Client.subscribe', client.id, client);
   return client;
-};
-
-var ffdcSequence = 0;
-ffdc = function(fnc, probeId, client, data) {
-  var clientId = client ? client.id : NO_CLIENT_ID;
-
-  log('ffdc', clientId, '+--------------------------------------' +
-      '---------------------------------------+');
-  log('ffdc', clientId, '| IBM MQ Light Node.js Client Module - ' +
-      'First Failure Data Capture');
-  log('ffdc', clientId, '| =====================================' +
-      '==========================');
-  log('ffdc', clientId, '|');
-  log('ffdc', clientId, '| Date/Time         :- ' +
-      moment(new Date()).format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
-  log('ffdc', clientId, '| Host Name         :- ' + os.hostname());
-  log('ffdc', clientId, '| Operating System  :- ' + os.type(), os.release());
-  log('ffdc', clientId, '| Architecture      :- ' + os.platform(), os.arch());
-  log('ffdc', clientId, '| Node Version      :- ' + process.version);
-  log('ffdc', clientId, '| Node Path         :- ' + process.execPath);
-  log('ffdc', clientId, '| Node Arguments    :- ' + process.execArgs);
-  log('ffdc', clientId, '| Program Arguments :- ' + process.argv);
-  if (!isWin) {
-    log('ffdc', clientId, '| User Id            :- ' + process.getuid());
-    log('ffdc', clientId, '| Group Id           :- ' + process.getgid());
-  }
-  log('ffdc', clientId, '| Name              :- ' + pkg.name);
-  log('ffdc', clientId, '| Version           :- ' + pkg.version);
-  log('ffdc', clientId, '| Description       :- ' + pkg.description);
-  log('ffdc', clientId, '| Installation Path :- ' + __dirname);
-  log('ffdc', clientId, '| Uptime            :- ' + process.uptime());
-  log('ffdc', clientId, '| Function          :- ' + fnc);
-  log('ffdc', clientId, '| Probe Id          :- ' + probeId);
-  log('ffdc', clientId, '| FDCSequenceNumber :- ' + ffdcSequence++);
-  log('ffdc', clientId, '+--------------------------------------' +
-      '---------------------------------------+');
-  log('ffdc', clientId, '');
-  log('ffdc', clientId, new Error().stack);
-  if (client) {
-    log('ffdc', clientId, '');
-    log('ffdc', clientId, 'Client');
-    log('ffdc', clientId, client);
-  }
-  if (data) {
-    log('ffdc', clientId, '');
-    log('ffdc', clientId, 'Data');
-    log('ffdc', clientId, data);
-  }
-  log('ffdc', clientId, '');
-  log('ffdc', clientId, 'Memory Usage');
-  log('ffdc', clientId, process.memoryUsage());
-  if ((ffdcSequence === 1) || (probeId === 255)) {
-    log('ffdc', clientId, '');
-    log('ffdc', clientId, 'Environment Variables');
-    log('ffdc', clientId, process.env);
-  }
-  log('ffdc', clientId, '');
 };
 
 /* ------------------------------------------------------------------------- */
