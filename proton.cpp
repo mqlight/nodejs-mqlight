@@ -39,6 +39,7 @@ using namespace v8;
 Persistent<Function> Proton::logEntry;
 Persistent<Function> Proton::logExit;
 Persistent<Function> Proton::logLog;
+Persistent<Function> Proton::logFFDC;
 
 #define NO_CLIENT_ID "*"
 
@@ -110,6 +111,17 @@ void Proton::Log(const char *lvl, const char *id, const char *prefix, int data)
   Proton::Log(lvl, id, prefix, dataString);
 }
 
+void Proton::FFDC(const char *fnc, int probeId, const char *data)
+{
+  HandleScope scope;
+  Local<Value> args[4] = {Local<Value>::New(String::New(fnc)),
+                          Local<Value>::New(Integer::New(probeId)),
+                          Local<Value>::New(Undefined()),
+                          Local<Value>::New(String::New(data ? data : ""))};
+  Proton::logFFDC->Call(Context::GetCurrent()->Global(), 4, args);
+  scope.Close(Undefined());
+}
+
 Handle<Value> CreateMessage(const Arguments& args) {
   HandleScope scope;
   return scope.Close(ProtonMessage::NewInstance(args));
@@ -136,9 +148,11 @@ void RegisterModule(Handle<Object> exports)
   Local<Function> entryFnc = Local<Function>::Cast(logObj->Get(String::New("entryLevel")));
   Local<Function> exitFnc = Local<Function>::Cast(logObj->Get(String::New("exitLevel")));
   Local<Function> logFnc = Local<Function>::Cast(logObj->Get(String::New("log")));
+  Local<Function> ffdcFnc = Local<Function>::Cast(logObj->Get(String::New("ffdc")));
   Proton::logEntry = Persistent<Function>::New(Local<Function>::Cast(entryFnc));
   Proton::logExit = Persistent<Function>::New(Local<Function>::Cast(exitFnc));
   Proton::logLog = Persistent<Function>::New(Local<Function>::Cast(logFnc));
+  Proton::logFFDC = Persistent<Function>::New(Local<Function>::Cast(ffdcFnc));
 
   scope.Close(Undefined());
 }

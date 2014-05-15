@@ -238,10 +238,19 @@ log.ffdc = function(fnc, probeId, client, data) {
 };
 
 
-/** The identifier used when a log entry is not associated
- *  with a particular client.
+/**
+ * Easily dump an FFDC when running under the node debugger.
+ */
+log.debug = function() {
+  log.ffdc('log.debug', 255, null, 'User-requested FFDC by function');
+};
+
+
+/**
+ * The identifier used when a log entry is not associated with a
+ * particular client.
  *
- *  @const {string}
+ * @const {string}
  */
 log.NO_CLIENT_ID = '*';
 
@@ -318,7 +327,10 @@ if (!process.env.MQLIGHT_NODE_NO_HANDLER) {
   var signal = isWin ? 'SIGBREAK' : 'SIGUSR2';
   log.log('debug', log.NO_CLIENT_ID, 'Registering signal handler for', signal);
   process.on(signal, function() {
-    log.ffdc(signal, 255, null, null);
+    log.ffdc(signal, 255, null, 'User-requested FFDC on signal');
+
+    // Start logging at the 'debug' level if we're not doing so, or turn off
+    // logging if we already are.
     if (logger.levels[startLevel] > logger.levels.debug) {
       if (logger.level === startLevel) {
         log.setLevel('debug');
