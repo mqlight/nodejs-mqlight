@@ -457,15 +457,16 @@ Client.prototype.connect = function(callback) {
     } catch (e) {
       // if there is an error getting the service list then ensure state is
       // disconnected
+      log.log('error', client.id, e);
       client.disconnect();
       var err = new Error(e.message);
       process.nextTick(function() {
-        log.log('error', client.id, 'error', err);
         if (callback) {
           log.entry('Client.connect.performConnect.callback', client.id);
           callback(err);
           log.exit('Client.connect.performConnect.callback', client.id, null);
         }
+        log.log('emit', client.id, 'error', err);
         client.emit('error', err);
       });
 
@@ -482,15 +483,16 @@ Client.prototype.connect = function(callback) {
     } catch (e) {
       // if there is an error connecting to the service then ensure state is
       // disconnected
+      log.log('error', client.id, e);
       client.disconnect();
       var err = new Error(e.message);
       process.nextTick(function() {
-        log.log('error', client.id, 'error', err);
         if (callback) {
           log.entry('Client.connect.performConnect.callback', client.id);
           callback(err);
           log.exit('Client.connect.performConnect.callback', client.id, null);
         }
+        log.log('emit', client.id, 'error', err);
         client.emit('error', err);
       });
 
@@ -523,17 +525,25 @@ Client.prototype.connect = function(callback) {
       if (client.state !== 'connected') {
         return;
       }
+
+      log.entryLevel('entry_often', 'check_for_messages', client.id);
+
       try {
         var messages = messenger.receive(50);
         if (messages.length > 0) {
-          for (var i = 0, tot = messages.length; i < tot; i++) {
-            var protonMsg = messages[i];
+          log.log('debug', client.id, 'received %d messages', messages.length);
+
+          for (var msg = 0, tot = messages.length; msg < tot; msg++) {
+            log.log('debug', client.id, 'processing message %d', msg);
+            var protonMsg = messages[msg];
+
             // if body is a JSON'ified object, try to parse it back to a js obj
             var data;
             if (protonMsg.contentType === 'application/json') {
               try {
                 data = JSON.parse(protonMsg.body);
               } catch (_) {
+                log.log('error', client.id, _);
                 console.warn(_);
               }
             } else {
@@ -551,11 +561,15 @@ Client.prototype.connect = function(callback) {
                 },
                 topic: topic,
                 settleDelivery: autoSettle ? function() {
+                  log.entry('message.settleDelivery.auto', this.id);
                   log.log('data', this.id, 'delivery:', delivery);
+                  log.exit('message.settleDelivery.auto', this.id, null);
                 } : function() {
+                  log.entry('message.settleDelivery', this.id);
                   log.log('data', this.id, 'delivery:', delivery);
                   messenger.settle(protonMsg);
                   protonMsg.destroy();
+                  log.exit('message.settleDelivery', this.id, null);
                 }
               }
             };
@@ -574,20 +588,20 @@ Client.prototype.connect = function(callback) {
             var da = protonMsg.deliveryAnnotations;
             var malformed = {};
             malformed.MQMD = {};
-            for (var i = 0; da && (i < da.length); ++i) {
-              if (da[i] && da[i].key) {
-                switch (da[i].key) {
+            for (var an = 0; da && (an < da.length); ++an) {
+              if (da[an] && da[an].key) {
+                switch (da[an].key) {
                   case 'x-opt-message-malformed-condition':
-                    malformed.condition = da[i].value;
+                    malformed.condition = da[an].value;
                     break;
                   case 'x-opt-message-malformed-description':
-                    malformed.description = da[i].value;
+                    malformed.description = da[an].value;
                     break;
                   case 'x-opt-message-malformed-MQMD.CodedCharSetId':
-                    malformed.MQMD.CodedCharSetId = Number(da[i].value);
+                    malformed.MQMD.CodedCharSetId = Number(da[an].value);
                     break;
                   case 'x-opt-message-malformed-MQMD.Format':
-                    malformed.MQMD.Format = da[i].value;
+                    malformed.MQMD.Format = da[an].value;
                     break;
                   default:
                     break;
@@ -615,11 +629,12 @@ Client.prototype.connect = function(callback) {
           }
         }
       } catch (e) {
+        log.log('error', client.id, e);
         var err = new Error(e.message);
         client.disconnect();
         process.nextTick(function() {
           if (err) {
-            log.log('error', client.id, 'error', err);
+            log.log('emit', client.id, 'error', err);
             client.emit('error', err);
           }
         });
@@ -627,6 +642,8 @@ Client.prototype.connect = function(callback) {
       if (client.state === 'connected') {
         setImmediate(check_for_messages);
       }
+
+      log.exitLevel('entry_often', 'check_for_messages', client.id);
     };
 
     // Setup the check for messages such that each received messages is output
@@ -990,6 +1007,7 @@ Client.prototype.send = function(topic, data, options, callback) {
           setImmediate(untilSendComplete, protonMsg, callbackOption);
         }
       } catch (e) {
+        log.log('error', client.id, e);
         var err = new Error(e.message);
         client.disconnect();
         process.nextTick(function() {
@@ -999,7 +1017,7 @@ Client.prototype.send = function(topic, data, options, callback) {
             log.exit('Client.send.utilSendComplete.callback', client.id, null);
           }
           if (err) {
-            log.log('error', client.id, 'error', err);
+            log.log('emit', client.id, 'error', err);
             client.emit('error', err);
           }
         });
@@ -1010,6 +1028,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     // start the timer to trigger it to keep sending until msg has sent
     setImmediate(untilSendComplete, protonMsg, callbackOption);
   } catch (e) {
+    log.log('error', client.id, e);
     var err = new Error(e.message);
     client.disconnect();
     process.nextTick(function() {
@@ -1019,7 +1038,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         log.exit('Client.send.callback', client.id, null);
       }
       if (err) {
-        log.log('error', client.id, 'error', err);
+        log.log('emit', client.id, 'error', err);
         client.emit('error', err);
       }
     });
@@ -1179,6 +1198,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   try {
     messenger.subscribe(address, qos);
   } catch (e) {
+    log.log('error', client.id, e);
     err = new Error(e.message);
   }
 
@@ -1189,7 +1209,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       log.exit('Client.subscribe.callback', client.id, null);
     }
     if (err) {
-      log.log('error', client.id, 'error', err);
+      log.log('emit', client.id, 'error', err);
       client.emit('error', err);
       client.disconnect();
     }
