@@ -83,26 +83,30 @@ ProtonMessage::ProtonMessage() : ObjectWrap()
   Proton::Entry("ProtonMessage::constructor", NULL);
 
   message = pn_message();
+  sprintf(name, "%p", message);
   linkAddr = NULL;
 
-  Proton::Exit("ProtonMessage::constructor", NULL, 0);
+  Proton::Exit("ProtonMessage::constructor", name, 0);
 }
 
 ProtonMessage::~ProtonMessage()
 {
-  Proton::Entry("ProtonMessage::destructor", NULL);
+  Proton::Entry("ProtonMessage::destructor", name);
+
+  linkAddr = NULL;
 
   if (message)
   {
-    Proton::Entry("ProtonMessage::pn_message_free", NULL);
+    Proton::Entry("ProtonMessage::pn_message_free", name);
     pn_message_free(message);
-    Proton::Exit("ProtonMessage::pn_message_free", NULL, 0);
+    message = NULL;
+    Proton::Exit("ProtonMessage::pn_message_free", name, 0);
   }
   handle_->SetInternalField(0, Undefined());
   handle_.Dispose();
   handle_.Clear();
 
-  Proton::Exit("ProtonMessage::destructor", NULL, 0);
+  Proton::Exit("ProtonMessage::destructor", name, 0);
 }
 
 Handle<Value> ProtonMessage::NewInstance(const Arguments& args)
@@ -132,21 +136,24 @@ Handle<Value> ProtonMessage::New(const Arguments& args)
   ProtonMessage *msg = new ProtonMessage();
   msg->Wrap(args.This());
 
-  Proton::Exit("ProtonMessage::New", NULL, 0);
+  Proton::Exit("ProtonMessage::New", msg->name, 0);
   return args.This();
 }
 
 Handle<Value> ProtonMessage::Destroy(const Arguments& args)
 {
   HandleScope scope;
-  ProtonMessage *msg;
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  const char *name = msg ? msg->name : NULL;
 
-  Proton::Entry("ProtonMessage::Destroy", NULL);
+  Proton::Entry("ProtonMessage::Destroy", name);
 
-  msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
-  msg->~ProtonMessage();
+  if(msg)
+  {
+    msg->~ProtonMessage();
+  }
 
-  Proton::Exit("ProtonMessage::Destroy", NULL, 0);
+  Proton::Exit("ProtonMessage::Destroy", name, 0);
   return scope.Close(Undefined());
 }
 
@@ -154,15 +161,20 @@ Handle<Value> ProtonMessage::GetAddress(Local<String> property,
                                         const AccessorInfo &info)
 {
   HandleScope scope;
-  Handle<Value> result;
-
-  Proton::Entry("ProtonMessage::GetAddress", NULL);
-
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
-  const char *addr = pn_message_get_address(msg->message);
+  const char *name = msg ? msg->name : NULL;
+  Handle<Value> result;
+  const char *addr = NULL;
+
+  Proton::Entry("ProtonMessage::GetAddress", name);
+
+  if(msg && msg->message)
+  {
+    addr = pn_message_get_address(msg->message);
+  }
   result = addr ? String::New(addr) : Undefined();
 
-  Proton::Exit("ProtonMessage::GetAddress", NULL, addr);
+  Proton::Exit("ProtonMessage::GetAddress", name, addr);
   return scope.Close(result);
 }
 
@@ -171,19 +183,21 @@ void ProtonMessage::SetAddress(Local<String> property,
                                const AccessorInfo &info)
 {
   HandleScope scope;
-
-  Proton::Entry("ProtonMessage::SetAddress", NULL);
-
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char *name = msg ? msg->name : NULL;
 
-  String::Utf8Value param(value->ToString());
-  std::string address = std::string(*param);
+  Proton::Entry("ProtonMessage::SetAddress", name);
 
-  Proton::Log("parms", NULL, "address:", address.c_str());
+  if(msg && msg->message)
+  {
+    String::Utf8Value param(value->ToString());
+    std::string address = std::string(*param);
+    Proton::Log("parms", name, "address:", address.c_str());
 
-  pn_message_set_address(msg->message, address.c_str());
+    pn_message_set_address(msg->message, address.c_str());
+  }
 
-  Proton::Exit("ProtonMessage::SetAddress", NULL, 0);
+  Proton::Exit("ProtonMessage::SetAddress", name, 0);
   scope.Close(Undefined());
 }
 
@@ -191,11 +205,11 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
                                      const AccessorInfo &info)
 {
   HandleScope scope;
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char *name = msg ? msg->name : NULL;
   Handle<Value> result;
 
-  Proton::Entry("ProtonMessage::GetBody", NULL);
-
-  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  Proton::Entry("ProtonMessage::GetBody", name);
 
   if (msg && msg->message)
   {
@@ -237,9 +251,9 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
         break;
     }
 
-    Proton::Log("debug", NULL, "address:", pn_message_get_address(msg->message));
-    Proton::Log("debug", NULL, "subject:", pn_message_get_subject(msg->message));
-    Proton::Log("debug", NULL, "content:", buffer);
+    Proton::Log("debug", name, "address:", pn_message_get_address(msg->message));
+    Proton::Log("debug", name, "subject:", pn_message_get_subject(msg->message));
+    Proton::Log("debug", name, "content:", buffer);
 
     free(buffer);
   }
@@ -248,7 +262,7 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
     result = Undefined();
   }
 
-  Proton::Exit("ProtonMessage::GetBody", NULL, 0);
+  Proton::Exit("ProtonMessage::GetBody", name, 0);
   return scope.Close(result);
 }
 
@@ -257,31 +271,34 @@ void ProtonMessage::PutBody(Local<String> property,
                             const AccessorInfo &info)
 {
   HandleScope scope;
-
-  Proton::Entry("ProtonMessage::PutBody", NULL);
-
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char *name = msg ? msg->name : NULL;
 
-  if (value->IsString()) {
-    String::Utf8Value param(value->ToString());
-    std::string msgtext = std::string(*param);
-    Proton::Log("parms", NULL, "msgtext:", msgtext.c_str());
-    Proton::Log("data", NULL, "format:", "PN_TEXT");
-    pn_message_set_format(msg->message, PN_TEXT);
-    pn_message_load_text(msg->message, msgtext.c_str(), strlen(msgtext.c_str()));
-    V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgtext.c_str()));
-  } else if (value->IsObject()) {
-    Local<Object> buffer = value->ToObject();
-    char *msgdata = Buffer::Data(buffer);
-    size_t msglen = Buffer::Length(buffer);
-    Proton::Log("data", NULL, "msglen:", (int)msglen);
-    Proton::Log("data", NULL, "format:", "PN_DATA");
-    pn_message_set_format(msg->message, PN_DATA);
-    pn_message_load_data(msg->message, msgdata, msglen);
-    V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgdata));
+  Proton::Entry("ProtonMessage::PutBody", name);
+
+  if (msg && msg->message)
+  {
+    if (value->IsString()) {
+      String::Utf8Value param(value->ToString());
+      std::string msgtext = std::string(*param);
+      Proton::Log("parms", name, "msgtext:", msgtext.c_str());
+      Proton::Log("data", name, "format:", "PN_TEXT");
+      pn_message_set_format(msg->message, PN_TEXT);
+      pn_message_load_text(msg->message, msgtext.c_str(), strlen(msgtext.c_str()));
+      V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgtext.c_str()));
+    } else if (value->IsObject()) {
+      Local<Object> buffer = value->ToObject();
+      char *msgdata = Buffer::Data(buffer);
+      size_t msglen = Buffer::Length(buffer);
+      Proton::Log("data", name, "msglen:", (int)msglen);
+      Proton::Log("data", name, "format:", "PN_DATA");
+      pn_message_set_format(msg->message, PN_DATA);
+      pn_message_load_data(msg->message, msgdata, msglen);
+      V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgdata));
+    }
   }
 
-  Proton::Exit("ProtonMessage::PutBody", NULL, 0);
+  Proton::Exit("ProtonMessage::PutBody", name, 0);
   scope.Close(Undefined());
 }
 
@@ -289,13 +306,18 @@ Handle<Value> ProtonMessage::GetContentType(Local<String> property,
                                             const AccessorInfo &info)
 {
   HandleScope scope;
-
-  Proton::Entry("ProtonMessage::GetContentType", NULL);
-
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
-  const char *type = pn_message_get_content_type(msg->message);
+  const char *name = msg ? msg->name : NULL;
+  const char *type = NULL;
 
-  Proton::Exit("ProtonMessage::GetContentType", NULL, type);
+  Proton::Entry("ProtonMessage::GetContentType", name);
+
+  if (msg && msg->message)
+  {
+    type = pn_message_get_content_type(msg->message);
+  }
+
+  Proton::Exit("ProtonMessage::GetContentType", name, type);
   return scope.Close(type ? String::New(type) : Null());
 }
 
@@ -304,18 +326,21 @@ void ProtonMessage::SetContentType(Local<String> property,
                                    const AccessorInfo &info)
 {
   HandleScope scope;
-
-  Proton::Entry("ProtonMessage::SetContentType", NULL);
-
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char *name = msg ? msg->name : NULL;
 
-  String::Utf8Value param(value->ToString());
-  std::string type = std::string(*param);
+  Proton::Entry("ProtonMessage::SetContentType", name);
 
-  Proton::Log("parms", NULL, "type:", type.c_str());
-  pn_message_set_content_type(msg->message, type.c_str());
+  if (msg && msg->message)
+  {
+    String::Utf8Value param(value->ToString());
+    std::string type = std::string(*param);
+    Proton::Log("parms", name, "type:", type.c_str());
 
-  Proton::Exit("ProtonMessage::SetContentType", NULL, 0);
+    pn_message_set_content_type(msg->message, type.c_str());
+  }
+
+  Proton::Exit("ProtonMessage::SetContentType", name, 0);
   scope.Close(Undefined());
 }
 
@@ -323,14 +348,20 @@ Handle<Value> ProtonMessage::GetLinkAddress(Local<String> property,
                                             const AccessorInfo &info)
 {
   HandleScope scope;
-  Handle<Value> result;
-
-  Proton::Entry("ProtonMessage::GetLinkAddress", NULL);
-
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
-  result = (msg->linkAddr) ? String::New(msg->linkAddr) : Undefined();
+  const char *name = msg ? msg->name : NULL;
+  Handle<Value> result;
+  const char *linkAddr = NULL;
 
-  Proton::Exit("ProtonMessage::GetLinkAddress", NULL, msg->linkAddr);
+  Proton::Entry("ProtonMessage::GetLinkAddress", name);
+
+  if (msg)
+  {
+    linkAddr = msg->linkAddr;
+  }
+  result = linkAddr ? String::New(linkAddr) : Undefined();
+
+  Proton::Exit("ProtonMessage::GetLinkAddress", name, linkAddr);
   return scope.Close(result);
 }
 
@@ -346,110 +377,120 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
                                                     const AccessorInfo &info)
 {
   HandleScope scope;
-
-  Proton::Entry("ProtonMessage::GetDeliveryAnnotations", NULL);
-
   ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
-  pn_data_t *da = pn_message_instructions(msg->message); // instructions === delivery annotations
+  const char *name = msg ? msg->name : NULL;
+  Handle<Value> result;
 
-  // Count the numner of delivery annotations that we are interested in returning
-  bool lval = pn_data_next(da);                 // Move to Map
-  int elements = 0;
-  if (lval && pn_data_type(da) == PN_MAP) {     // Check it actuall is a Map
-    if (lval) lval = pn_data_enter(da);         // Enter the Map
-    if (lval) lval = pn_data_next(da);          // Poisition on first map key
-    if (lval) {
-      while(true) {
-        if (pn_data_type(da) == PN_SYMBOL) {
-          if (pn_data_next(da)) {
-            switch (pn_data_type(da)) {
-              case PN_SYMBOL:
-              case PN_STRING:
-              case PN_INT:
-                ++elements;
-              default:
-                break;
+  Proton::Entry("ProtonMessage::GetDeliveryAnnotations", name);
+
+  if(msg && msg->message)
+  {
+    pn_data_t *da = pn_message_instructions(msg->message); // instructions === delivery annotations
+
+    // Count the numner of delivery annotations that we are interested in returning
+    bool lval = pn_data_next(da);                 // Move to Map
+    int elements = 0;
+    if (lval && pn_data_type(da) == PN_MAP) {     // Check it actuall is a Map
+      if (lval) lval = pn_data_enter(da);         // Enter the Map
+      if (lval) lval = pn_data_next(da);          // Poisition on first map key
+      if (lval) {
+        while(true) {
+          if (pn_data_type(da) == PN_SYMBOL) {
+            if (pn_data_next(da)) {
+              switch (pn_data_type(da)) {
+                case PN_SYMBOL:
+                case PN_STRING:
+                case PN_INT:
+                  ++elements;
+                default:
+                  break;
+              }
+              if (!pn_data_next(da)) break;
+            } else {
+              break;
             }
-            if (!pn_data_next(da)) break;
-          } else {
-            break;
           }
         }
       }
     }
-  }
-  pn_data_rewind(da);
+    pn_data_rewind(da);
 
-  // Return early if there are no (interesting) delivery annotations
-  if (elements == 0) {
-    Proton::Exit("ProtonMessage::GetDeliveryAnnotations", NULL, 0);
-    return scope.Close(Undefined());
-  }
+    // Return early if there are no (interesting) delivery annotations
+    if (elements == 0) {
+      Proton::Exit("ProtonMessage::GetDeliveryAnnotations", name, 0);
+      return scope.Close(Undefined());
+    }
 
-  pn_data_next(da);         // Move to Map
-  pn_data_enter(da);        // Enter the Map
-  pn_data_next(da);         // Poisition on first map key
+    pn_data_next(da);         // Move to Map
+    pn_data_enter(da);        // Enter the Map
+    pn_data_next(da);         // Poisition on first map key
 
-  // Build an array of objects, where each object has the following four properties:
-  //   key        : the key of the delivery annotation entry
-  //   key_type   : the type of the delivery annotation key (always 'symbol')
-  //   value      : the value of the delivery annotation entry
-  //   value_type : the type of the delivery annotation value ('symbol', 'string', or 'int32')
-  Local<Array> result = Array::New(elements);
-  int count = 0;
-  while(true) {
+    // Build an array of objects, where each object has the following four properties:
+    //   key        : the key of the delivery annotation entry
+    //   key_type   : the type of the delivery annotation key (always 'symbol')
+    //   value      : the value of the delivery annotation entry
+    //   value_type : the type of the delivery annotation value ('symbol', 'string', or 'int32')
+    Local<Array> array = Array::New(elements);
+    result = array;
+    int count = 0;
+    while(true) {
 
-    if (pn_data_type(da) == PN_SYMBOL) {
-      char *key = pn_data_get_symbol(da).start;
+      if (pn_data_type(da) == PN_SYMBOL) {
+        char *key = pn_data_get_symbol(da).start;
 
-      if (pn_data_next(da)) {
-        char *value;
-        const char *value_type;
-        char int_buffer[12];	// strlen("-2147483648") + '\0'
-        pn_type_t type = pn_data_type(da);
-        bool add_entry = true;
+        if (pn_data_next(da)) {
+          char *value;
+          const char *value_type;
+          char int_buffer[12];	// strlen("-2147483648") + '\0'
+          pn_type_t type = pn_data_type(da);
+          bool add_entry = true;
 
-        switch (type) {
-          case PN_SYMBOL:
-            add_entry = true;
-            value_type = "symbol";
-            value = pn_data_get_symbol(da).start;
-            break;
-          case PN_STRING:
-            add_entry = true;
-            value_type = "string";
-            value = pn_data_get_string(da).start;
-            break;
-          case PN_INT:
-            add_entry = true;
-            value_type = "int32";
-            snprintf(int_buffer, sizeof(int_buffer), "%d", pn_data_get_atom(da).u.as_int);
-            value = int_buffer;
-            break;
-          default:
-            add_entry = false;
-            break;
+          switch (type) {
+            case PN_SYMBOL:
+              add_entry = true;
+              value_type = "symbol";
+              value = pn_data_get_symbol(da).start;
+              break;
+            case PN_STRING:
+              add_entry = true;
+              value_type = "string";
+              value = pn_data_get_string(da).start;
+              break;
+            case PN_INT:
+              add_entry = true;
+              value_type = "int32";
+              snprintf(int_buffer, sizeof(int_buffer), "%d", pn_data_get_atom(da).u.as_int);
+              value = int_buffer;
+              break;
+            default:
+              add_entry = false;
+              break;
+          }
+
+          if (add_entry) {
+            // e.g. {key: 'xopt-blah', key_type: 'symbol', value: 'blahblah', value_type: 'string'}
+            Local<Object> obj = Object::New();
+            obj->Set(String::NewSymbol("key"), String::NewSymbol(key));
+            obj->Set(String::NewSymbol("key_type"), String::NewSymbol("symbol"));
+            obj->Set(String::NewSymbol("value"), String::NewSymbol(value));
+            obj->Set(String::NewSymbol("value_type"), String::NewSymbol(value_type));
+            array->Set(Number::New(count++), obj);
+          }
+
+          if (!pn_data_next(da)) break;
+        } else {
+          break;
         }
-
-        if (add_entry) {
-          // e.g. {key: 'xopt-blah', key_type: 'symbol', value: 'blahblah', value_type: 'string'}
-          Local<Object> obj = Object::New();
-          obj->Set(String::NewSymbol("key"), String::NewSymbol(key));
-          obj->Set(String::NewSymbol("key_type"), String::NewSymbol("symbol"));
-          obj->Set(String::NewSymbol("value"), String::NewSymbol(value));
-          obj->Set(String::NewSymbol("value_type"), String::NewSymbol(value_type));
-          result->Set(Number::New(count++), obj);
-        }
-
-        if (!pn_data_next(da)) break;
-      } else {
-        break;
       }
     }
+
+    pn_data_rewind(da);
+  }
+  else
+  {
+    result = Undefined();
   }
 
-  pn_data_rewind(da);
-
-  Proton::Exit("ProtonMessage::GetDeliveryAnnotations", NULL, 1);
+  Proton::Exit("ProtonMessage::GetDeliveryAnnotations", name, 1);
   return scope.Close(result);
 }

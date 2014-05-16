@@ -50,6 +50,7 @@ public:
     pn_message_t *message;
     pn_tracker_t tracker;
     const char *linkAddr;
+    char name[24];
 
 protected:
     static v8::Handle<v8::Value> New(const v8::Arguments &args);
