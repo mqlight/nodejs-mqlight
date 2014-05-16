@@ -9,7 +9,7 @@ build your applications with.
 This Node.js module provides the high-level API by which you can interact
 with the MQ Light runtime.
 
-See https://www.ibmdw.net/messaging/mq-light/ for more details.
+See https://developer.ibm.com/messaging/mq-light/ for more details.
 
 Current Features:
 
@@ -211,6 +211,20 @@ Options:
                         (default amqp://localhost/public)
   -d NUM, --delay=NUM   add a NUM seconds time delay between each request
 ```
+
+## Feedback
+
+You can help shape the product we release by trying out the beta code and
+leaving your
+[feedback](https://developer.ibm.com/community/groups/service/html/communityview?communityUuid=00a6a6d0-9601-44cb-a2a2-b0b26811790a).
+
+### Reporting bugs
+
+If you think you've found a bug, please leave us
+[feedback](https://developer.ibm.com/community/groups/service/html/communityview?communityUuid=00a6a6d0-9601-44cb-a2a2-b0b26811790a).
+To help us fix the bug a log might be helpful. You can get a log by setting the
+environment variable `MQLIGHT_NODE_LOG` to `debug` and by collecting the output
+that goes to stderr when you run your application.
 
 ## Release notes
 
