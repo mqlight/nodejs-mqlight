@@ -114,4 +114,9 @@ client.on('connected', function() {
     console.log(data);
     console.log(delivery);
   });
+  client.on('malformed', function(data, delivery) {
+    console.log('*** received malformed message (%d)', (++i));
+    console.log(data);
+    console.log(delivery);
+  });
 });
