@@ -21,7 +21,7 @@
  * Set up logging to stderr. The level of output is configured by the
  * value of the MQLIGHT_NODE_LOG environment variable. The default is 'ffdc'.
  */
-log = require('./log.js');
+log = require('./mqlight-log');
 
 var os = require('os');
 var _system = os.platform() + '-' + process.arch;
