@@ -340,3 +340,11 @@ if (!process.env.MQLIGHT_NODE_NO_HANDLER) {
     }
   });
 }
+
+if (process.env.MQLIGHT_NODE_DEBUG_PORT) {
+  /**
+   * Set the port which the debugger will listen on to the value of the
+   * MQLIGHT_NODE_DEBUG_PORT environment variable, if it's set.
+   */
+  process.debugPort = process.env.MQLIGHT_NODE_DEBUG_PORT;
+}
