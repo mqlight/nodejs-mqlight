@@ -316,25 +316,44 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   pn_messenger_set_incoming_window(obj->messenger, std::numeric_limits<int>::max());
 
   // if we have a username make sure we set a route to force auth
+  std::string validationAddress;
   std::string authPattern;
   if ( username.length() > 0){
 	int index = address.find("//");
     std::string hostandport =  index >= 0 ? address.substr(index+2) : address;
     if ( password.length() > 0 ){
-      authPattern = "amqp://" + username + ":" + password + "@" + hostandport;
+      authPattern = "amqp://" + username + ":" + password + "@$1";
+      validationAddress = "amqp://" + username + ":" + password + "@" + hostandport;
     } else {
-      authPattern = "amqp://" + username + "@" + hostandport;
+      authPattern = "amqp://" + username + "@$1";
+      validationAddress = "amqp://" + username + "@" + hostandport;
     }
   } else {
-	  authPattern = address;
+	  authPattern = "";
+ 	  validationAddress = address;
   }
 
   /*
-   * set the route so that the address gets the supplied user and password added
+   * if we have a username set the route so any address starting with
+   * amqp:// gets the supplied user and password added
+   */
+  int error;
+  if (authPattern.length() > 0) {
+    Proton::Entry("pn_messenger_route", NULL);
+    Proton::Log("parms", NULL, "authPattern:", authPattern.c_str());
+    error = pn_messenger_route(obj->messenger, "amqp://*", authPattern.c_str());
+    Proton::Exit("pn_messenger_route", NULL, error);
+    if (error){
+      THROW_EXCEPTION("Failed to set messenger route", "ProtonMessenger:Connect", NULL);
+    }
+  }
+
+  /*
+   * set the route for validation
    */
   Proton::Entry("pn_messenger_route", name);
-  Proton::Log("parms", name, "authPattern:", authPattern.c_str());
-  int error = pn_messenger_route(obj->messenger, authPattern.c_str(), authPattern.c_str());
+  Proton::Log("parms", name, "validationAddress:", validationAddress.c_str());
+  error = pn_messenger_route(obj->messenger, validationAddress.c_str(), validationAddress.c_str());
   Proton::Exit("pn_messenger_route", name, error);
   if (error){
     THROW_EXCEPTION("Failed to set messenger route", "ProtonMessenger::Connect", name);
