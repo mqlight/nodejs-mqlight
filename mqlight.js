@@ -567,8 +567,11 @@ Client.prototype.connect = function(callback) {
                 } : function() {
                   log.entry('message.settleDelivery', this.id);
                   log.log('data', this.id, 'delivery:', delivery);
-                  messenger.settle(protonMsg);
-                  protonMsg.destroy();
+                  if (protonMsg) {
+                    messenger.settle(protonMsg);
+                    protonMsg.destroy();
+                    protonMsg = undefined;
+                  }
                   log.exit('message.settleDelivery', this.id, null);
                 }
               }
