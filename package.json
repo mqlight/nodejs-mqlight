@@ -4,6 +4,9 @@
     "description": "IBM MQ Light Client Module",
     "main": "mqlight.js",
     "gypfile": true,
+    "bin": {
+        "mqlight-debug": "./bin/mqlight-debug.js"
+    },
     "dependencies": {
         "node-uuid": "~1.4.0",
         "nopt": "~2.2.0",
