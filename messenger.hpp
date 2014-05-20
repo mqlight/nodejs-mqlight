@@ -48,7 +48,7 @@ public:
     static v8::Persistent<v8::FunctionTemplate> constructor;
     static void Init(v8::Handle<v8::Object> target);
     static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
-    ProtonMessenger(std::string name);
+    ProtonMessenger(std::string name, std::string username, std::string password);
     ~ProtonMessenger();
 
 protected:
@@ -67,7 +67,28 @@ protected:
                                              const v8::AccessorInfo &info);
     static void Tracer(pn_transport_t *transport, const char *message);
 
+    /**
+     * Name for the messenger. Initially this will be set to the value passed to the constructor.
+     * When the proton messenger is constructed this may be modified to the name passed back from
+     * the pn_messenger_name function. In general it will not change.
+     */
+    std::string name;
+
+    /**
+     * Username, non-blank implies SASL authentication required.
+     */
+    std::string username;
+
+    /**
+     * Password for a specified username, when SASL authentication required.
+     */
+    std::string password;
+
+    /**
+     * Points to the underlying proton messenger. This will be set when Connect is called and unset when stop is called.
+     */
     pn_messenger_t *messenger;
+
 };
 
 #endif /* MESSENGER_HPP */
