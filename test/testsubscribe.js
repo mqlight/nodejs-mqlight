@@ -181,7 +181,10 @@ module.exports.test_subscribe_ok_callback = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
   client.connect(function() {
     client.subscribe('/foo', function() {
-      test.equals(arguments.length, 2);  // Is this correct? See defect 61003
+      test.equals(arguments.length, 3);
+      test.deepEqual(arguments[0], undefined);  // error argument
+      test.deepEqual(arguments[1], '/foo');     // topic pattern
+      test.equals(arguments[2], undefined);  // share name
       test.ok(this === client);
       client.disconnect();
       test.done();
@@ -208,9 +211,11 @@ module.exports.test_subscribe_fail_callback = function(test) {
   };
 
   client.connect(function() {
-    client.subscribe('/foo', function(err) {
+    client.subscribe('/foo', 'share', function(err) {
       test.ok(err instanceof Error);
-      test.equals(arguments.length, 2);  // Is this correct? See defect 61003
+      test.equals(arguments.length, 3);
+      test.deepEqual(arguments[1], '/foo');
+      test.deepEqual(arguments[2], 'share');
       test.ok(this === client);
 
       client.disconnect();

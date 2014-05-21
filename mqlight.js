@@ -1135,6 +1135,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
   }
 
+  var originalShareValue = share;
   if (share) {
     share = String(share);
     if (share.indexOf(':') >= 0) {
@@ -1208,7 +1209,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   setImmediate(function() {
     if (callback) {
       log.entry('Client.subscribe.callback', client.id);
-      callback.apply(client, [err, topicPattern]);
+      callback.apply(client, [err, topicPattern, originalShareValue]);
       log.exit('Client.subscribe.callback', client.id, null);
     }
     if (err) {
