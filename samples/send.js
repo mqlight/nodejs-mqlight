@@ -104,7 +104,7 @@ client.on('connected', function() {
   var i = 0;
   var sendNextMessage = function() {
     var body = messages[i];
-    client.send(topic, body, function(err, data, delivery) {
+    client.send(topic, body, function(err, topic, data, options) {
       if (err) {
         console.error('Problem with send request: %s', err.message);
         process.exit(1);
@@ -112,7 +112,6 @@ client.on('connected', function() {
       if (data) {
         console.log('# sent message:');
         console.log(data);
-        console.log(delivery);
       }
       // if there are more messages pending, send the next in <delay> seconds
       if (messages.length > ++i) {

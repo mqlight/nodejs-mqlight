@@ -979,24 +979,13 @@ Client.prototype.send = function(topic, data, options, callback) {
         if (complete) {
           if (sendCallback) {
             var body = protonMsg.body;
-            var decoded = decodeURIComponent(protonMsg.address);
-            var topic = url.parse(decoded).path.substring(1);
-            var delivery = {
-              message: {
-                properties: {
-                  contentType: protonMsg.contentType
-                },
-                topic: topic
-              }
-            };
             setImmediate(function() {
               // TODO: defect 59405 might mean we change what gets passed into
               // the callback...
               log.entry('Client.send.utilSendComplete.callback', client.id);
-              sendCallback.apply(client, [undefined, body, delivery]);
+              sendCallback.apply(client, [undefined, topic, body, options]);
               log.exit('Client.send.utilSendComplete.callback', client.id,
                        null);
-              //sendCallback.apply(client);
             });
           }
           protonMsg.destroy();
@@ -1016,7 +1005,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         process.nextTick(function() {
           if (callbackOption) {
             log.entry('Client.send.utilSendComplete.callback', client.id);
-            callbackOption(err, protonMsg);
+            callbackOption.apply(client, [err, topic, protonMsg.body, options]);
             log.exit('Client.send.utilSendComplete.callback', client.id, null);
           }
           if (err) {
