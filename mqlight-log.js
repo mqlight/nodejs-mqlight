@@ -61,6 +61,26 @@ var write = function(lvl, prefix, args) {
 log.setLevel = function(lvl) {
   logger.level = lvl;
   log.log('debug', log.NO_CLIENT_ID, 'logger.level:', logger.level);
+
+  if (logger.levels[logger.level] <= logger.levels.detail) {
+    // Set PN_TRACE_FRM if detailed data level logging is enabled.
+    log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
+    process.env['PN_TRACE_FRM'] = '1';
+    if (logger.levels[logger.level] <= logger.levels.raw) {
+      // Set PN_TRACE_RAW if raw level logging is enabled.
+      log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
+      process.env['PN_TRACE_RAW'] = '1';
+    } else {
+      log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
+      delete process.env['PN_TRACE_RAW'];
+    }
+  }
+  else {
+    log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
+    delete process.env['PN_TRACE_RAW'];
+    log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
+    delete process.env['PN_TRACE_FRM'];
+  }
 };
 
 
@@ -306,17 +326,6 @@ if (process.env.MQLIGHT_NODE_LOG_STREAM === 'stdout') {
    * variable MQLIGHT_NODE_LOG_STREAM=stdout.
    */
   logger.stream = process.stdout;
-}
-
-if (logger.levels[logger.level] <= logger.levels.detail) {
-  // Set PN_TRACE_FRM if detailed data level logging is enabled.
-  log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
-  process.env['PN_TRACE_FRM'] = '1';
-  if (logger.levels[logger.level] <= logger.levels.raw) {
-    // Set PN_TRACE_RAW if raw level logging is enabled.
-    log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
-    process.env['PN_TRACE_RAW'] = '1';
-  }
 }
 
 /*
