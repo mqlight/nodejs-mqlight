@@ -186,8 +186,8 @@ log.ffdc = function(fnc, probeId, client, data) {
     write('ffdc', clientId, '| Node Arguments    :-', process.execArgs);
     write('ffdc', clientId, '| Program Arguments :- ', process.argv);
     if (!isWin) {
-      write('ffdc', clientId, '| User Id            :-', process.getuid());
-      write('ffdc', clientId, '| Group Id           :-', process.getgid());
+      write('ffdc', clientId, '| User Id           :-', process.getuid());
+      write('ffdc', clientId, '| Group Id          :-', process.getgid());
     }
     write('ffdc', clientId, '| Name              :-', pkg.name);
     write('ffdc', clientId, '| Version           :-', pkg.version);
@@ -258,11 +258,12 @@ logger.addLevel('all', -Infinity, styles.inverse, 'all   ');
 logger.addLevel('data_often', -Infinity, styles.green, 'data  ');
 logger.addLevel('exit_often', -Infinity, styles.yellow, 'exit  ');
 logger.addLevel('entry_often', -Infinity, styles.yellow, 'entry ');
-logger.addLevel('debug', 800, styles.inverse, 'debug ');
-logger.addLevel('detail', 1000, styles.green, 'detail');
-logger.addLevel('emit', 1000, styles.green, 'emit  ');
+logger.addLevel('raw', 500, styles.inverse, 'raw   ');
+logger.addLevel('detail', 800, styles.green, 'detail');
+logger.addLevel('debug', 1000, styles.inverse, 'debug ');
+logger.addLevel('emit', 1200, styles.green, 'emit  ');
 logger.addLevel('data', 1500, styles.green, 'data  ');
-logger.addLevel('parms', 1500, styles.yellow, 'parms ');
+logger.addLevel('parms', 2000, styles.yellow, 'parms ');
 logger.addLevel('exit', 3000, styles.yellow, 'exit  ');
 logger.addLevel('entry', 3000, styles.yellow, 'entry ');
 logger.addLevel('entry_exit', 3000, styles.yellow, 'func  ');
@@ -307,12 +308,12 @@ if (process.env.MQLIGHT_NODE_LOG_STREAM === 'stdout') {
   logger.stream = process.stdout;
 }
 
-if (logger.levels[logger.level] <= logger.levels.data) {
-  // Set PN_TRACE_FRM if data level logging is enabled.
+if (logger.levels[logger.level] <= logger.levels.detail) {
+  // Set PN_TRACE_FRM if detailed data level logging is enabled.
   log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
   process.env['PN_TRACE_FRM'] = '1';
-  if (logger.levels[logger.level] <= logger.levels.detail) {
-    // Set PN_TRACE_RAW if detailed data level logging is enabled.
+  if (logger.levels[logger.level] <= logger.levels.raw) {
+    // Set PN_TRACE_RAW if raw level logging is enabled.
     log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
     process.env['PN_TRACE_RAW'] = '1';
   }

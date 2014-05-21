@@ -89,16 +89,16 @@ void ProtonMessenger::Tracer(pn_transport_t *transport, const char *message)
   if(connection)
   {
     const char *id = pn_connection_get_container(connection);
-    Proton::Log("data", id, "|", message);
+    Proton::Log("detail", id, "|", message);
   }
   else
   {
-    Proton::Log("data", NULL, "|", message);
+    Proton::Log("detail", NULL, "|", message);
   }
 }
 
 ProtonMessenger::ProtonMessenger(std::string name, std::string username, std::string password) :
-		name(name), username(username), password(password), messenger(NULL), ObjectWrap()
+		ObjectWrap(), name(name), username(username), password(password), messenger(NULL)
 {
   Proton::Entry("ProtonMessenger::constructor", NULL);
   Proton::Log("parms", NULL, "name:", name.c_str());
@@ -298,6 +298,8 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   std::string address = std::string(*param);
 
   Proton::Log("parms", name, "address:", address.c_str());
+  Proton::Log("data", name, "username:", username.c_str());
+  Proton::Log("data", name, "password:", password.length() ? "********" : NULL);
 
   // throw exception if already connected
   if (obj->messenger) {
@@ -321,6 +323,8 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   if ( username.length() > 0){
 	int index = address.find("//");
     std::string hostandport =  index >= 0 ? address.substr(index+2) : address;
+    Proton::Log("data", name, "hostandport:", hostandport.c_str());
+
     if ( password.length() > 0 ){
       authPattern = "amqp://" + username + ":" + password + "@$1";
       validationAddress = "amqp://" + username + ":" + password + "@" + hostandport;
@@ -339,12 +343,11 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
    */
   int error;
   if (authPattern.length() > 0) {
-    Proton::Entry("pn_messenger_route", NULL);
-    Proton::Log("parms", NULL, "authPattern:", authPattern.c_str());
+    Proton::Entry("pn_messenger_route", name);
     error = pn_messenger_route(obj->messenger, "amqp://*", authPattern.c_str());
-    Proton::Exit("pn_messenger_route", NULL, error);
+    Proton::Exit("pn_messenger_route", name, error);
     if (error){
-      THROW_EXCEPTION("Failed to set messenger route", "ProtonMessenger:Connect", NULL);
+      THROW_EXCEPTION("Failed to set messenger route", "ProtonMessenger:Connect", name);
     }
   }
 
@@ -352,7 +355,6 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
    * set the route for validation
    */
   Proton::Entry("pn_messenger_route", name);
-  Proton::Log("parms", name, "validationAddress:", validationAddress.c_str());
   error = pn_messenger_route(obj->messenger, validationAddress.c_str(), validationAddress.c_str());
   Proton::Exit("pn_messenger_route", name, error);
   if (error){
@@ -380,7 +382,7 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args) {
   HandleScope scope;
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char *name = obj->name.c_str();
-  
+
   Proton::Entry("ProtonMessenger::Stop", name);
 
   // throw exception if not connected
