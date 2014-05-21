@@ -903,7 +903,7 @@ Client.prototype.send = function(topic, data, options, callback) {
 
   var qos = exports.QOS_AT_MOST_ONCE;
   if (options) {
-    if (options.qos) {
+    if ('qos' in options) {
       if (options.qos == exports.QOS_AT_MOST_ONCE) {
         qos = exports.QOS_AT_MOST_ONCE;
       } else if (options.qos == exports.QOS_AT_LEAST_ONCE) {
@@ -1149,7 +1149,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var qos = exports.QOS_AT_MOST_ONCE;
   var autoSettle = true;
   if (options) {
-    if (options.qos) {
+    if ('qos' in options) {
       if (options.qos == exports.QOS_AT_MOST_ONCE) {
         qos = exports.QOS_AT_MOST_ONCE;
       } else if (options.qos == exports.QOS_AT_LEAST_ONCE) {
@@ -1159,15 +1159,15 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
                             "' is invalid must evaluate to 0 or 1");
       }
     }
-    if (options.autoSettle === true) {
-      autoSettle = true;
-    } else if (options.autoSettle === false) {
-      autoSettle = false;
-    } else if (options.autoSettle == undefined) {
-      autoSettle = true;
-    } else {
-      throw new TypeError("options:autoSettle value '" + options.autoSettle +
-                          "' is invalid must evaluate to true or false");
+    if ('autoSettle' in options) {
+      if (options.autoSettle === true) {
+        autoSettle = true;
+      } else if (options.autoSettle === false) {
+        autoSettle = false;
+      } else {
+        throw new TypeError("options:autoSettle value '" + options.autoSettle +
+                            "' is invalid must evaluate to true or false");
+      }
     }
   }
 
