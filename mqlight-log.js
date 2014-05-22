@@ -22,17 +22,20 @@ var pkg = require('./package.json');
 var os = require('os');
 var moment = require('moment');
 var logger = require('npmlog');
+var fs = require('fs');
+var util = require('util');
 
 var isWin = (os.platform() === 'win32');
 var stack = ['<stack unwind error>'];
 var startLevel;
 var historyLevel;
 var ffdcSequence = 0;
+var fd = 0;
 
 var ENTRY_IND = '>-----------------------------------------------------------';
 var EXIT_IND = '<-----------------------------------------------------------';
-var FFDC_BANNER = '+---------------------------------------' +
-                  '---------------------------------------+';
+var HEADER_BANNER = '+---------------------------------------' +
+                    '---------------------------------------+';
 
 var styles = {
   blue: { fg: 'blue', bg: 'black' },
@@ -53,6 +56,50 @@ var write = function(lvl, prefix, args) {
 };
 
 
+/*
+ * Write a log or ffdc header, including basic information about the program
+ * and host.
+ */
+var header = function(lvl, clientId, options) {
+  if (logger.levels[logger.level] <= logger.levels[lvl]) {
+    write(lvl, clientId, HEADER_BANNER);
+    write(lvl, clientId, '| IBM MQ Light Node.js Client Module -',
+          options.title);
+    write(lvl, clientId, HEADER_BANNER);
+    write(lvl, clientId, '| Date/Time         :-',
+          moment(new Date()).format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
+    write(lvl, clientId, '| Host Name         :-', os.hostname());
+    write(lvl, clientId, '| Operating System  :-', os.type(), os.release());
+    write(lvl, clientId, '| Architecture      :-', os.platform(), os.arch());
+    write(lvl, clientId, '| Node Version      :-', process.version);
+    write(lvl, clientId, '| Node Path         :-', process.execPath);
+    write(lvl, clientId, '| Node Arguments    :-', process.execArgs);
+    write(lvl, clientId, '| Program Arguments :- ', process.argv);
+    if (!isWin) {
+      write(lvl, clientId, '| User Id           :-', process.getuid());
+      write(lvl, clientId, '| Group Id          :-', process.getgid());
+    }
+    write(lvl, clientId, '| Name              :-', pkg.name);
+    write(lvl, clientId, '| Version           :-', pkg.version);
+    write(lvl, clientId, '| Description       :-', pkg.description);
+    write(lvl, clientId, '| Installation Path :-', __dirname);
+    write(lvl, clientId, '| Uptime            :-', process.uptime());
+    write(lvl, clientId, '| Log Level         :-', logger.level);
+    if ('fnc' in options) {
+      write(lvl, clientId, '| Function          :-', options.fnc);
+    }
+    if ('probeId' in options) {
+      write(lvl, clientId, '| Probe Id          :-', options.probeId);
+    }
+    if ('ffdcSequence' in options) {
+      write(lvl, clientId, '| FDCSequenceNumber :-', options.ffdcSequence++);
+    }
+    write(lvl, clientId, HEADER_BANNER);
+    write(lvl, clientId, '');
+  }
+};
+
+
 /**
  * Set the logging level.
  *
@@ -60,7 +107,8 @@ var write = function(lvl, prefix, args) {
  */
 log.setLevel = function(lvl) {
   logger.level = lvl;
-  log.log('debug', log.NO_CLIENT_ID, 'logger.level:', logger.level);
+
+  header('header', log.NO_CLIENT_ID, {title: 'Log'});
 
   if (logger.levels[logger.level] <= logger.levels.detail) {
     // Set PN_TRACE_FRM if detailed data level logging is enabled.
@@ -76,10 +124,14 @@ log.setLevel = function(lvl) {
     }
   }
   else {
-    log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
-    delete process.env['PN_TRACE_RAW'];
-    log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
-    delete process.env['PN_TRACE_FRM'];
+    if (process.env['PN_TRACE_RAW']) {
+      log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
+      delete process.env['PN_TRACE_RAW'];
+    }
+    if (process.env['PN_TRACE_FRM']) {
+      log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
+      delete process.env['PN_TRACE_FRM'];
+    }
   }
 };
 
@@ -91,6 +143,59 @@ log.setLevel = function(lvl) {
  */
 log.getLevel = function() {
   return logger.level;
+};
+
+
+/**
+ * Set the logging stream.
+ *
+ * @param {String} stream The stream to log to. If the value
+ *        isn't 'stderr' or 'stdout' then stream will be treated
+ *        as a file which will be written to as well as
+ *        stderr/stdout.
+ */
+log.setStream = function(stream) {
+  if (stream === 'stderr') {
+    // Log to stderr.
+    logger.stream = process.stderr;
+
+    // Stop writing to a file.
+    if (fd) {
+      fs.closeSync(fd);
+    }
+  } else if (stream === 'stdout') {
+    // Log to stdout.
+    logger.stream = process.stdout;
+
+    // Stop writing to a file.
+    if (fd) {
+      fs.closeSync(fd);
+    }
+  } else {
+    // A file has been specified. As well as writing to stderr/stdout, we
+    // additionally write the output to a file.
+
+    // Stop writing to an existing file.
+    if (fd) {
+      fs.closeSync(fd);
+    }
+
+    // Open the specified file.
+    fd = fs.openSync(stream, 'a', 0644);
+
+    // Set up a listener for log events.
+    logger.on('log', function(m) {
+      if (fd) {
+        if (logger.levels[logger.level] <= logger.levels[m.level]) {
+          // We'll get called for every log event, so filter to ones we're
+          // interested in.
+          fs.writeSync(fd, util.format('%s %s %s %s\n',
+                                       logger.heading, logger.disp[m.level],
+                                       m.prefix, m.message));
+        }
+      }
+    });
+  }
 };
 
 
@@ -191,34 +296,12 @@ log.ffdc = function(fnc, probeId, client, data) {
   log.log('parms', clientId, 'data:', data);
 
   if (logger.levels[logger.level] <= logger.levels.ffdc) {
-
-    write('ffdc', clientId, FFDC_BANNER);
-    write('ffdc', clientId, '| IBM MQ Light Node.js Client Module -',
-        'First Failure Data Capture');
-    write('ffdc', clientId, FFDC_BANNER);
-    write('ffdc', clientId, '| Date/Time         :-',
-        moment(new Date()).format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
-    write('ffdc', clientId, '| Host Name         :-', os.hostname());
-    write('ffdc', clientId, '| Operating System  :-', os.type(), os.release());
-    write('ffdc', clientId, '| Architecture      :-', os.platform(), os.arch());
-    write('ffdc', clientId, '| Node Version      :-', process.version);
-    write('ffdc', clientId, '| Node Path         :-', process.execPath);
-    write('ffdc', clientId, '| Node Arguments    :-', process.execArgs);
-    write('ffdc', clientId, '| Program Arguments :- ', process.argv);
-    if (!isWin) {
-      write('ffdc', clientId, '| User Id           :-', process.getuid());
-      write('ffdc', clientId, '| Group Id          :-', process.getgid());
-    }
-    write('ffdc', clientId, '| Name              :-', pkg.name);
-    write('ffdc', clientId, '| Version           :-', pkg.version);
-    write('ffdc', clientId, '| Description       :-', pkg.description);
-    write('ffdc', clientId, '| Installation Path :-', __dirname);
-    write('ffdc', clientId, '| Uptime            :-', process.uptime());
-    write('ffdc', clientId, '| Function          :-', fnc);
-    write('ffdc', clientId, '| Probe Id          :-', probeId);
-    write('ffdc', clientId, '| FDCSequenceNumber :-', ffdcSequence++);
-    write('ffdc', clientId, FFDC_BANNER);
-    write('ffdc', clientId, '');
+    header('ffdc', clientId, {
+      title: 'First Failure Data Capture',
+      fnc: fnc,
+      probeId: probeId,
+      ffdcSequence: ffdcSequence++
+    });
     write('ffdc', clientId, new Error().stack);
     write('ffdc', clientId, '');
     write('ffdc', clientId, 'Function Stack');
@@ -230,7 +313,7 @@ log.ffdc = function(fnc, probeId, client, data) {
       if ((rec.level !== 'ffdc') &&
           (logger.levels[rec.level] >= logger.levels[historyLevel])) {
         write('ffdc', clientId, '%d %s %s %s',
-              rec.id, rec.level, rec.prefix, rec.message);
+              rec.id, logger.disp[rec.level], rec.prefix, rec.message);
       }
     }
     if (client) {
@@ -284,11 +367,20 @@ logger.addLevel('debug', 1000, styles.inverse, 'debug ');
 logger.addLevel('emit', 1200, styles.green, 'emit  ');
 logger.addLevel('data', 1500, styles.green, 'data  ');
 logger.addLevel('parms', 2000, styles.yellow, 'parms ');
+logger.addLevel('header', 3000, styles.yellow, 'header');
 logger.addLevel('exit', 3000, styles.yellow, 'exit  ');
 logger.addLevel('entry', 3000, styles.yellow, 'entry ');
 logger.addLevel('entry_exit', 3000, styles.yellow, 'func  ');
 logger.addLevel('error', 5000, styles.red, 'error ');
 logger.addLevel('ffdc', 10000, styles.red, 'ffdc  ');
+
+
+/**
+ * Set the logging stream. By default stderr will be used, but
+ * this can be changed to stdout by setting the environment
+ * variable MQLIGHT_NODE_LOG_STREAM=stdout.
+ */
+log.setStream(process.env.MQLIGHT_NODE_LOG_STREAM || 'stderr');
 
 
 /**
@@ -319,14 +411,6 @@ log.log('debug', log.NO_CLIENT_ID,
 historyLevel = process.env.MQLIGHT_NODE_LOG_HISTORY || 'debug';
 log.log('debug', log.NO_CLIENT_ID, 'historyLevel:', historyLevel);
 
-if (process.env.MQLIGHT_NODE_LOG_STREAM === 'stdout') {
-  /**
-   * Set the logging stream. By default stderr will be used, but
-   * this can be changed to stdout by setting the environment
-   * variable MQLIGHT_NODE_LOG_STREAM=stdout.
-   */
-  logger.stream = process.stdout;
-}
 
 /*
  * Set up a signal handler that will cause an ffdc to be generated when
@@ -343,8 +427,10 @@ if (!process.env.MQLIGHT_NODE_NO_HANDLER) {
     // logging if we already are.
     if (logger.levels[startLevel] > logger.levels.debug) {
       if (logger.level === startLevel) {
+        log.log('ffdc', log.NO_CLIENT_ID, 'Setting logger.level: debug');
         log.setLevel('debug');
       } else {
+        log.log('ffdc', log.NO_CLIENT_ID, 'Setting logger.level:', startLevel);
         log.setLevel(startLevel);
       }
     }
@@ -357,4 +443,16 @@ if (process.env.MQLIGHT_NODE_DEBUG_PORT) {
    * MQLIGHT_NODE_DEBUG_PORT environment variable, if it's set.
    */
   process.debugPort = process.env.MQLIGHT_NODE_DEBUG_PORT;
+}
+
+/*
+ * If the MQLIGHT_NODE_FFDC_ON_UNCAUGHT environment variable is set, then
+ * an ffdc will be produced on an uncaught exception.
+ */
+if (process.env.MQLIGHT_NODE_FFDC_ON_UNCAUGHT) {
+  log.log('debug', log.NO_CLIENT_ID, 'Registering uncaught exception handler');
+  process.on('uncaughtException', function(err) {
+    log.ffdc('uncaughtException', 100, null, err);
+    throw err;
+  });
 }

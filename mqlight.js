@@ -17,11 +17,22 @@
  * </copyright>
  */
 
-/*
- * Set up logging to stderr. The level of output is configured by the
- * value of the MQLIGHT_NODE_LOG environment variable. The default is 'ffdc'.
+
+/**
+ * Set up logging (to stderr by default). The level of output is
+ * configured by the value of the MQLIGHT_NODE_LOG environment
+ * variable. The default is 'ffdc'.
  */
 log = require('./mqlight-log');
+
+
+/**
+ * The logging level can be set programmatically by calling
+ *   log.setLevel(level)
+ * An ffdc can be generated programmatically by calling
+ *   log.debug()
+ */
+exports.log = log;
 
 var os = require('os');
 var _system = os.platform() + '-' + process.arch;
@@ -979,13 +990,24 @@ Client.prototype.send = function(topic, data, options, callback) {
         if (complete) {
           if (sendCallback) {
             var body = protonMsg.body;
+            var decoded = decodeURIComponent(protonMsg.address);
+            var topic = url.parse(decoded).path.substring(1);
+            var delivery = {
+              message: {
+                properties: {
+                  contentType: protonMsg.contentType
+                },
+                topic: topic
+              }
+            };
             setImmediate(function() {
               // TODO: defect 59405 might mean we change what gets passed into
               // the callback...
               log.entry('Client.send.utilSendComplete.callback', client.id);
-              sendCallback.apply(client, [undefined, topic, body, options]);
+              sendCallback.apply(client, [undefined, body, delivery]);
               log.exit('Client.send.utilSendComplete.callback', client.id,
                        null);
+              //sendCallback.apply(client);
             });
           }
           protonMsg.destroy();
@@ -1005,7 +1027,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         process.nextTick(function() {
           if (callbackOption) {
             log.entry('Client.send.utilSendComplete.callback', client.id);
-            callbackOption.apply(client, [err, topic, protonMsg.body, options]);
+            callbackOption(err, protonMsg);
             log.exit('Client.send.utilSendComplete.callback', client.id, null);
           }
           if (err) {
