@@ -98,7 +98,7 @@ void ProtonMessenger::Tracer(pn_transport_t *transport, const char *message)
 }
 
 ProtonMessenger::ProtonMessenger(std::string name, std::string username, std::string password) :
-		ObjectWrap(), name(name), username(username), password(password), messenger(NULL)
+  ObjectWrap(), name(name), username(username), password(password), messenger(NULL)
 {
   Proton::Entry("ProtonMessenger::constructor", NULL);
   Proton::Log("parms", NULL, "name:", name.c_str());
@@ -209,20 +209,20 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args) {
 
   // throw exception if not connected
   if (!obj->messenger) {
-	THROW_EXCEPTION("Not connected", "ProtonMessenger::Put", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Put", name);
   }
 
   /* Set the required QoS, by setting the sender settler mode to settled (QoS = AMO) or unsettled (QoS = ALO).
    * Note that the receiver settler mode is always set to first, as the MQ Light listener will negotiate down any receiver settler mode to first.
    */
   if (qos == 0) {
-	  pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
-	  pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
+    pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
+    pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
   } else if (qos == 1) {
-	  pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
-	  pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
+    pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
+    pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
   } else {
-	  THROW_EXCEPTION("Invalid qos argument.", "ProtonMessenger::Put", name);
+    THROW_EXCEPTION("Invalid qos argument.", "ProtonMessenger::Put", name);
   }
 
   /*
@@ -254,7 +254,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args) {
 
   // throw exception if not connected
   if (!obj->messenger) {
-	THROW_EXCEPTION("Not connected", "ProtonMessenger::Send", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Send", name);
   }
 
   Proton::Entry("pn_messenger_send", name);
@@ -303,7 +303,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
 
   // throw exception if already connected
   if (obj->messenger) {
-	THROW_EXCEPTION("Already connected", "ProtonMessenger::Connect", name);
+    THROW_EXCEPTION("Already connected", "ProtonMessenger::Connect", name);
   }
 
   // Create the messenger object and update the name in case messenger has changed it
@@ -321,7 +321,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   std::string validationAddress;
   std::string authPattern;
   if ( username.length() > 0){
-	int index = address.find("//");
+  int index = address.find("//");
     std::string hostandport =  index >= 0 ? address.substr(index+2) : address;
     Proton::Log("data", name, "hostandport:", hostandport.c_str());
 
@@ -333,8 +333,8 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
       validationAddress = "amqp://" + username + "@" + hostandport;
     }
   } else {
-	  authPattern = "";
- 	  validationAddress = address;
+    authPattern = "";
+    validationAddress = address;
   }
 
   /*
@@ -387,7 +387,7 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args) {
 
   // throw exception if not connected
   if (!obj->messenger) {
-	THROW_EXCEPTION("Not connected", "ProtonMessenger::Stop", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Stop", name);
   }
 
   Proton::Entry("pn_messenger_stop", name);
@@ -418,7 +418,7 @@ Handle<Value> ProtonMessenger::Stopped(Local<String> property,
     stopped = pn_messenger_stopped(obj->messenger);
     Proton::Exit("pn_messenger_stopped", name, stopped);
   } else {
-	stopped = true;
+    stopped = true;
   }
 
   Proton::Exit("ProtonMessenger::Stopped", name, stopped);
@@ -446,20 +446,20 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
 
   // throw exception if not connected
   if (!obj->messenger) {
-	THROW_EXCEPTION("Not connected", "ProtonMessenger::Subscribe", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Subscribe", name);
   }
 
   /* Set the required QoS, by setting the sender settler mode to settled (QoS = AMO) or unsettled (QoS = ALO).
    * Note that our API client implementation will always specify a value of first - meaning "The Receiver will spontaneously settle all incoming transfers" - this equates to a maximum QoS of "at least once delivery".
    */
   if (qos == 0) {
-	pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
-	pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
+    pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
+    pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
   } else if (qos == 1) {
-	pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
-	pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
+    pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
+    pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
   } else {
-	THROW_EXCEPTION("Invalid qos argument.", "ProtonMessenger::Subscribe", name);
+    THROW_EXCEPTION("Invalid qos argument.", "ProtonMessenger::Subscribe", name);
   }
 
 
@@ -499,7 +499,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
 
   // throw exception if not connected
   if (!obj->messenger) {
-	THROW_EXCEPTION("Not connected", "ProtonMessenger::Receive", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Receive", name);
   }
 
   Proton::Entry("entry_often", "pn_messenger_work", name);
@@ -559,12 +559,12 @@ Handle<Value> ProtonMessenger::HasOutgoing(Local<String> property,
 
   Proton::Entry("ProtonMessenger::HasOutgoing", name);
 
-  // throw exception if not connected
-  if (!obj->messenger) {
-	THROW_EXCEPTION("Not connected", "ProtonMessenger::HasOutgoing", name);
+  bool hasOutgoing;
+  if (obj->messenger) {
+    hasOutgoing = (pn_messenger_outgoing(obj->messenger) > 0);
+  } else {
+    hasOutgoing = false;
   }
-
-  bool hasOutgoing = (pn_messenger_outgoing(obj->messenger) > 0);
 
   Proton::Exit("ProtonMessenger::HasOutgoing", name, hasOutgoing);
   return scope.Close(Boolean::New(hasOutgoing));
@@ -589,7 +589,7 @@ Handle<Value> ProtonMessenger::Status(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-	THROW_EXCEPTION("Not connected", "ProtonMessenger::Status", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Status", name);
   }
 
   int status = pn_messenger_status(obj->messenger, msg->tracker);
@@ -617,7 +617,7 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-	THROW_EXCEPTION("Not connected", "ProtonMessenger::Settle", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Settle", name);
   }
 
   int status = pn_messenger_settle(obj->messenger, msg->tracker, 0);
