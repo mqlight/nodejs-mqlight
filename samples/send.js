@@ -87,14 +87,6 @@ var messages = (remain.length > 0) ? remain : ['Hello World!'];
 // insert a delay between sends if requested
 var delay = parsed.delay * 1000 || 0;
 
-// Make the connection
-client.connect(function(err) {
-  if (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-});
-
 // once connection is acquired, send messages
 client.on('connected', function() {
   console.log('Connected to %s using client-id %s', service, client.getId());
@@ -104,7 +96,7 @@ client.on('connected', function() {
   var i = 0;
   var sendNextMessage = function() {
     var body = messages[i];
-    client.send(topic, body, function(err, topic, data, options) {
+    client.send(topic, body, function(err, data, delivery) {
       if (err) {
         console.error('Problem with send request: %s', err.message);
         process.exit(1);
@@ -112,6 +104,7 @@ client.on('connected', function() {
       if (data) {
         console.log('# sent message:');
         console.log(data);
+        console.log(delivery);
       }
       // if there are more messages pending, send the next in <delay> seconds
       if (messages.length > ++i) {
@@ -127,4 +120,12 @@ client.on('connected', function() {
   };
 
   sendNextMessage();
+});
+
+// Make the connection
+client.connect(function(err) {
+  if (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
 });

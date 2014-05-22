@@ -84,14 +84,6 @@ var opts = {
 };
 var client = mqlight.createClient(opts);
 
-// Make the connection
-client.connect(function(err) {
-  if (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-});
-
 // once connection is acquired, receive messages from the required topic
 client.on('connected', function() {
   console.log('Connected to %s using client-id %s', service, client.getId());
@@ -119,4 +111,12 @@ client.on('connected', function() {
     console.log(data);
     console.log(delivery);
   });
+});
+
+// Make the connection
+client.connect(function(err) {
+  if (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
 });
