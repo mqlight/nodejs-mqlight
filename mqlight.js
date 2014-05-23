@@ -372,8 +372,8 @@ var Client = function(service, id, user, password) {
   this.service = undefined;
 
   // List of message subscriptions that the application is expected to call
-  // message.settleDelivery() for
-  this.manualSettleSubscriptions = new Array();
+  // message.confirmDelivery() for
+  this.manualConfirmSubscriptions = new Array();
 
   log.exit('Client.constructor', this.id, this);
 };
@@ -563,27 +563,27 @@ Client.prototype.connect = function(callback) {
 
             var topic = url.parse(protonMsg.address).path.substring(1);
             var index =
-                client.manualSettleSubscriptions.indexOf(protonMsg.address);
-            var autoSettle = index < 0;
+                client.manualConfirmSubscriptions.indexOf(protonMsg.address);
+            var autoConfirm = index < 0;
             var delivery = {
               message: {
                 properties: {
                   contentType: protonMsg.contentType
                 },
                 topic: topic,
-                settleDelivery: autoSettle ? function() {
-                  log.entry('message.settleDelivery.auto', this.id);
+                confirmDelivery: autoConfirm ? function() {
+                  log.entry('message.confirmDelivery.auto', this.id);
                   log.log('data', this.id, 'delivery:', delivery);
-                  log.exit('message.settleDelivery.auto', this.id, null);
+                  log.exit('message.confirmDelivery.auto', this.id, null);
                 } : function() {
-                  log.entry('message.settleDelivery', this.id);
+                  log.entry('message.confirmDelivery', this.id);
                   log.log('data', this.id, 'delivery:', delivery);
                   if (protonMsg) {
                     messenger.settle(protonMsg);
                     protonMsg.destroy();
                     protonMsg = undefined;
                   }
-                  log.exit('message.settleDelivery', this.id, null);
+                  log.exit('message.confirmDelivery', this.id, null);
                 }
               }
             };
@@ -636,7 +636,7 @@ Client.prototype.connect = function(callback) {
               log.log('emit', client.id, 'message', data, delivery);
               client.emit('message', data, delivery);
             }
-            if (autoSettle) {
+            if (autoConfirm) {
               messenger.settle(protonMsg);
               protonMsg.destroy();
             }
@@ -1148,7 +1148,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   }
 
   var qos = exports.QOS_AT_MOST_ONCE;
-  var autoSettle = true;
+  var autoConfirm = true;
   if (options) {
     if ('qos' in options) {
       if (options.qos == exports.QOS_AT_MOST_ONCE) {
@@ -1160,13 +1160,13 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
                             "' is invalid must evaluate to 0 or 1");
       }
     }
-    if ('autoSettle' in options) {
-      if (options.autoSettle === true) {
-        autoSettle = true;
-      } else if (options.autoSettle === false) {
-        autoSettle = false;
+    if ('autoConfirm' in options) {
+      if (options.autoConfirm === true) {
+        autoConfirm = true;
+      } else if (options.autoConfirm === false) {
+        autoConfirm = false;
       } else {
-        throw new TypeError("options:autoSettle value '" + options.autoSettle +
+        throw new TypeError("options:autoConfirm value '" + options.autoConfirm +
                             "' is invalid must evaluate to true or false");
       }
     }
@@ -1187,15 +1187,15 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var address = this.getService() + '/' + share + topicPattern;
   var client = this;
 
-  // If manual settle required then add address to manual settle list,
-  // otherwise ensure manual settle list does not contain the address
-  var index = client.manualSettleSubscriptions.indexOf(this.getService() +
+  // If manual confirm (settle) required then add address to manual confirm list,
+  // otherwise ensure manual confirm list does not contain the address
+  var index = client.manualConfirmSubscriptions.indexOf(this.getService() +
                                                        '/' + topicPattern);
-  if (qos === exports.QOS_AT_LEAST_ONCE && !autoSettle) {
-    if (index < 0) client.manualSettleSubscriptions.push(this.getService() +
+  if (qos === exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
+    if (index < 0) client.manualConfirmSubscriptions.push(this.getService() +
                                                          '/' + topicPattern);
   } else {
-    if (index >= 0) client.manualSettleSubscriptions.splice(index, 1);
+    if (index >= 0) client.manualConfirmSubscriptions.splice(index, 1);
   }
 
   var err;
