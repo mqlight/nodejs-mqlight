@@ -83,6 +83,9 @@ module.exports.test_receive_message = function(test) {
             "delivery object should have 'destination' property");
     test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
 
+    // Ensure that the confirmDelivery() method is available to be called
+    delivery.message.confirmDelivery();
+    
     test.done();
     client.disconnect();
     mqlight.proton.messenger.receive = originalReceiveMethod;

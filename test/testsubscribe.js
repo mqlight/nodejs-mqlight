@@ -328,3 +328,130 @@ module.exports.test_subscribe_share_names = function(test) {
     test.done();
   });
 };
+
+/**
+ * Test a variety of valid and invalid options values. Invalid options
+ * should result in the client.subscribe(...) method throwing a TypeError.
+ * <p>
+ * Note that this test just checks that the options parameter is only
+ * accepted when it is of the correct type. The actual validation of
+ * individual options will be in separate tests.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_options = function(test) {
+  var data = Array();
+  var data = [{valid: false, options: ''},
+              {valid: true, options: undefined},   // effectively the same as not providing options
+              {valid: true, options: null},        // effectively the same as not providing options
+              {valid: false, options: function() {}},
+              {valid: false, options: '1'},
+              {valid: false, options: 2},
+              {valid: false, options: true},
+              {valid: true, options: {}},
+              {valid: true, options: data},
+              {valid: true, options: { a:1 } }];
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+  client.connect(function() {
+    for (var i = 0; i < data.length; ++i) {
+      if (data[i].valid) {
+        test.doesNotThrow(
+            function() {
+              client.subscribe('testpattern', 'share', data[i].options, function(){});
+            }
+        );
+      } else {
+        test.throws(
+            function() {
+              client.subscribe('testpattern', 'share', data[i].options, function(){});
+            },
+            TypeError,
+            'options should have been rejected: ' + data[i].options
+        );
+      }
+    }
+    client.disconnect();
+    test.done();
+  });
+};
+
+/**
+ * Test a variety of valid and invalid QoS options.  Invalid QoS values
+ * should result in the client.subscribe(...) method throwing a TypeError.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_qos = function(test) {
+  var number = Number(0);
+  var data = [{valid: false, qos: ''},
+              {valid: false, qos: undefined},
+              {valid: false, qos: null},
+              {valid: false, qos: function() {}},
+              {valid: false, qos: '1'},
+              {valid: false, qos: 2},
+              {valid: true, qos: 0},
+              {valid: true, qos: 1},
+              {valid: true, qos: number},
+              {valid: true, qos: 9-8},
+              {valid: true, qos: mqlight.QOS_AT_MOST_ONCE},
+              {valid: true, qos: mqlight.QOS_AT_LEAST_ONCE}];
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+  client.connect(function() {
+    for (var i = 0; i < data.length; ++i) {
+      var opts = { qos : data[i].qos };
+      if (data[i].valid) {
+        test.doesNotThrow(function() {
+          client.subscribe('testpattern', opts);
+        });
+      } else {
+        test.throws(function() {
+          client.subscribe('testpattern', opts);
+        }, TypeError, 'qos should have been rejected: ' + data[i].qos);
+      }
+    }
+    client.disconnect();
+    test.done();
+  });
+};
+
+/**
+ * Test a variety of valid and invalid autoConfirm options.  Invalid autoConfirm values
+ * should result in the client.subscribe(...) method throwing a TypeError.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_autoConfirm = function(test) {
+  var a = Boolean(true);
+  var data = [{valid: false, opts: { autoConfirm: '' } },
+              {valid: false, opts: { autoConfirm: undefined } },
+              {valid: false, opts: { autoConfirm: null } },
+              {valid: false, opts: { autoConfirm: function() {} } },
+              {valid: false, opts: { autoConfirm: 'true'} },
+              {valid: false, opts: { autoConfirm: 'false'} },
+              {valid: false, opts: { autoConfirm: 2 } },
+              {valid: true, opts: { autoConfirm: true } },
+              {valid: true, opts: { autoConfirm: false } },
+              {valid: true, opts: { qos:0, autoConfirm: true } },
+              {valid: true, opts: { qos:0, autoConfirm: false } },
+              {valid: true, opts: { qos:1, autoConfirm: true } },
+              {valid: true, opts: { qos:1, autoConfirm: false } },
+              {valid: true, opts: { autoConfirm: 1 == 1 } },
+              {valid: true, opts: { autoConfirm: 'abc' == 'abc' } },
+              {valid: true, opts: { autoConfirm: a } }];
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+  client.connect(function() {
+    for (var i = 0; i < data.length; ++i) {
+      if (data[i].valid) {
+        test.doesNotThrow(function() {
+          client.subscribe('testpattern', data[i].opts);
+        });
+      } else {
+        test.throws(function() {
+          client.subscribe('testpattern', data[i].opts);
+        }, TypeError, 'autoConfirm should have been rejected: ' + data[i].opts);
+      }
+    }
+    client.disconnect();
+    test.done();
+  });
+};
