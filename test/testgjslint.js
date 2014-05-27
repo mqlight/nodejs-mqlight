@@ -31,7 +31,11 @@ module.exports = testCase({
   'Test conformance to Google JavaScript Style Guide': testCase({
     'gjslint': function(test) {
       var child = childProcess.spawn('gjslint', [
-        '--jslint_error=all --strict --disable 1,0002,0010',
+        '--jslint_error=all',
+        '--strict',
+        '--disable',
+        '1,0002,0010',
+        '--unix_mode',
         'mqlight.js',
         'mqlight-log.js',
         'bin/mqlight-debug.js',

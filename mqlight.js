@@ -373,7 +373,7 @@ var Client = function(service, id, user, password) {
 
   // List of message subscriptions that the application is expected to call
   // message.confirmDelivery() for
-  this.manualConfirmSubscriptions = new Array();
+  this.manualConfirmSubscriptions = [];
 
   log.exit('Client.constructor', this.id, this);
 };
@@ -879,8 +879,8 @@ Client.prototype.hasConnected = function() {
  *           If the topic or data parameter is undefined.
  */
 Client.prototype.send = function(topic, data, options, callback) {
-  log.entry('Client.send', this.id);  
-  
+  log.entry('Client.send', this.id);
+
   // Validate the passed parameters
   if (!topic) {
     throw new TypeError('Cannot send to undefined topic');
@@ -895,30 +895,29 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
   log.log('parms', this.id, 'data:', data);
 
-  // If the last argument is a Function then it must be a callback, and not options
-  if (arguments.length === 3) {
-    if (arguments[2] instanceof Function) {
-      callback = options;
+  // Validate the remaining optional parameters, assigning local variables to
+  // the appropriate parameter
+  var callbackOption;
+  if (options) {
+    if (options instanceof Function) {
+      callbackOption = options;
       options = undefined;
-    }
-  }
-
-  // Validate the options parameter, when specified
-  if (options != undefined) {
-    if (typeof options == 'object') {
-      log.log('parms', this.id, 'options:', options);
     } else {
-      throw new TypeError('options must be an object type not a ' +
-                          (typeof options) + ')');
+      if (options instanceof Object) {
+        log.log('parms', this.id, 'options:', options);
+      } else {
+        throw new TypeError('options must be an object type not a ' +
+                            (typeof options) + ')');
+      }
     }
   }
 
   var qos = exports.QOS_AT_MOST_ONCE;
   if (options) {
     if ('qos' in options) {
-      if (options.qos === exports.QOS_AT_MOST_ONCE) {
+      if (options.qos == exports.QOS_AT_MOST_ONCE) {
         qos = exports.QOS_AT_MOST_ONCE;
-      } else if (options.qos === exports.QOS_AT_LEAST_ONCE) {
+      } else if (options.qos == exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
         throw new TypeError("options:qos value '" + options.qos +
@@ -927,9 +926,14 @@ Client.prototype.send = function(topic, data, options, callback) {
     }
   }
 
-  // Validate the callback parameter, when specified
   if (callback) {
-    if (!(callback instanceof Function)) {
+    if (callbackOption) {
+      throw new TypeError('Invalid forth argument, callback already matched' +
+                          'for third argument');
+    }
+    if (callback instanceof Function) {
+      callbackOption = callback;
+    } else {
       throw new TypeError('callback must be a function type');
     }
   }
@@ -1003,16 +1007,16 @@ Client.prototype.send = function(topic, data, options, callback) {
         // if msg not yet sent and still running, check again in a second or so
         if (!messenger.stopped) {
           messenger.send();
-          setImmediate(untilSendComplete, protonMsg, callback);
+          setImmediate(untilSendComplete, protonMsg, callbackOption);
         }
       } catch (e) {
         log.log('error', client.id, e);
         var err = new Error(e.message);
         client.disconnect();
         process.nextTick(function() {
-          if (callback) {
+          if (callbackOption) {
             log.entry('Client.send.utilSendComplete.callback', client.id);
-            callback.apply(client, [err, topic, protonMsg.body, options]);
+            callbackOption.apply(client, [err, topic, protonMsg.body, options]);
             log.exit('Client.send.utilSendComplete.callback', client.id, null);
           }
           if (err) {
@@ -1025,15 +1029,15 @@ Client.prototype.send = function(topic, data, options, callback) {
       log.exit('Client.send.utilSendComplete', client.id, null);
     };
     // start the timer to trigger it to keep sending until msg has sent
-    setImmediate(untilSendComplete, protonMsg, callback);
+    setImmediate(untilSendComplete, protonMsg, callbackOption);
   } catch (e) {
     log.log('error', client.id, e);
     var err = new Error(e.message);
     client.disconnect();
     process.nextTick(function() {
-      if (callback) {
+      if (callbackOption) {
         log.entry('Client.send.callback', client.id);
-        callback(err, protonMsg);
+        callbackOption(err, protonMsg);
         log.exit('Client.send.callback', client.id, null);
       }
       if (err) {
@@ -1143,23 +1147,13 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     share = 'private:';
   }
 
-  // Validate the options parameter, when specified
-  if (options != undefined) {
-    if (typeof options == 'object') {
-      log.log('parms', this.id, 'options:', options);
-    } else {
-      throw new TypeError('options must be an object type not a ' +
-                          (typeof options) + ')');
-    }
-  }
-  
   var qos = exports.QOS_AT_MOST_ONCE;
   var autoConfirm = true;
   if (options) {
     if ('qos' in options) {
-      if (options.qos === exports.QOS_AT_MOST_ONCE) {
+      if (options.qos == exports.QOS_AT_MOST_ONCE) {
         qos = exports.QOS_AT_MOST_ONCE;
-      } else if (options.qos === exports.QOS_AT_LEAST_ONCE) {
+      } else if (options.qos == exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
         throw new TypeError("options:qos value '" + options.qos +
@@ -1172,7 +1166,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       } else if (options.autoConfirm === false) {
         autoConfirm = false;
       } else {
-        throw new TypeError("options:autoConfirm value '" + options.autoConfirm +
+        throw new TypeError("options:autoConfirm value '" +
+                            options.autoConfirm +
                             "' is invalid must evaluate to true or false");
       }
     }
@@ -1193,13 +1188,13 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var address = this.getService() + '/' + share + topicPattern;
   var client = this;
 
-  // If manual confirm (settle) required then add address to manual confirm list,
-  // otherwise ensure manual confirm list does not contain the address
+  // If manual confirm (settle) required then add address to manual confirm
+  // list, otherwise ensure manual confirm list does not contain the address
   var index = client.manualConfirmSubscriptions.indexOf(this.getService() +
-                                                       '/' + topicPattern);
+                                                        '/' + topicPattern);
   if (qos === exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
     if (index < 0) client.manualConfirmSubscriptions.push(this.getService() +
-                                                         '/' + topicPattern);
+                                                          '/' + topicPattern);
   } else {
     if (index >= 0) client.manualConfirmSubscriptions.splice(index, 1);
   }
