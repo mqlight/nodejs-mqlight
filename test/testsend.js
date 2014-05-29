@@ -320,7 +320,7 @@ module.exports.test_send_qos = function(test) {
       if (data[i].valid) {
         test.doesNotThrow(
             function() {
-              client.send('test', 'message', opts);
+              client.send('test', 'message', opts, function() {});
             }
         );
       } else {
@@ -330,6 +330,42 @@ module.exports.test_send_qos = function(test) {
             },
             TypeError,
             'qos value should have been rejected: ' + data[i].qos
+        );
+      }
+    }
+    client.disconnect();
+    test.done();
+  });
+};
+
+/**
+ * Test that a function is required when QoS is 1.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_send_qos_function = function(test) {
+  var number = Number(1);
+  var data = [{valid: false, qos: 1, callback: undefined},
+              {valid: true, qos: 1, callback: function() {}},
+              {valid: true, qos: 0, callback: undefined},
+              {valid: true, qos: 0, callback: function() {}}];
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+  client.connect(function() {
+    for (var i = 0; i < data.length; ++i) {
+      var opts = { qos : data[i].qos };
+      if (data[i].valid) {
+        test.doesNotThrow(
+            function() {
+              client.send('test', 'message', opts, data[i].callback);
+            }
+        );
+      } else {
+        test.throws(
+            function() {
+              client.send('test', 'message', opts, data[i].callback);
+            },
+            TypeError,
+            'Should have thrown, as qos and callback combination is invalid'
         );
       }
     }

@@ -375,6 +375,10 @@ var Client = function(service, id, user, password) {
   // message.confirmDelivery() for
   this.manualConfirmSubscriptions = [];
 
+  // List of outstanding send operations waiting to be accepted, settled, etc
+  // by the listener.
+  this.outstandingSends = [];
+  
   log.exit('Client.constructor', this.id, this);
 };
 util.inherits(Client, EventEmitter);
@@ -738,27 +742,34 @@ Client.prototype.disconnect = function(callback) {
     log.entry('Client.disconnect.performDisconnect', client.id);
 
     client.state = 'disconnecting';
-    if (client.messenger) {
-      client.messenger.stop();
-    }
+    
+    // Only disconnect when all outstanding send operations are complete
+    if (client.outstandingSends.length == 0) {
+      if (client.messenger) {
+        client.messenger.stop();
+      }
 
-    // Indicate that we've disconnected
-    client.state = 'disconnected';
-    process.nextTick(function() {
-      log.log('emit', client.id, 'disconnected');
-      client.emit('disconnected');
-    });
-    if (callback) {
+      // Indicate that we've disconnected
+      client.state = 'disconnected';
       process.nextTick(function() {
-        log.entry('Client.disconnect.performDisconnect.callback', client.id);
-        callback.apply(client);
-        log.exit('Client.disconnect.performDisconnect.callback', client.id,
-                 null);
+        log.log('emit', client.id, 'disconnected');
+        client.emit('disconnected');
       });
-    }
+      if (callback) {
+        process.nextTick(function() {
+          log.entry('Client.disconnect.performDisconnect.callback', client.id);
+          callback.apply(client);
+          log.exit('Client.disconnect.performDisconnect.callback', client.id,
+                   null);
+        });
+      }
 
-    log.exit('Client.disconnect.performDisconnect', client.id, null);
-    return;
+      log.exit('Client.disconnect.performDisconnect', client.id, null);
+      return;
+    }
+    
+    // try disconnect again
+    setImmediate(performDisconnect, client, callback);
   };
 
   if (callback && !(callback instanceof Function)) {
@@ -928,10 +939,14 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   // Validate the callback parameter, when specified
+  // (and must be specified for QoS of ALO)
   if (callback) {
     if (!(callback instanceof Function)) {
       throw new TypeError('callback must be a function type');
     }
+  } else if (qos === exports.QOS_AT_LEAST_ONCE) {
+    throw new TypeError('callback must be specified when options:qos value ' +
+                        'of 1 (at least once) is specified'); 
   }
 
   // Ensure we have attempted a connect
@@ -968,49 +983,93 @@ Client.prototype.send = function(topic, data, options, callback) {
     }
     messenger.put(protonMsg, qos);
     messenger.send();
+    
+    // Record that a send operation is in progress
+    var localMessageId = uuid.v4();
+    client.outstandingSends.push(localMessageId);
 
     // setup a timer to trigger the callback once the msg has been sent, or
     // immediately if no message to be sent
-    var untilSendComplete = function(protonMsg, sendCallback) {
+    var untilSendComplete = function(protonMsg, localMessageId, sendCallback) {
       log.entry('Client.send.utilSendComplete', client.id);
 
       try {
         var complete = false;
-        switch (messenger.status(protonMsg)) {
-          case PN_STATUS_ACCEPTED:
-          case PN_STATUS_SETTLED:
-            messenger.settle(protonMsg);
-            complete = true;
-            break;
-        }
-        if (complete) {
+        if (!messenger.stopped) { // if still connected
+          var status = messenger.status(protonMsg);
+          var err = undefined;
+          switch (status) {
+            case PN_STATUS_ACCEPTED:
+            case PN_STATUS_SETTLED:
+              messenger.settle(protonMsg);
+              complete = true;
+              break;
+            case PN_STATUS_REJECTED:
+              complete = true;
+              err = new Error("send failed - message was rejected");
+              break;
+            case PN_STATUS_RELEASED:
+              complete = true;
+              err = new Error("send failed - message was released");
+              break;
+            case PN_STATUS_MODIFIED:
+              complete = true;
+              err = new Error("send failed - message was modified");
+              break;
+            case PN_STATUS_ABORTED:
+              complete = true;
+              err = new Error("send failed - message was aborted");
+              break;
+          }
+
+          // If complete then invoke the callback, when specified
+          if (complete) {
+            var index = client.outstandingSends.indexOf(localMessageId);
+            if (index >= 0) client.outstandingSends.splice(index, 1);
+            if (sendCallback) {
+              var body = protonMsg.body;
+              setImmediate(function() {
+                log.entry('Client.send.utilSendComplete.callback', client.id);
+                sendCallback.apply(client, [err, topic, body, options]);
+                log.exit('Client.send.utilSendComplete.callback', client.id,
+                         null);
+              });
+            }
+            protonMsg.destroy();
+
+            log.exit('Client.send.utilSendComplete', client.id, null);
+            return;
+          }
+          
+          // message not sent yet, so check again in a second or so
+          messenger.send();
+          setImmediate(untilSendComplete, protonMsg, localMessageId, sendCallback);
+          
+        } else {
+          // TODO Not sure we can actually get here (so FFDC?)
+          var index = client.outstandingSends.indexOf(localMessageId);
+          if (index >= 0) client.outstandingSends.splice(index, 1);
           if (sendCallback) {
-            var body = protonMsg.body;
-            setImmediate(function() {
-              log.entry('Client.send.utilSendComplete.callback', client.id);
-              sendCallback.apply(client, [undefined, topic, body, options]);
-              log.exit('Client.send.utilSendComplete.callback', client.id,
-                       null);
-            });
+            var err = new Error("send may have not completed due to disconnect");
+            log.entry('Client.send.utilSendComplete.callback', client.id);
+            sendCallback.apply(client, [err, topic, protonMsg.body, options]);
+            log.exit('Client.send.utilSendComplete.callback', client.id, null);
           }
           protonMsg.destroy();
-
+          
           log.exit('Client.send.utilSendComplete', client.id, null);
           return;
         }
-        // if msg not yet sent and still running, check again in a second or so
-        if (!messenger.stopped) {
-          messenger.send();
-          setImmediate(untilSendComplete, protonMsg, callback);
-        }
       } catch (e) {
         log.log('error', client.id, e);
+        var index = client.outstandingSends.indexOf(localMessageId);
+        if (index >= 0) client.outstandingSends.splice(index, 1);
         var err = new Error(e.message);
         client.disconnect();
         process.nextTick(function() {
-          if (callback) {
+          if (sendCallback) {
             log.entry('Client.send.utilSendComplete.callback', client.id);
-            callback.apply(client, [err, topic, protonMsg.body, options]);
+            sendCallback.apply(client, [err, topic, protonMsg.body, options]);
             log.exit('Client.send.utilSendComplete.callback', client.id, null);
           }
           if (err) {
@@ -1023,7 +1082,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       log.exit('Client.send.utilSendComplete', client.id, null);
     };
     // start the timer to trigger it to keep sending until msg has sent
-    setImmediate(untilSendComplete, protonMsg, callback);
+    setImmediate(untilSendComplete, protonMsg, localMessageId, callback);
   } catch (e) {
     log.log('error', client.id, e);
     var err = new Error(e.message);

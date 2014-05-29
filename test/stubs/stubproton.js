@@ -23,16 +23,11 @@
 module.exports.createProtonStub = function() {
 
   var DEBUG = false;
-  var started = false;
   
 	return {
 	   messenger : {
 	    send: function() {
 	      if (DEBUG) console.log('stub send function called');
-	    },
-	    start: function() {
-	      if (DEBUG) console.log('stub start function called');
-	      start = true;
 	    },
 	    status: function() {
 	      if (DEBUG) console.log('stub status function called');
@@ -43,6 +38,7 @@ module.exports.createProtonStub = function() {
 	    },
 	    connect: function() {
 	      if (DEBUG) console.log('stub connect function called');
+	      this.stopped = false;
 	    },
 	    receive: function() {
 	      // Commented - as generates a lot of output...
@@ -51,7 +47,7 @@ module.exports.createProtonStub = function() {
 	    },
 	    stop: function() {
 	      if (DEBUG) console.log('stub stop function called');
-	      started = false;
+ 	      this.stopped = true;
 	    },
 	    put: function() {
 	      if (DEBUG) console.log('stub put function called');
@@ -60,10 +56,7 @@ module.exports.createProtonStub = function() {
 	      if (DEBUG) console.log('stub hasSent function called');
 	      return true;
 	    },
-	    stopped: function() {
-	      if (DEBUG) console.log('stub stopped function called');
-	      return !started;
-	    },
+	    stopped: true,
 	    subscribe: function() {
 	      if (DEBUG) console.log('stub subscribe function called');
 	    }
