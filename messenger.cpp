@@ -318,44 +318,36 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   pn_messenger_set_incoming_window(obj->messenger, std::numeric_limits<int>::max());
 
   // if we have a username make sure we set a route to force auth
-  std::string validationAddress;
-  std::string authPattern;
-  if ( username.length() > 0){
   int index = address.find("//");
-    std::string hostandport =  index >= 0 ? address.substr(index+2) : address;
-    Proton::Log("data", name, "hostandport:", hostandport.c_str());
-
+  int endIndex = index >= 0 ? address.find("/", index+2) : -1;
+  std::string hostandport;
+  if (endIndex >= 0) {
+  	size_t len = endIndex - (index+2);
+  	hostandport = index >= 0 ? address.substr(index+2, len) : address.substr(0, len);
+  } else {
+  	hostandport = index >= 0 ? address.substr(index+2) : address;
+  }
+  std::string validationAddress;
+  if ( username.length() > 0){
     if ( password.length() > 0 ){
-      authPattern = "amqp://" + username + ":" + password + "@$1";
-      validationAddress = "amqp://" + username + ":" + password + "@" + hostandport;
+      validationAddress = "amqp://" + username + ":" + password + "@" + hostandport + "/$1";
     } else {
-      authPattern = "amqp://" + username + "@$1";
-      validationAddress = "amqp://" + username + "@" + hostandport;
+      validationAddress = "amqp://" + username + "@" + hostandport + "/$1";
     }
   } else {
-    authPattern = "";
-    validationAddress = address;
+    validationAddress = address + "/$1";
   }
 
   /*
-   * if we have a username set the route so any address starting with
-   * amqp:// gets the supplied user and password added
+   * Set the route so that when required any address starting with
+   * amqp://<host>:<port> gets the supplied user and password added
    */
   int error;
-  if (authPattern.length() > 0) {
-    Proton::Entry("pn_messenger_route", name);
-    error = pn_messenger_route(obj->messenger, "amqp://*", authPattern.c_str());
-    Proton::Exit("pn_messenger_route", name, error);
-    if (error){
-      THROW_EXCEPTION("Failed to set messenger route", "ProtonMessenger:Connect", name);
-    }
-  }
-
-  /*
-   * set the route for validation
-   */
+  std::string pattern = "amqp://"+hostandport+"/*";
   Proton::Entry("pn_messenger_route", name);
-  error = pn_messenger_route(obj->messenger, validationAddress.c_str(), validationAddress.c_str());
+  Proton::Log("parms", name, "pattern:", pattern.c_str());
+  Proton::Log("parms", name, "substitution:", validationAddress.c_str());
+  error = pn_messenger_route(obj->messenger, pattern.c_str(), validationAddress.c_str());
   Proton::Exit("pn_messenger_route", name, error);
   if (error){
     THROW_EXCEPTION("Failed to set messenger route", "ProtonMessenger::Connect", name);
