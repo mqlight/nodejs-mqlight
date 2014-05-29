@@ -19,6 +19,37 @@ Current Features:
 
 ## Getting Started
 
+### Prerequisites
+
+You will need a Node.js 0.10 runtime environment to use the MQ Light API
+module. This can be installed from http://nodejs.org/download/, or by using
+your operating system's package manager.
+
+The following are the currently supported platform architectures:
+
+* 64-bit or 32-bit runtime on Windows (x64 or x86)
+* 64-bit runtime on Linux (x64)
+
+You will currently receive an error if you attempt to use any other
+combination.
+
+Before using MQ Light on Linux, you will also need the 0.9.8 version of an
+OpenSSL package. This version of the package is not installed by default, so to
+use the beta code you will need to install it. For example:
+
+* To install the package on Ubuntu, run: ``sudo apt-get install libssl0.9.8``
+* To install the package on RedHat, run: ``sudo yum install openssl098e``
+
+Additionally, you will also need to make sure you have the libuuid package
+installed. For example:
+
+* To check whether you have the package on Ubuntu, run: ``dpkg -l libuuid1``
+* To check whether you have the package on RedHat, run: ``rpm -qa | grep
+  libuuid``
+
+
+### Usage
+
 Install it in node.js:
 
 ```
