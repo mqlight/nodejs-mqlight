@@ -987,8 +987,6 @@ Client.prototype.send = function(topic, data, options, callback) {
           if (sendCallback) {
             var body = protonMsg.body;
             setImmediate(function() {
-              // TODO: defect 59405 might mean we change what gets passed into
-              // the callback...
               log.entry('Client.send.utilSendComplete.callback', client.id);
               sendCallback.apply(client, [undefined, topic, body, options]);
               log.exit('Client.send.utilSendComplete.callback', client.id,
