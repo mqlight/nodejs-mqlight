@@ -85,7 +85,7 @@ module.exports.test_receive_message = function(test) {
 
     // Ensure that the confirmDelivery() method is available to be called
     delivery.message.confirmDelivery();
-    
+
     test.done();
     client.disconnect();
     mqlight.proton.messenger.receive = originalReceiveMethod;
@@ -98,6 +98,52 @@ module.exports.test_receive_message = function(test) {
   client.on('error', function(err) {
     console.log(err, 'error event should not be emitted');
     test.ok(false);
+  });
+};
+
+
+/**
+ * Tests an error in a message listener isn't accidentally caugh in mqlight.js
+ * and has the correct stack (referencing this file.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_bad_listener = function(test) {
+  var originalReceiveMethod = mqlight.proton.messenger.receive;
+  var messages = [testMessage('x', 'x'), testMessage('x', 'x')];
+  mqlight.proton.messenger.receive = function() {
+    var result = messages;
+    messages = [];
+    return result;
+  };
+
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_bad_listener'
+  });
+
+  var handler = function(err) {
+    var err_stack = err.stack.split('\n');
+    if (err_stack[2].indexOf('testreceivemessage.js') < 0) {
+      test.ok(false, 'Unexpected stack trace at ' + err_stack[2]);
+      test.done();
+    }
+  };
+  process.addListener('uncaughtException', handler);
+
+  client.connect(function() {
+    var first = true;
+    client.on('message', function(data, delivery) {
+      // purposefully throw an exception the first time
+      if (first === true) {
+        first = false;
+        throw Error();
+      }
+      process.removeListener('uncaughtException', handler);
+      test.done();
+      client.disconnect();
+      mqlight.proton.messenger.receive = originalReceiveMethod;
+    });
+    client.subscribe('/public');
   });
 };
 
