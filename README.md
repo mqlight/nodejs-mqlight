@@ -35,7 +35,7 @@ combination.
 
 Before using MQ Light on Linux, you will also need the 0.9.8 version of an
 OpenSSL package. This version of the package is not installed by default, so to
-use the beta code you will need to install it. For example:
+use the module you will need to install it. For example:
 
 * To install the package on Ubuntu, run: ``sudo apt-get install libssl0.9.8``
 * To install the package on RedHat, run: ``sudo yum install openssl098e``

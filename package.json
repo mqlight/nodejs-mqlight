@@ -24,6 +24,7 @@
         "url": "http://www14.software.ibm.com/cgi-bin/weblap/lap.pl?popup=Y&li_formnum=L-ACRR-9FLFNA"
     }],
     "scripts": {
-    	"test": "./node_modules/.bin/nodeunit --config tests/nodeunit.json tests"
+        "postinstall": "node bin/mqlight-postinstall.js",
+        "test": "./node_modules/.bin/nodeunit --config tests/nodeunit.json tests"
     }
 }
