@@ -132,7 +132,10 @@ Object type when received.
 * `topic` - (String) the topic to which the message will be sent.
 * `message` - (String | Buffer | Object) the message body to be sent
 * `options` - (Object) (optional) map of additional options for the send.
-  There are no options that can be set in this beta.
+  Supported options are:
+  *  **qos**, (Number) The quality of service to use when sending the message.
+     0 is used to denote at most once (the default) and 1 is used for at least
+     once.
 * `callback` - (Function) (optional) callback to be notified of errors &
   completion
 
@@ -151,7 +154,15 @@ message will be delivered to a particular `Destination`, and hence
   subscription for which messages are anycast between connected subscribers. If
   omitted defaults to unshared (e.g. private to the client).
 * `options` - (Object) (optional) map of additional options for the destination.
-  There are no options that can be set in this beta.
+  Supported options are:
+  *  **autoConfirm**, (Boolean) When qos option is specified with a value of 1:
+     true (the default) denotes received messages will be automatically
+     confirmed (settled).
+     false denotes received messages will only be confirmed when the associated
+     'message' events's delivery.message.confirmDelivery() method is called.
+  *  **qos**, (Number) The quality of service to use for delivering messages to
+     the subscription.  Valid values are: 0 to denote at most once (the default)
+     and 1 is used for at least once.
 * `callback` - (Function) callback to be notified of errors & completion.
 
 Returns the `Client` object that the subscribe was called on.  `message` events
@@ -189,10 +200,15 @@ client's subscriptions.
   Properties include:
   *  **message**, (Object) additional information about the message.  Properties
      include:
+    *  **properties** (Object) Map of properties for the message. Properties are:
+      * **contentType** (String) The content of the `data` argument. Values are:
+        'text/plain' - `data` will be a String.
+        'application/octet-stream' - `data` will be a Buffer.
+        'application/json' - `data` will be a JSON Object.
     *  **topic**, (Object) the topic that the message was sent to.
-  *  **subscription**, (Object) information about the `Client.subscribe` method
-     call that caused the client to receive this message (note: this isn't
-     implemented yet!)
+    *  **confirmDelivery**, (Function) A method that can be used to confirm
+       (settle) the delivery of a at least once quality of service (qos:1)
+       message. This method does not expect any arguments.
 
 ### Event: 'connect'
 
