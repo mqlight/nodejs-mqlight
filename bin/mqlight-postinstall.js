@@ -23,8 +23,8 @@ var fs = require('fs');
 var childProcess = require('child_process');
 
 if (os.platform() === 'linux' && process.arch === 'x64') {
-  // on redhat we need to check openssl 0.9.8 is installed and also symlink
-  // it to match the official openssl naming conventions
+  // on Red Hat Linux we need to check openssl 0.9.8 is installed and also
+  // symlink it to match the official openssl naming conventions.
   fs.exists('/etc/redhat-release', function(redhat) {
     if (redhat) {
       fs.exists('/usr/lib64/libssl.so.6', function(exists) {
@@ -46,20 +46,20 @@ if (os.platform() === 'linux' && process.arch === 'x64') {
         ], { stdio: 'inherit' });
         child.on('exit', function(code, signal) {
           if (signal) {
-            console.erroror('ln killed by signal: ' + signal);
+            console.error('ln killed by signal: ' + signal);
             process.exit(1);
           } else {
             if (code > 0) console.error('ln failed with return code: ' + code);
             process.exit(code);
           }
         }).on('error', function(err) {
-          console.erroror('Unable to run ln for reason: %s', err);
+          console.error('Unable to run ln for reason: %s', err);
           process.exit(1);
         });
       });
     } else {
-      // else we assume we are running on ubuntu and just report if the library
-      // is missing from the install
+      // else we assume we are running on Ubuntu and just report if the library
+      // is missing from the install.
       fs.exists('/usr/lib/x86_64-linux-gnu/libssl.so.0.9.8', function(exists) {
         if (!exists) {
           console.error('Before using MQ Light on Linux, you will also need ' +
@@ -67,7 +67,7 @@ if (os.platform() === 'linux' && process.arch === 'x64') {
               'package is not installed by default, so to use the module ' +
               'you will need to install it.');
           console.error();
-          console.error('* To install the package on Ubunt, run: sudo ' +
+          console.error('* To install the package on Ubuntu, run: sudo ' +
                         'apt-get install libssl0.9.8');
           process.exit(1);
         }
