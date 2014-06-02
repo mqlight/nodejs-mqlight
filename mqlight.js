@@ -371,9 +371,8 @@ var Client = function(service, id, user, password) {
   this.state = 'disconnected';
   this.service = undefined;
 
-  // List of message subscriptions that the application is expected to call
-  // message.confirmDelivery() for
-  this.manualConfirmSubscriptions = [];
+  // List of message subscriptions
+  this.subscriptions = [];
 
   // List of outstanding send operations waiting to be accepted, settled, etc
   // by the listener.
@@ -564,9 +563,16 @@ Client.prototype.connect = function(callback) {
             }
 
             var topic = url.parse(protonMsg.address).path.substring(1);
-            var index =
-                client.manualConfirmSubscriptions.indexOf(protonMsg.address);
-            var autoConfirm = index < 0;
+            var autoConfirm = true;
+            var qos = exports.QOS_AT_MOST_ONCE;
+            for (var i=0; i<client.subscriptions.length; i++) {
+              if (client.subscriptions[i].address === protonMsg.address) {
+                qos = client.subscriptions[i].qos;
+                if (qos === exports.QOS_AT_LEAST_ONCE) autoConfirm = client.subscriptions[i].autoConfirm; 
+                 break;
+              }
+            }
+
             var delivery = {
               message: {
                 properties: {
@@ -640,9 +646,15 @@ Client.prototype.connect = function(callback) {
                 client.emit('message', data, delivery);
               });
             }
-            if (autoConfirm) {
+            if (qos === exports.QOS_AT_MOST_ONCE) {
+              messenger.accept(protonMsg);
               messenger.settle(protonMsg);
               protonMsg.destroy();
+            } else {
+              if (autoConfirm) {
+                messenger.settle(protonMsg);
+                protonMsg.destroy();       
+              }
             }
           }
         }
@@ -1245,16 +1257,16 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var address = this.getService() + '/' + share + topicPattern;
   var client = this;
 
-  // If manual confirm (settle) required then add address to manual confirm
-  // list, otherwise ensure manual confirm list does not contain the address
-  var index = client.manualConfirmSubscriptions.indexOf(this.getService() +
-                                                        '/' + topicPattern);
-  if (qos === exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
-    if (index < 0) client.manualConfirmSubscriptions.push(this.getService() +
-                                                          '/' + topicPattern);
-  } else {
-    if (index >= 0) client.manualConfirmSubscriptions.splice(index, 1);
+  // Add address to list of subscriptions, relacing any axisting entry
+  var subscriptionAddress = this.getService() + '/' + topicPattern;
+  for (var i=0; i<client.subscriptions.length; i++) {
+    if (client.subscriptions[i].address === subscriptionAddress) {
+      client.subscriptions.splice(i, 1);
+      break;
+    }
   }
+  client.subscriptions.push({ address:subscriptionAddress,
+                              qos:qos, autoConfirm:autoConfirm });
 
   var err;
   try {

@@ -62,6 +62,7 @@ protected:
     static v8::Handle<v8::Value> Subscribe(const v8::Arguments& args);
     static v8::Handle<v8::Value> Receive(const v8::Arguments& args);
     static v8::Handle<v8::Value> Status(const v8::Arguments& args);
+    static v8::Handle<v8::Value> Accept(const v8::Arguments& args);
     static v8::Handle<v8::Value> Settle(const v8::Arguments& args);
     static v8::Handle<v8::Value> HasOutgoing(v8::Local<v8::String> property,
                                              const v8::AccessorInfo &info);

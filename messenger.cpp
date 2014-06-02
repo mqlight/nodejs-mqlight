@@ -67,6 +67,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   Local<String> name = String::NewSymbol("ProtonMessenger");
   constructor->SetClassName(name);
 
+  NODE_SET_PROTOTYPE_METHOD(constructor, "accept", Accept);
   NODE_SET_PROTOTYPE_METHOD(constructor, "put", Put);
   NODE_SET_PROTOTYPE_METHOD(constructor, "send", Send);
   NODE_SET_PROTOTYPE_METHOD(constructor, "stop", Stop);
@@ -528,7 +529,6 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
     if (link) {
       msg->linkAddr = pn_terminus_get_address(pn_link_remote_target(link));
     }
-    pn_messenger_accept(obj->messenger, tracker, 0);
   }
 
   Local<Array> messages = Array::New(vector.size());
@@ -588,6 +588,39 @@ Handle<Value> ProtonMessenger::Status(const Arguments& args)
 
   Proton::Exit("ProtonMessenger::Status", name, status);
   return scope.Close(Number::New(status));
+}
+
+Handle<Value> ProtonMessenger::Accept(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::Accept", name);
+
+  // throw exception if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
+      || args[0]->IsUndefined())
+  {
+    THROW_EXCEPTION("Missing required message argument.", "ProtonMessenger::Accept", name);
+  }
+
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+
+  // throw exception if not connected
+  if (!obj->messenger) {
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Accept", name);
+  }
+
+  int status = pn_messenger_accept(obj->messenger, msg->tracker, 0);
+  if (pn_messenger_errno(obj->messenger)) {
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Accept", name);
+  } else if (status != 0) {
+    THROW_EXCEPTION("Failed to accept.", "ProtonMessenger::Accept", name);
+  }
+
+  Proton::Exit("ProtonMessenger::Accept", name, 0);
+  return scope.Close(Boolean::New(true));
 }
 
 Handle<Value> ProtonMessenger::Settle(const Arguments& args)
