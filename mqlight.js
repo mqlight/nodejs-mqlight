@@ -1257,7 +1257,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var address = this.getService() + '/' + share + topicPattern;
   var client = this;
 
-  // Add address to list of subscriptions, relacing any axisting entry
+  // Add address to list of subscriptions, replacing any existing entry
   var subscriptionAddress = this.getService() + '/' + topicPattern;
   for (var i=0; i<client.subscriptions.length; i++) {
     if (client.subscriptions[i].address === subscriptionAddress) {

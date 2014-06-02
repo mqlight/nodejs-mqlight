@@ -33,6 +33,9 @@ module.exports.createProtonStub = function() {
 	      if (DEBUG) console.log('stub status function called');
 	      return 7; // PN_STATUS_SETTLED = 7;
 	    },
+	    accept: function() {
+	        if (DEBUG) console.log('stub accept function called');
+	    },
 	    settle: function() {
 	      if (DEBUG) console.log('stub settle function called');
 	    },
