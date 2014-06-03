@@ -565,11 +565,13 @@ Client.prototype.connect = function(callback) {
             var topic = url.parse(protonMsg.address).path.substring(1);
             var autoConfirm = true;
             var qos = exports.QOS_AT_MOST_ONCE;
-            for (var i=0; i<client.subscriptions.length; i++) {
+            for (var i = 0; i < client.subscriptions.length; i++) {
               if (client.subscriptions[i].address === protonMsg.address) {
                 qos = client.subscriptions[i].qos;
-                if (qos === exports.QOS_AT_LEAST_ONCE) autoConfirm = client.subscriptions[i].autoConfirm; 
-                 break;
+                if (qos === exports.QOS_AT_LEAST_ONCE) {
+                  autoConfirm = client.subscriptions[i].autoConfirm;
+                }
+                break;
               }
             }
 
@@ -653,7 +655,7 @@ Client.prototype.connect = function(callback) {
             } else {
               if (autoConfirm) {
                 messenger.settle(protonMsg);
-                protonMsg.destroy();       
+                protonMsg.destroy();
               }
             }
           }
@@ -753,7 +755,7 @@ Client.prototype.disconnect = function(callback) {
     client.state = 'disconnecting';
 
     // Only disconnect when all outstanding send operations are complete
-    if (client.outstandingSends.length == 0) {
+    if (client.outstandingSends.length === 0) {
       if (client.messenger) {
         client.messenger.stop();
       }
@@ -1259,14 +1261,14 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   // Add address to list of subscriptions, replacing any existing entry
   var subscriptionAddress = this.getService() + '/' + topicPattern;
-  for (var i=0; i<client.subscriptions.length; i++) {
+  for (var i = 0; i < client.subscriptions.length; i++) {
     if (client.subscriptions[i].address === subscriptionAddress) {
       client.subscriptions.splice(i, 1);
       break;
     }
   }
-  client.subscriptions.push({ address:subscriptionAddress,
-                              qos:qos, autoConfirm:autoConfirm });
+  client.subscriptions.push({ address: subscriptionAddress,
+    qos: qos, autoConfirm: autoConfirm });
 
   var err;
   try {
