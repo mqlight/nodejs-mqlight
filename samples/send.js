@@ -121,6 +121,16 @@ client.on('connected', function() {
   sendNextMessage();
 });
 
+client.on('error', function(error) {
+  console.log('*** error ***');
+  if (error) {
+    if (error.message) console.log('message: '+error.message);
+    else if (error.stack) console.log(error.stack);
+  }
+  console.log('exiting.');
+  process.exit(1);
+});
+
 // Make the connection
 client.connect(function(err) {
   if (err) {
