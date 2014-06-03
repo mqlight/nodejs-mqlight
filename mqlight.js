@@ -530,157 +530,6 @@ Client.prototype.connect = function(callback) {
       });
     }
 
-    // Function to check for messages, outputting the contents of each to the
-    // event emitter
-    var messenger = client.messenger;
-    var check_for_messages = function() {
-      if (client.state !== 'connected') {
-        return;
-      }
-
-      log.entryLevel('entry_often', 'check_for_messages', client.id);
-
-      try {
-        var messages = messenger.receive(50);
-        if (messages.length > 0) {
-          log.log('debug', client.id, 'received %d messages', messages.length);
-
-          for (var msg = 0, tot = messages.length; msg < tot; msg++) {
-            log.log('debug', client.id, 'processing message %d', msg);
-            var protonMsg = messages[msg];
-
-            // if body is a JSON'ified object, try to parse it back to a js obj
-            var data;
-            if (protonMsg.contentType === 'application/json') {
-              try {
-                data = JSON.parse(protonMsg.body);
-              } catch (_) {
-                log.log('error', client.id, _);
-                console.warn(_);
-              }
-            } else {
-              data = protonMsg.body;
-            }
-
-            var topic = url.parse(protonMsg.address).path.substring(1);
-            var autoConfirm = true;
-            var qos = exports.QOS_AT_MOST_ONCE;
-            for (var i = 0; i < client.subscriptions.length; i++) {
-              if (client.subscriptions[i].address === protonMsg.address) {
-                qos = client.subscriptions[i].qos;
-                if (qos === exports.QOS_AT_LEAST_ONCE) {
-                  autoConfirm = client.subscriptions[i].autoConfirm;
-                }
-                break;
-              }
-            }
-
-            var delivery = {
-              message: {
-                properties: {
-                  contentType: protonMsg.contentType
-                },
-                topic: topic,
-                confirmDelivery: autoConfirm ? function() {
-                  log.entry('message.confirmDelivery.auto', this.id);
-                  log.log('data', this.id, 'delivery:', delivery);
-                  log.exit('message.confirmDelivery.auto', this.id, null);
-                } : function() {
-                  log.entry('message.confirmDelivery', this.id);
-                  log.log('data', this.id, 'delivery:', delivery);
-                  if (protonMsg) {
-                    messenger.settle(protonMsg);
-                    protonMsg.destroy();
-                    protonMsg = undefined;
-                  }
-                  log.exit('message.confirmDelivery', this.id, null);
-                }
-              }
-            };
-            var linkAddress = protonMsg.linkAddress;
-            if (linkAddress) {
-              delivery.destination = {};
-              var split = linkAddress.split(':', 3);
-              if (linkAddress.indexOf('share:') === 0) {
-                delivery.destination.share = split[1];
-                delivery.destination.topicPattern = split[2];
-              } else {
-                delivery.destination.topicPattern = split[1];
-              }
-            }
-
-            var da = protonMsg.deliveryAnnotations;
-            var malformed = {};
-            malformed.MQMD = {};
-            for (var an = 0; da && (an < da.length); ++an) {
-              if (da[an] && da[an].key) {
-                switch (da[an].key) {
-                  case 'x-opt-message-malformed-condition':
-                    malformed.condition = da[an].value;
-                    break;
-                  case 'x-opt-message-malformed-description':
-                    malformed.description = da[an].value;
-                    break;
-                  case 'x-opt-message-malformed-MQMD.CodedCharSetId':
-                    malformed.MQMD.CodedCharSetId = Number(da[an].value);
-                    break;
-                  case 'x-opt-message-malformed-MQMD.Format':
-                    malformed.MQMD.Format = da[an].value;
-                    break;
-                  default:
-                    break;
-                }
-              }
-            }
-            if (malformed.condition) {
-              if (client.listeners('malformed').length > 0) {
-                delivery.malformed = malformed;
-                log.log('emit', client.id,
-                        'malformed', protonMsg.body, delivery);
-                client.emit('malformed', protonMsg.body, delivery);
-              } else {
-                protonMsg.destroy();
-                throw new Error('No listener for "malformed" event.');
-              }
-            } else {
-              process.nextTick(function() {
-                log.log('emit', client.id, 'message', data, delivery);
-                client.emit('message', data, delivery);
-              });
-            }
-            if (qos === exports.QOS_AT_MOST_ONCE) {
-              messenger.accept(protonMsg);
-              messenger.settle(protonMsg);
-              protonMsg.destroy();
-            } else {
-              if (autoConfirm) {
-                messenger.settle(protonMsg);
-                protonMsg.destroy();
-              }
-            }
-          }
-        }
-      } catch (err) {
-        log.log('error', client.id, err);
-        client.disconnect();
-        process.nextTick(function() {
-          log.log('emit', client.id, 'error', err);
-          client.emit('error', err);
-        });
-      }
-      if (client.state === 'connected') {
-        setImmediate(check_for_messages);
-      }
-
-      log.exitLevel('entry_often', 'check_for_messages', client.id);
-    };
-
-    // Setup the check for messages such that each received messages is output
-    // to the event emitter
-    process.nextTick(function() {
-      check_for_messages();
-    });
-
     log.exit('Client.connect.performConnect', client.id, null);
     return;
   };
@@ -1111,6 +960,163 @@ Client.prototype.send = function(topic, data, options, callback) {
   log.exit('Client.send', this.id, null);
 };
 
+
+/**
+ * Function to force the client to check for messages, outputting the contents
+ * of any that have arrived to the client event emitter.
+ *
+ * @throws {Error}
+ *           If a listener hasn't been reqistered for the 'malformed' event and
+ *           one needs to be emitted.
+ */
+Client.prototype.checkForMessages = function() {
+  var client = this;
+  log.entryLevel('entry_often', 'checkForMessages', client.id);
+  var messenger = client.messenger;
+  if (client.state !== 'connected' || client.subscriptions.length === 0) {
+    log.exitLevel('entry_often', 'checkForMessages', client.id);
+    return;
+  }
+
+  try {
+    var messages = messenger.receive(50);
+    if (messages.length > 0) {
+      log.log('debug', client.id, 'received %d messages', messages.length);
+
+      for (var msg = 0, tot = messages.length; msg < tot; msg++) {
+        log.log('debug', client.id, 'processing message %d', msg);
+        var protonMsg = messages[msg];
+
+        // if body is a JSON'ified object, try to parse it back to a js obj
+        var data;
+        if (protonMsg.contentType === 'application/json') {
+          try {
+            data = JSON.parse(protonMsg.body);
+          } catch (_) {
+            log.log('error', client.id, _);
+            console.warn(_);
+          }
+        } else {
+          data = protonMsg.body;
+        }
+
+        var topic = url.parse(protonMsg.address).path.substring(1);
+        var autoConfirm = true;
+        var qos = exports.QOS_AT_MOST_ONCE;
+        for (var i = 0; i < client.subscriptions.length; i++) {
+          if (client.subscriptions[i].address === protonMsg.address) {
+            qos = client.subscriptions[i].qos;
+            if (qos === exports.QOS_AT_LEAST_ONCE) {
+              autoConfirm = client.subscriptions[i].autoConfirm;
+            }
+            break;
+          }
+        }
+
+        var delivery = {
+          message: {
+            properties: {
+              contentType: protonMsg.contentType
+            },
+            topic: topic,
+            confirmDelivery: autoConfirm ? function() {
+              log.entry('message.confirmDelivery.auto', this.id);
+              log.log('data', this.id, 'delivery:', delivery);
+              log.exit('message.confirmDelivery.auto', this.id, null);
+            } : function() {
+              log.entry('message.confirmDelivery', this.id);
+              log.log('data', this.id, 'delivery:', delivery);
+              if (protonMsg) {
+                messenger.settle(protonMsg);
+                protonMsg.destroy();
+                protonMsg = undefined;
+              }
+              log.exit('message.confirmDelivery', this.id, null);
+            }
+          }
+        };
+        var linkAddress = protonMsg.linkAddress;
+        if (linkAddress) {
+          delivery.destination = {};
+          var split = linkAddress.split(':', 3);
+          if (linkAddress.indexOf('share:') === 0) {
+            delivery.destination.share = split[1];
+            delivery.destination.topicPattern = split[2];
+          } else {
+            delivery.destination.topicPattern = split[1];
+          }
+        }
+
+        var da = protonMsg.deliveryAnnotations;
+        var malformed = {};
+        malformed.MQMD = {};
+        for (var an = 0; da && (an < da.length); ++an) {
+          if (da[an] && da[an].key) {
+            switch (da[an].key) {
+              case 'x-opt-message-malformed-condition':
+                malformed.condition = da[an].value;
+                break;
+              case 'x-opt-message-malformed-description':
+                malformed.description = da[an].value;
+                break;
+              case 'x-opt-message-malformed-MQMD.CodedCharSetId':
+                malformed.MQMD.CodedCharSetId = Number(da[an].value);
+                break;
+              case 'x-opt-message-malformed-MQMD.Format':
+                malformed.MQMD.Format = da[an].value;
+                break;
+              default:
+                break;
+            }
+          }
+        }
+        if (malformed.condition) {
+          if (client.listeners('malformed').length > 0) {
+            delivery.malformed = malformed;
+            log.log('emit', client.id,
+                    'malformed', protonMsg.body, delivery);
+            client.emit('malformed', protonMsg.body, delivery);
+          } else {
+            protonMsg.destroy();
+            throw new Error('No listener for "malformed" event.');
+          }
+        } else {
+          process.nextTick(function() {
+            log.log('emit', client.id, 'message', data, delivery);
+            client.emit('message', data, delivery);
+          });
+        }
+        if (qos === exports.QOS_AT_MOST_ONCE) {
+          messenger.accept(protonMsg);
+          messenger.settle(protonMsg);
+          protonMsg.destroy();
+        } else {
+          if (autoConfirm) {
+            messenger.settle(protonMsg);
+            protonMsg.destroy();
+          }
+        }
+      }
+    }
+  } catch (err) {
+    log.log('error', client.id, err);
+    client.disconnect();
+    process.nextTick(function() {
+      log.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+    });
+  }
+
+  log.exitLevel('entry_often', 'checkForMessages', client.id);
+
+  setImmediate(function() {
+    if (client.state === 'connected') {
+      client.checkForMessages.apply(client);
+    }
+  });
+};
+
+
 /**
  * @param {function(object)}
  *          destCallback - callback, invoked with an Error object if
@@ -1259,20 +1265,29 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var address = this.getService() + '/' + share + topicPattern;
   var client = this;
 
-  // Add address to list of subscriptions, replacing any existing entry
-  var subscriptionAddress = this.getService() + '/' + topicPattern;
-  for (var i = 0; i < client.subscriptions.length; i++) {
-    if (client.subscriptions[i].address === subscriptionAddress) {
-      client.subscriptions.splice(i, 1);
-      break;
-    }
-  }
-  client.subscriptions.push({ address: subscriptionAddress,
-    qos: qos, autoConfirm: autoConfirm });
-
   var err;
   try {
     messenger.subscribe(address, qos);
+
+    // If this is the first subscription to be added, schedule a request to
+    // start the polling loop to check for messages arriving
+    if (client.subscriptions.length === 0) {
+      process.nextTick(function() {
+        client.checkForMessages();
+      });
+    }
+
+    // Add address to list of subscriptions, replacing any existing entry
+    var subscriptionAddress = this.getService() + '/' + topicPattern;
+    for (var i = 0; i < client.subscriptions.length; i++) {
+      if (client.subscriptions[i].address === subscriptionAddress) {
+        client.subscriptions.splice(i, 1);
+        break;
+      }
+    }
+    client.subscriptions.push({ address: subscriptionAddress,
+      qos: qos, autoConfirm: autoConfirm });
+
   } catch (e) {
     log.log('error', client.id, e);
     err = e;

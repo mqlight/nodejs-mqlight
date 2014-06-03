@@ -51,8 +51,8 @@ typedef unsigned __int32 uint32_t;
 using namespace v8;
 
 #define THROW_EXCEPTION(error, fnc, id) \
-    Proton::Exit((fnc), (id), "Exception thrown"); \
-    ThrowException(Exception::TypeError(String::New((error) == NULL ? "unknown error" : (error)))); \
+    ThrowException(Exception::TypeError(String::New(error == NULL ? "unknown error" : error))); \
+    Proton::Exit(fnc, id, -1); \
     return scope.Close(Undefined());
 
 Persistent<FunctionTemplate> ProtonMessenger::constructor;
@@ -236,8 +236,7 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args) {
   Proton::Exit("pn_messenger_put", name, error);
   if (error)
   {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Put", name)
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Put", name)
   }
 
   pn_tracker_t tracker = pn_messenger_outgoing_tracker(obj->messenger);
@@ -265,8 +264,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args) {
   Proton::Exit("pn_messenger_send", name, error);
   if (error)
   {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Send", name)
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Send", name)
   }
 
   Proton::Entry("pn_messenger_work", name);
@@ -275,8 +273,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args) {
   Proton::Exit("pn_messenger_work", name, error);
   if (error)
   {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Send", name)
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Send", name)
   }
 
   Proton::Exit("ProtonMessenger::Send", name, 0);
@@ -367,8 +364,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   error = pn_messenger_start(obj->messenger);
   Proton::Exit("pn_messenger_start", name, error);
   if (error) {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Connect", name);
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Connect", name);
   }
 
   Proton::Exit("ProtonMessenger::Connect", name, error);
@@ -463,16 +459,15 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
   Proton::Entry("pn_messenger_subscribe", name);
   pn_messenger_subscribe(obj->messenger, address.c_str());
   Proton::Exit("pn_messenger_subscribe", name, 0);
-  Proton::Entry("pn_messenger_recv", name);
-  pn_messenger_recv(obj->messenger, -1);
+
+  Proton::Entry("pn_messenger_work", name);
+  pn_messenger_work(obj->messenger, 50);
   int error = pn_messenger_errno(obj->messenger);
-  Proton::Exit("pn_messenger_recv", name, error);
+  Proton::Exit("pn_messenger_work", name, error);
   if (error)
   {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Subscribe", name)
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Subscribe", name)
   }
-
   Proton::Exit("ProtonMessenger::Subscribe", name, 0);
   return scope.Close(Boolean::New(true));
 }
@@ -500,14 +495,22 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
     THROW_EXCEPTION("Not connected", "ProtonMessenger::Receive", name);
   }
 
+  Proton::Entry("entry_often", "pn_messenger_recv", name);
+  pn_messenger_recv(obj->messenger, -1);
+  int error = pn_messenger_errno(obj->messenger);
+  Proton::Exit("exit_often", "pn_messenger_recv", name, error);
+  if (error)
+  {
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Receive", name)
+  }
+
   Proton::Entry("entry_often", "pn_messenger_work", name);
   pn_messenger_work(obj->messenger, timeout);
-  int error = pn_messenger_errno(obj->messenger);
+  error = pn_messenger_errno(obj->messenger);
   Proton::Exit("exit_often", "pn_messenger_work", name, error);
   if (error)
   {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Receive", name)
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Receive", name)
   }
 
   std::vector< Local<Object> > vector;
@@ -520,13 +523,12 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
 
     Proton::Entry("pn_messenger_get", name);
     pn_messenger_get(obj->messenger, msg->message);
-    int error = pn_messenger_errno(obj->messenger);
+    error = pn_messenger_errno(obj->messenger);
     Proton::Exit("pn_messenger_get", name, error);
     if (msg->message == NULL) continue;
     if (error)
     {
-      const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-      THROW_EXCEPTION(text, "ProtonMessenger::Receive", name)
+      THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Receive", name)
     }
 
     vector.push_back(msgObj);
@@ -621,8 +623,7 @@ Handle<Value> ProtonMessenger::Accept(const Arguments& args)
 
   int status = pn_messenger_accept(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Accept", name);
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Accept", name);
   } else if (status != 0) {
     THROW_EXCEPTION("Failed to accept.", "ProtonMessenger::Accept", name);
   }
@@ -655,8 +656,7 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
 
   int status = pn_messenger_settle(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Settle", name);
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Settle", name);
   } else if (status != 0) {
     THROW_EXCEPTION("Failed to settle.", "ProtonMessenger::Settle", name);
   }
