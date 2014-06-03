@@ -44,6 +44,7 @@ public:
     static void Entry(const char *name, const char *id);
     static void Entry(const char *lvl, const char *name, const char *id);
     static void Exit(const char *name, const char *id, int rc);
+    static void Exit(const char *name, const char *id, bool rc);
     static void Exit(const char *name, const char *id, const char *rc);
     static void Exit(const char *lvl, const char *name, const char *id, int rc);
     static void Exit(const char *lvl, const char *name, const char *id, const char *rc);

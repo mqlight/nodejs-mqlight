@@ -63,6 +63,11 @@ void Proton::Exit(const char *name, const char *id, int rc)
   Proton::Exit("exit", name, id, rc);
 }
 
+void Proton::Exit(const char *name, const char *id, bool rc)
+{
+  Proton::Exit("exit", name, id, rc ? "true" : "false");
+}
+
 void Proton::Exit(const char *name, const char *id, const char *rc)
 {
   Proton::Exit("exit", name, id, rc);
