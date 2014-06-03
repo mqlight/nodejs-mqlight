@@ -923,16 +923,19 @@ Client.prototype.send = function(topic, data, options, callback) {
         }
       } catch (e) {
         log.log('error', client.id, e);
+        //error condition so won't retry send remove from list of unsent
+        index = client.outstandingSends.indexOf(localMessageId);
+        if (index >= 0) client.outstandingSends.splice(index, 1);
         client.disconnect();
         process.nextTick(function() {
           if (sendCallback) {
             log.entry('Client.send.utilSendComplete.callback', client.id);
-            sendCallback.apply(client, [err, topic, protonMsg.body, options]);
+            sendCallback.apply(client, [e, topic, protonMsg.body, options]);
             log.exit('Client.send.utilSendComplete.callback', client.id, null);
           }
-          if (err) {
-            log.log('emit', client.id, 'error', err);
-            client.emit('error', err);
+          if (e) {
+            log.log('emit', client.id, 'error', e);
+            client.emit('error', e);
           }
         });
       }
@@ -943,6 +946,9 @@ Client.prototype.send = function(topic, data, options, callback) {
     setImmediate(untilSendComplete, protonMsg, localMessageId, callback);
   } catch (err) {
     log.log('error', client.id, err);
+    //error condition so won't retry send need to remove it from list of unsent
+    index = client.outstandingSends.indexOf(localMessageId);
+    if (index >= 0) client.outstandingSends.splice(index, 1);
     client.disconnect();
     process.nextTick(function() {
       if (callback) {
