@@ -464,9 +464,18 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
   pn_messenger_subscribe(obj->messenger, address.c_str());
   Proton::Exit("pn_messenger_subscribe", name, 0);
 
+  Proton::Entry("pn_messenger_recv", name);
+  pn_messenger_recv(obj->messenger, -1);
+  int error = pn_messenger_errno(obj->messenger);
+  Proton::Exit("pn_messenger_recv", name, error);
+  if (error)
+  {
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Subscribe", name)
+  }
+
   Proton::Entry("pn_messenger_work", name);
   pn_messenger_work(obj->messenger, 50);
-  int error = pn_messenger_errno(obj->messenger);
+  error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_work", name, error);
   if (error)
   {

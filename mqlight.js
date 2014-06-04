@@ -1302,6 +1302,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   setImmediate(function() {
     if (callback) {
       log.entry('Client.subscribe.callback', client.id);
+      log.log('parms', client.id, 'err:', err, 'topicPattern:', topicPattern,
+              'originalShareValue:', originalShareValue);
       callback.apply(client, [err, topicPattern, originalShareValue]);
       log.exit('Client.subscribe.callback', client.id, null);
     }
