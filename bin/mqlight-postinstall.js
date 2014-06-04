@@ -23,10 +23,10 @@ var fs = require('fs');
 var childProcess = require('child_process');
 
 if (os.platform() === 'linux' && process.arch === 'x64') {
-  // on Red Hat Linux we need to check openssl 0.9.8 is installed and also
-  // symlink it to match the official openssl naming conventions.
   fs.exists('/etc/redhat-release', function(redhat) {
     if (redhat) {
+      // on Red Hat Linux we need to check openssl 0.9.8 is installed and also
+      // symlink it to match the official openssl naming conventions.
       fs.exists('/usr/lib64/libssl.so.6', function(exists) {
         if (!exists) {
           console.error('Before using MQ Light on Linux, you will also need ' +
@@ -58,18 +58,26 @@ if (os.platform() === 'linux' && process.arch === 'x64') {
         });
       });
     } else {
-      // else we assume we are running on Ubuntu and just report if the library
-      // is missing from the install.
-      fs.exists('/usr/lib/x86_64-linux-gnu/libssl.so.0.9.8', function(exists) {
+      // else we assume we are running on Ubuntu or generic Linux and just
+      // report if the library is missing from the install.
+      fs.exists('/usr/lib64/libssl.so.0.9.8', function(exists) {
         if (!exists) {
-          console.error('Before using MQ Light on Linux, you will also need ' +
-              'the 0.9.8 version of an OpenSSL package. This version of the ' +
-              'package is not installed by default, so to use the module ' +
-              'you will need to install it.');
-          console.error();
-          console.error('* To install the package on Ubuntu, run: sudo ' +
-                        'apt-get install libssl0.9.8');
-          process.exit(1);
+          fs.exists('/usr/lib/x86_64-linux-gnu/libssl.so.0.9.8',
+                    function(exists) {
+                if (!exists) {
+                  console.error('Before using MQ Light on Linux, you will ' +
+                            'also need the 0.9.8 version of an OpenSSL ' +
+                            'package. This version of the package is not ' +
+                            'installed by default, so to use the module you ' +
+                            'will need to install it.');
+                  console.error();
+                  console.error('* To install the package on Ubuntu, run: ' +
+                            'sudo apt-get install libssl0.9.8');
+                  console.error('* To install the package on other distros ' +
+                            'refer to your package manager documentation');
+                  process.exit(1);
+                }
+              });
         }
       });
     }
