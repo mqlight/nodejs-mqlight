@@ -106,32 +106,36 @@ var header = function(lvl, clientId, options) {
  * @param {String} lvl The logging level to write at.
  */
 log.setLevel = function(lvl) {
-  logger.level = lvl;
+  if (logger.levels[lvl.toLowerCase()]) {
+    logger.level = lvl.toLowerCase();
 
-  header('header', log.NO_CLIENT_ID, {title: 'Log'});
+    header('header', log.NO_CLIENT_ID, {title: 'Log'});
 
-  if (logger.levels[logger.level] <= logger.levels.detail) {
-    // Set PN_TRACE_FRM if detailed data level logging is enabled.
-    log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
-    process.env['PN_TRACE_FRM'] = '1';
-    if (logger.levels[logger.level] <= logger.levels.raw) {
-      // Set PN_TRACE_RAW if raw level logging is enabled.
-      log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
-      process.env['PN_TRACE_RAW'] = '1';
-    } else {
-      log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
-      delete process.env['PN_TRACE_RAW'];
+    if (logger.levels[logger.level] <= logger.levels.detail) {
+      // Set PN_TRACE_FRM if detailed data level logging is enabled.
+      log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
+      process.env['PN_TRACE_FRM'] = '1';
+      if (logger.levels[logger.level] <= logger.levels.raw) {
+        // Set PN_TRACE_RAW if raw level logging is enabled.
+        log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
+        process.env['PN_TRACE_RAW'] = '1';
+      } else {
+        log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
+        delete process.env['PN_TRACE_RAW'];
+      }
     }
-  }
-  else {
-    if (process.env['PN_TRACE_RAW']) {
-      log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
-      delete process.env['PN_TRACE_RAW'];
+    else {
+      if (process.env['PN_TRACE_RAW']) {
+        log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
+        delete process.env['PN_TRACE_RAW'];
+      }
+      if (process.env['PN_TRACE_FRM']) {
+        log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
+        delete process.env['PN_TRACE_FRM'];
+      }
     }
-    if (process.env['PN_TRACE_FRM']) {
-      log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
-      delete process.env['PN_TRACE_FRM'];
-    }
+  } else {
+    console.error('ERROR: MQ Light log level \'' + lvl + '\' is invalid');
   }
 };
 
@@ -361,18 +365,18 @@ logger.addLevel('all', -Infinity, styles.inverse, 'all   ');
 logger.addLevel('data_often', -Infinity, styles.green, 'data  ');
 logger.addLevel('exit_often', -Infinity, styles.yellow, 'exit  ');
 logger.addLevel('entry_often', -Infinity, styles.yellow, 'entry ');
-logger.addLevel('raw', 500, styles.inverse, 'raw   ');
-logger.addLevel('detail', 800, styles.green, 'detail');
-logger.addLevel('debug', 1000, styles.inverse, 'debug ');
-logger.addLevel('emit', 1200, styles.green, 'emit  ');
-logger.addLevel('data', 1500, styles.green, 'data  ');
-logger.addLevel('parms', 2000, styles.yellow, 'parms ');
-logger.addLevel('header', 3000, styles.yellow, 'header');
-logger.addLevel('exit', 3000, styles.yellow, 'exit  ');
-logger.addLevel('entry', 3000, styles.yellow, 'entry ');
-logger.addLevel('entry_exit', 3000, styles.yellow, 'func  ');
-logger.addLevel('error', 5000, styles.red, 'error ');
-logger.addLevel('ffdc', 10000, styles.red, 'ffdc  ');
+logger.addLevel('raw', 200, styles.inverse, 'raw   ');
+logger.addLevel('detail', 300, styles.green, 'detail');
+logger.addLevel('debug', 500, styles.inverse, 'debug ');
+logger.addLevel('emit', 800, styles.green, 'emit  ');
+logger.addLevel('data', 1000, styles.green, 'data  ');
+logger.addLevel('parms', 1200, styles.yellow, 'parms ');
+logger.addLevel('header', 1500, styles.yellow, 'header');
+logger.addLevel('exit', 1500, styles.yellow, 'exit  ');
+logger.addLevel('entry', 1500, styles.yellow, 'entry ');
+logger.addLevel('entry_exit', 1500, styles.yellow, 'func  ');
+logger.addLevel('error', 1800, styles.red, 'error ');
+logger.addLevel('ffdc', 2000, styles.red, 'ffdc  ');
 
 
 /**
