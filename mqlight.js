@@ -488,47 +488,88 @@ Client.prototype.connect = function(callback) {
     }
 
     // Connect to one of the listed services
-    try {
-      // TODO - select a service (for now just select the first one)
-      var service = serviceList[0];
-      client.messenger.connect(service);
-      client.service = service;
-    } catch (err) {
-      // if there is an error connecting to the service then ensure state is
-      // disconnected
-      log.log('error', client.id, err);
-      client.disconnect();
-      process.nextTick(function() {
-        if (callback) {
-          log.entry('Client.connect.performConnect.callback', client.id);
-          callback(err);
-          log.exit('Client.connect.performConnect.callback', client.id, null);
+    var connectToService = function(client, serviceList, callback) {
+      log.entry('Client.connect.connectToService', client.id);
+      var connected = false;
+      var error = undefined;
+      for ( var i = 0; i < serviceList.length; i++) {
+        try {
+          var service = serviceList[i];
+          log.log('data', client.id, 'attempting connect to: '+service);
+          var err = client.messenger.connect(service);
+          if (!err) {
+            log.log('data', client.id, 'successfully connected to: '+service);
+            client.service = service;
+            connected = true;
+            break;
+          } else {
+            var errorText = client.messenger.getLastErrorText();
+            log.log('data', client.id, 'failed to connect to: '+service+
+                    ' error: '+err+' ('+errorText+')');
+            // If a fatal error then do not continue retrying
+            // error code -2, PN_ERR, is typically when we get a response from
+            // the network or server so assume it is recoverable, other errors
+            // (such as -5, PN_STATE_ERR, for an authorization issue) are
+            // non-recoverable.
+            if (err != -2) {
+              error = errorText;
+              break;
+            }
+          }
+        } catch (err) {
+          // Should not get here.
+          // Means that messenger.connect has been called in an invalid way
+          error = err;
+          log.log('data', client.id, err);
+          log.debug('ffdc', client.id, err);
+          break;
         }
-        log.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      });
-
-      log.exit('Client.connect.performConnect', client.id, null);
-      return;
-    }
-
-    // Indicate that we're connected
-    client.state = 'connected';
-    process.nextTick(function() {
-      log.log('emit', client.id, 'connected');
-      client.emit('connected');
-    });
-
-    if (callback) {
-      if (!(callback instanceof Function)) {
-        throw new TypeError('callback must be a function');
       }
-      process.nextTick(function() {
-        log.entry('Client.connect.performConnect.callback', client.id);
-        callback.apply(client);
-        log.exit('Client.connect.performConnect.callback', client.id, null);
-      });
-    }
+      
+      if (connected) {
+        // Indicate that we're connected
+        client.state = 'connected';
+        
+        process.nextTick(function() {
+          log.log('emit', client.id, 'connected');
+          client.emit('connected');
+        });
+
+        if (callback) {
+          process.nextTick(function() {
+            log.entry('Client.connect.performConnect.callback', client.id);
+            callback.apply(client);
+            log.exit('Client.connect.performConnect.callback', client.id, null);
+          });
+        }
+        
+      } else if (error) {
+        // A fatal connect error has occured so emit an error event and
+        // invoke the callback with the error
+        process.nextTick(function() {
+          if (callback) {
+            log.entry('Client.connect.performConnect.callback', client.id);
+            callback(error);
+            log.exit('Client.connect.performConnect.callback', client.id, null);
+          }
+          log.log('emit', client.id, 'error', error);
+          client.emit('error', error);
+        });
+        
+      } else {
+        // We've tried all services without success,
+        // pause for a while before trying again
+        // TODO 10 seconds is an arbtary value, need to review if this is
+        // appropriate.
+        log.log('data', client.id, 'trying connect again after 10 seconds');
+        setTimeout(connectToService, 10000, client, serviceList, callback);
+      }
+      
+      log.exit('Client.connect.connectToService', client.id, null);
+      return;
+    };
+
+    connectToService(client, serviceList, callback);
 
     log.exit('Client.connect.performConnect', client.id, null);
     return;

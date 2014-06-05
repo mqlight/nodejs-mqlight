@@ -66,6 +66,7 @@ protected:
     static v8::Handle<v8::Value> Settle(const v8::Arguments& args);
     static v8::Handle<v8::Value> HasOutgoing(v8::Local<v8::String> property,
                                              const v8::AccessorInfo &info);
+    static v8::Handle<v8::Value> GetLastErrorText(const v8::Arguments& args);
     static void Tracer(pn_transport_t *transport, const char *message);
 
     /**
@@ -90,6 +91,11 @@ protected:
      */
     pn_messenger_t *messenger;
 
+    /**
+     * The error message text for the last connect error. This is used by the GetLastErrorText method when we do not have
+     * a connection, as the error text comes from the proton messenger, which we free up on a connection error.
+     */
+    std::string lastConnectErrorText;
 };
 
 #endif /* MESSENGER_HPP */

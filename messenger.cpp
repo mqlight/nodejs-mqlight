@@ -76,6 +76,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
   NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
   NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "getLastErrorText", GetLastErrorText);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
   tpl->InstanceTemplate()->SetAccessor(String::New("hasOutgoing"),
@@ -353,12 +354,16 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   Proton::Log("parms", name, "substitution:", validationAddress.c_str());
   error = pn_messenger_route(obj->messenger, pattern.c_str(), validationAddress.c_str());
   Proton::Exit("pn_messenger_route", name, error);
-  if (error){
+  if (error) {
+	pn_messenger_free(obj->messenger);
+	obj->messenger = NULL;
     THROW_EXCEPTION("Failed to set messenger route", "ProtonMessenger::Connect", name);
   }
 
   // Indicate that the route should be validated
   if (pn_messenger_set_flags(obj->messenger, PN_FLAGS_CHECK_ROUTES)) {
+	pn_messenger_free(obj->messenger);
+	obj->messenger = NULL;
     THROW_EXCEPTION("Invalid set flags call", "ProtonMessenger::Connect", name);
   }
 
@@ -367,8 +372,11 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   error = pn_messenger_start(obj->messenger);
   Proton::Exit("pn_messenger_start", name, error);
   if (error) {
-    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Connect", name);
+	obj->lastConnectErrorText = pn_error_text(pn_messenger_error(obj->messenger));
+	pn_messenger_free(obj->messenger);
+	obj->messenger = NULL;
+  } else {
+	obj->lastConnectErrorText = "";
   }
 
   Proton::Exit("ProtonMessenger::Connect", name, error);
@@ -681,4 +689,22 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
 
   Proton::Exit("ProtonMessenger::Settle", name, 0);
   return scope.Close(Boolean::New(true));
+}
+
+Handle<Value> ProtonMessenger::GetLastErrorText(const Arguments& args) {
+  HandleScope scope;
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::GetLastErrorText", name);
+
+  const char *errorText;
+  if (obj->messenger) {
+	  errorText = pn_error_text(pn_messenger_error(obj->messenger));
+  } else {
+	  errorText = obj->lastConnectErrorText.c_str();
+  }
+
+  Proton::Exit("ProtonMessenger::GetLastErrorText", name, errorText);
+  return scope.Close(String::New(errorText));
 }
