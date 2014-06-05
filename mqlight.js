@@ -370,6 +370,8 @@ var Client = function(service, id, user, password) {
   // Set the initial state to disconnected
   this.state = 'disconnected';
   this.service = undefined;
+  //the first connect, set to false after connect and back to true on disconnect
+  this.firstConnect = true;
 
   // List of message subscriptions
   this.subscriptions = [];
@@ -461,104 +463,7 @@ Client.prototype.connect = function(callback) {
     client.state = 'connecting';
 
     // Connect to one of the required services, retrying if a connection cannot
-    // be successfully made
-    var connectToService = function(client, callback) {
-      log.entry('Client.connect.connectToService', client.id);
-
-      if (client.getState() === 'diconnecting' ||
-          client.getState() === 'diconnected') {
-        log.exit('Client.connect.connectToService', client.id, null);
-        if (callback) {
-          log.entry('Client.connect.performConnect.callback', client.id);
-          callback(new Error('connect aborted due to disconnect'));
-          log.exit('Client.connect.performConnect.callback', client.id, null);
-        }
-        return;
-      }
-
-      var connected = false;
-      var error = undefined;
-
-      var serviceList;
-      try {
-        // Obtain the list of services for connect
-        if (client.serviceFunction) {
-          var serviceFunction = client.serviceFunction();
-          serviceList = generateServiceList(serviceFunction);
-        } else {
-          serviceList = client.serviceList;
-        }
-      } catch (err) {
-        log.log('error', client.id, 'Error getting list of services. reason: ' +
-            err);
-        error = err;
-      }
-
-      // Try each service in turn until we can successfully connect, or exhaust
-      // the list
-      if (!error) {
-        for ( var i = 0; i < serviceList.length; i++) {
-          try {
-            var service = serviceList[i];
-            log.log('data', client.id, 'attempting connect to: ' + service);
-            var err = client.messenger.connect(service);
-            if (!err) {
-              log.log('data', client.id, 'successfully connected to: ' +
-                  service);
-              client.service = service;
-              connected = true;
-              break;
-            } else {
-              error = new Error(client.messenger.getLastErrorText());
-              log.log('data', client.id, 'failed to connect to: ' + service +
-                  ' due to error: ' + error);
-            }
-          } catch (err) {
-            // Should not get here.
-            // Means that messenger.connect has been called in an invalid way
-            error = err;
-            log.log('data', client.id, err);
-            log.debug('ffdc', client.id, err);
-            throw err;
-          }
-        }
-      }
-
-      // If we've successfully connected then we're done, otherwise we'll retry
-      if (connected) {
-        // Indicate that we're connected
-        client.state = 'connected';
-
-        process.nextTick(function() {
-          log.log('emit', client.id, 'connected');
-          client.emit('connected');
-        });
-
-        if (callback) {
-          process.nextTick(function() {
-            log.entry('Client.connect.performConnect.callback', client.id);
-            callback.apply(client);
-            log.exit('Client.connect.performConnect.callback', client.id, null);
-          });
-        }
-
-      } else {
-        // We've tried all services without success. Pause for a while before
-        // trying again
-        // TODO 10 seconds is an arbtary value, need to review if this is
-        // appropriate.
-        log.log('emit', client.id, 'error', error);
-        client.emit('error', error);
-        client.state = 'retrying';
-        log.log('data', client.id, 'trying connect again after 10 seconds');
-        setTimeout(connectToService, 10000, client, callback);
-      }
-
-      log.exit('Client.connect.connectToService', client.id, null);
-      return;
-    };
-
-    connectToService(client, callback);
+    client.connectToService(client, callback);
 
     log.exit('Client.connect.performConnect', client.id, null);
     return;
@@ -588,6 +493,116 @@ Client.prototype.connect = function(callback) {
 
   log.exit('Client.connect', client.id, client);
   return client;
+};
+
+/**
+* Function to connect to the service, trys each available service
+* in turn. If none can connect it emits an error, waits and 
+* attempts to connect again. Callback happens once a succesful 
+* connect/reconnect occurs. 
+*/
+Client.prototype.connectToService = function(client, callback) {
+  log.entry('Client.connect.connectToService', client.id);
+
+  if (client.getState() === 'diconnecting' ||
+      client.getState() === 'diconnected') {
+    log.exit('Client.connect.connectToService', client.id, null);
+    if (callback) {
+      log.entry('Client.connect.performConnect.callback', client.id);
+      callback(new Error('connect aborted due to disconnect'));
+      log.exit('Client.connect.performConnect.callback', client.id, null);
+    }
+    return;
+  }
+
+  var connected = false;
+  var error = undefined;
+
+  var serviceList;
+  try {
+    // Obtain the list of services for connect
+    if (client.serviceFunction) {
+      var serviceFunction = client.serviceFunction();
+      serviceList = generateServiceList(serviceFunction);
+    } else {
+      serviceList = client.serviceList;
+    }
+  } catch (err) {
+    log.log('error', client.id, 'Error getting list of services. reason: ' +
+        err);
+    error = err;
+  }
+
+  // Try each service in turn until we can successfully connect, or exhaust
+  // the list
+  if (!error) {
+    for ( var i = 0; i < serviceList.length; i++) {
+      try {
+        var service = serviceList[i];
+        log.log('data', client.id, 'attempting connect to: ' + service);
+        var err = client.messenger.connect(service);
+        if (!err) {
+          log.log('data', client.id, 'successfully connected to: ' +
+              service);
+          client.service = service;
+          connected = true;
+          break;
+        } else {
+          error = new Error(client.messenger.getLastErrorText());
+          log.log('data', client.id, 'failed to connect to: ' + service +
+              ' due to error: ' + error);
+        }
+      } catch (err) {
+        // Should not get here.
+        // Means that messenger.connect has been called in an invalid way
+        error = err;
+        log.log('data', client.id, err);
+        log.debug('ffdc', client.id, err);
+        throw err;
+      }
+    }
+  }
+
+  // If we've successfully connected then we're done, otherwise we'll retry
+  if (connected) {
+    // Indicate that we're connected
+    client.state = 'connected';
+    
+    if ( client.firstConnect ) {
+      process.nextTick(function() {
+        log.log('emit', client.id, 'connected');
+        client.firstConnect = false;
+        client.emit('connected');
+      });
+    } else {
+      process.nextTick(function() {
+        log.log('emit', client.id, 'reconnected');
+        client.emit('reconnected');
+      });
+    }
+
+    if (callback) {
+      process.nextTick(function() {
+        log.entry('Client.connect.performConnect.callback', client.id);
+        callback.apply(client);
+        log.exit('Client.connect.performConnect.callback', client.id, null);
+      });
+    }
+
+  } else {
+    // We've tried all services without success. Pause for a while before
+    // trying again
+    // TODO 10 seconds is an arbtary value, need to review if this is
+    // appropriate. Timeout should be adjusted based on reconnect algo.
+    log.log('emit', client.id, 'error', error);
+    client.emit('error', error);
+    client.state = 'retrying';
+    log.log('data', client.id, 'trying connect again after 10 seconds');
+    setTimeout(client.connectToService, 10000, client, callback);
+  }
+
+  log.exit('Client.connect.connectToService', client.id, null);
+  return;
 };
 
 /**
@@ -644,6 +659,7 @@ Client.prototype.disconnect = function(callback) {
       process.nextTick(function() {
         log.log('emit', client.id, 'disconnected');
         client.emit('disconnected');
+        client.firstConnect = true;
       });
       if (callback) {
         process.nextTick(function() {
@@ -689,6 +705,13 @@ Client.prototype.disconnect = function(callback) {
   return client;
 };
 
+/**
+* TODO Flesh this out for reconnects after a connection broken.
+*/
+Client.prototype.reconnect = function() {
+  log.entry('Client.reconnect');
+  log.exit('Client.reconnect', client.id, client);
+};
 
 /**
  * @return {String} The identifier associated with the client. This will
