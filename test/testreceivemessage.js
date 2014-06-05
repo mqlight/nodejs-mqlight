@@ -57,6 +57,53 @@ var testMessage = function(sentTopic, subscribedPattern) {
  */
 module.exports.test_receive_message = function(test) {
   var originalReceiveMethod = mqlight.proton.messenger.receive;
+  mqlight.proton.messenger.receive = function() {};
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+  client.connect(function() {
+    client.subscribe('/kittens/#');
+    client.subscribe('/kittens/+/boots');
+  });
+
+  var first = true;
+  client.on('message', function(data, delivery) {
+    if (first) {
+      test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
+      first = false;
+    } else {
+      test.deepEqual(delivery.destination.topicPattern, '/kittens/+/boots');
+      test.done();
+      client.disconnect();
+      mqlight.proton.messenger.receive = originalReceiveMethod;
+    }
+  });
+
+  client.on('malformed', function() {
+    test.ok(false, 'malformed event should not be emitted');
+  });
+
+  client.on('error', function(err) {
+    console.log(err, 'error event should not be emitted');
+    test.ok(false);
+  });
+
+  var messages = [testMessage('/kittens/wearing/boots', '/kittens/#'),
+                  testMessage('/kittens/wearing/boots', '/kittens/+/boots')];
+  mqlight.proton.messenger.receive = function() {
+    var result = messages;
+    messages = [];
+    return result;
+  };
+};
+
+
+/**
+ * Test that receiving a message on multiple subscriber patterns have the
+ * correct topicPattern on the emitted message.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_receive_topic_pattern = function(test) {
+  var originalReceiveMethod = mqlight.proton.messenger.receive;
   var messages = [testMessage('/kittens/boots', '/kittens/#')];
   mqlight.proton.messenger.receive = function() {
     var result = messages;
@@ -129,6 +176,7 @@ module.exports.test_bad_listener = function(test) {
     }
   };
   process.addListener('uncaughtException', handler);
+  client.on('error', handler);
 
   client.connect(function() {
     var first = true;

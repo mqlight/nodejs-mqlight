@@ -1142,10 +1142,13 @@ Client.prototype.checkForMessages = function() {
             throw new Error('No listener for "malformed" event.');
           }
         } else {
-          process.nextTick(function() {
-            log.log('emit', client.id, 'message', data, delivery);
+          log.log('emit', client.id, 'message', data, delivery);
+          try {
             client.emit('message', data, delivery);
-          });
+          } catch (err) {
+            log.log('emit', client.id, 'error', err);
+            client.emit('error', err);
+          }
         }
         if (qos === exports.QOS_AT_MOST_ONCE) {
           messenger.accept(protonMsg);
