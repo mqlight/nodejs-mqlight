@@ -497,20 +497,23 @@ Client.prototype.connect = function(callback) {
 
 /**
 * Function to connect to the service, trys each available service
-* in turn. If none can connect it emits an error, waits and 
-* attempts to connect again. Callback happens once a succesful 
-* connect/reconnect occurs. 
+* in turn. If none can connect it emits an error, waits and
+* attempts to connect again. Callback happens once a successful
+* connect/reconnect occurs.
+* @param {Client} client object you want to connect.
+* @param {connectCallback}
+*  - callback called when connect/reconnect happens
 */
 Client.prototype.connectToService = function(client, callback) {
-  log.entry('Client.connect.connectToService', client.id);
+  log.entry('Client.connectToService', client.id);
 
   if (client.getState() === 'diconnecting' ||
       client.getState() === 'diconnected') {
-    log.exit('Client.connect.connectToService', client.id, null);
+    log.exit('Client.connectToService', client.id, null);
     if (callback) {
-      log.entry('Client.connect.performConnect.callback', client.id);
+      log.entry('Client.connectToService.callback', client.id);
       callback(new Error('connect aborted due to disconnect'));
-      log.exit('Client.connect.performConnect.callback', client.id, null);
+      log.exit('Client.connectToService.callback', client.id, null);
     }
     return;
   }
@@ -536,7 +539,7 @@ Client.prototype.connectToService = function(client, callback) {
   // Try each service in turn until we can successfully connect, or exhaust
   // the list
   if (!error) {
-    for ( var i = 0; i < serviceList.length; i++) {
+    for (var i = 0; i < serviceList.length; i++) {
       try {
         var service = serviceList[i];
         log.log('data', client.id, 'attempting connect to: ' + service);
@@ -567,25 +570,24 @@ Client.prototype.connectToService = function(client, callback) {
   if (connected) {
     // Indicate that we're connected
     client.state = 'connected';
-    
-    if ( client.firstConnect ) {
-      process.nextTick(function() {
-        log.log('emit', client.id, 'connected');
-        client.firstConnect = false;
-        client.emit('connected');
-      });
+    var status;
+    if (client.firstConnect) {
+      status = 'connected';
+      client.firstConnect = false;
     } else {
-      process.nextTick(function() {
-        log.log('emit', client.id, 'reconnected');
-        client.emit('reconnected');
-      });
+      status = 'reconnected';
     }
+
+    process.nextTick(function() {
+      log.log('emit', client.id, status);
+      client.emit(status);
+    });
 
     if (callback) {
       process.nextTick(function() {
-        log.entry('Client.connect.performConnect.callback', client.id);
+        log.entry('Client.connectToService.callback', client.id);
         callback.apply(client);
-        log.exit('Client.connect.performConnect.callback', client.id, null);
+        log.exit('Client.connectToService.callback', client.id, null);
       });
     }
 
@@ -601,7 +603,7 @@ Client.prototype.connectToService = function(client, callback) {
     setTimeout(client.connectToService, 10000, client, callback);
   }
 
-  log.exit('Client.connect.connectToService', client.id, null);
+  log.exit('Client.connectToService', client.id, null);
   return;
 };
 
