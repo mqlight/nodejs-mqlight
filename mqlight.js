@@ -575,17 +575,17 @@ Client.prototype.connectToService = function(client, callback) {
   if (connected) {
     // Indicate that we're connected
     client.state = 'connected';
-    var status;
+    var statusClient;
     if (client.firstConnect) {
-      status = 'connected';
+      statusClient = 'connected';
       client.firstConnect = false;
     } else {
-      status = 'reconnected';
+      statusClient = 'reconnected';
     }
 
     process.nextTick(function() {
-      log.log('emit', client.id, status);
-      client.emit(status);
+      log.log('emit', client.id, statusClient);
+      client.emit(statusClient);
     });
 
     if (callback) {
@@ -719,6 +719,20 @@ Client.prototype.disconnect = function(callback) {
 */
 Client.prototype.reconnect = function() {
   log.entry('Client.reconnect');
+  var client = this;
+  //stop the messenger to free the object then attempt a reconnect
+  client.messenger.stop();
+
+  //clear the subscriptions list, if the cause of the reconnect happens
+  //during check for messages we need a 0 length so it will check once
+  //reconnected.
+  //TODO need to resubscribe to the existing subs so this logic may change
+  while (client.subscriptions.length > 0) {
+    client.subscriptions.pop();
+  }
+  //timeout to allow the original error to get output before the first
+  //reconnect attempt
+  setTimeout(client.connectToService, 0, client);
   log.exit('Client.reconnect', client.id, client);
 };
 
@@ -1012,7 +1026,6 @@ Client.prototype.send = function(topic, data, options, callback) {
     //error condition so won't retry send need to remove it from list of unsent
     index = client.outstandingSends.indexOf(localMessageId);
     if (index >= 0) client.outstandingSends.splice(index, 1);
-    client.disconnect();
     process.nextTick(function() {
       if (callback) {
         log.entry('Client.send.callback', client.id);
@@ -1024,6 +1037,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         client.emit('error', err);
       }
     });
+    client.reconnect();
   }
 
   log.exit('Client.send', this.id, null);
@@ -1172,11 +1186,11 @@ Client.prototype.checkForMessages = function() {
     }
   } catch (err) {
     log.log('error', client.id, err);
-    client.disconnect();
     process.nextTick(function() {
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
     });
+    client.reconnect();
   }
 
   log.exitLevel('entry_often', 'checkForMessages', client.id);
@@ -1376,7 +1390,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     if (err) {
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
-      client.disconnect();
+      client.reconnect();
     }
   });
 
