@@ -21,8 +21,18 @@ var DEBUG = false;
   
 var connectStatus = 0;
 exports.setConnectStatus = function(status) {
-  if (DEBUG) console.log("setting connect status to: "+status);
+  if (DEBUG) console.log('setting connect status to: '+status);
   connectStatus = status;
+}
+
+var sendStatus = 7; // PN_STATUS_SETTLED = 7
+exports.blockSendCompletion = function() {
+  if (DEBUG) console.log('blocking send completion');
+  sendStatus = 1; // PN_STATUS_PENDING = 1
+}
+exports.unblockSendCompletion = function() {
+  if (DEBUG) console.log('unblocking send completion');
+  sendStatus = 7;
 }
 
 /**
@@ -36,8 +46,8 @@ module.exports.createProtonStub = function() {
 	      if (DEBUG) console.log('stub send function called');
 	    },
 	    status: function() {
-	      if (DEBUG) console.log('stub status function called');
-	      return 7; // PN_STATUS_SETTLED = 7;
+	      if (DEBUG) console.log('stub status function called, returning: ', sendStatus);
+	      return sendStatus;
 	    },
 	    accept: function() {
 	        if (DEBUG) console.log('stub accept function called');

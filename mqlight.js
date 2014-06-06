@@ -447,10 +447,10 @@ Client.prototype.connect = function(callback) {
     // if we are not disconnected or disconnecting return with the client object
     if (currentState !== 'disconnected') {
       if (currentState === 'disconnecting') {
-        process.nextTick(function() {
+        setImmediate(function() {
           stillDisconnecting(client, callback);
         });
-        // TODO should we return here (a bug if not?)
+        return;
       } else {
         process.nextTick(function() {
           if (callback) {
@@ -480,7 +480,7 @@ Client.prototype.connect = function(callback) {
     log.entry('stillDisconnecting', client.id);
 
     if (client.getState() === 'disconnecting') {
-      process.nextTick(function() {
+      setImmediate(function() {
         stillDisconnecting(client, callback);
       });
     } else {
@@ -515,12 +515,12 @@ Client.prototype.connectToService = function(client, callback) {
 
   if (client.getState() === 'diconnecting' ||
       client.getState() === 'diconnected') {
-    log.exit('Client.connectToService', client.id, null);
     if (callback) {
       log.entry('Client.connectToService.callback', client.id);
       callback(new Error('connect aborted due to disconnect'));
       log.exit('Client.connectToService.callback', client.id, null);
     }
+    log.exit('Client.connectToService', client.id, null);
     return;
   }
 

@@ -215,3 +215,25 @@ module.exports.test_connect_variable_endpoints = function(test) {
     test.done();
   });
 };
+
+/**
+ * Tests that calling connect whilst still disconnecting will be
+ * successful only when the disconnect completes
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_disconnect_timing = function(test) {
+  var client = mqlight.createClient({
+    service : 'amqp://host'
+  });
+  client.connect(function() {
+    stubproton.blockSendCompletion();
+    client.send('topic', 'message');
+    client.disconnect();
+    client.connect(function(err) {
+      test.ok(err == undefined);
+      client.disconnect();
+      test.done();
+    });
+    setTimeout(stubproton.unblockSendCompletion, 10);
+  });
+};
