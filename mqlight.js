@@ -556,7 +556,7 @@ Client.prototype.connect = function(callback) {
 
     // Obtain the list of services for connect and connect to one of the
     // services, retrying until a connection can be established
-    if (client.serviceFunction) {
+    if (client.serviceFunction instanceof Function) {
       client.serviceFunction(function(err, service) {
         if (err) {
           log.entry('Client.connect.performConnect.serviceFunction.callback',
@@ -570,7 +570,7 @@ Client.prototype.connect = function(callback) {
         }
       });
     } else {
-      connectToService(callback);
+      client.connectToService(callback);
     }
 
     log.exit('Client.connect.performConnect', client.id, null);
@@ -688,14 +688,14 @@ Client.prototype.connectToService = function(callback) {
   } else {
     // We've tried all services without success. Pause for a while before
     // trying again
-    // TODO 10 seconds is an arbtary value, need to review if this is
+    // TODO 10 seconds is an arbitrary value, need to review if this is
     // appropriate. Timeout should be adjusted based on reconnect algo.
     log.log('emit', client.id, 'error', error);
     client.emit('error', error);
     client.state = 'retrying';
     log.log('data', client.id, 'trying connect again after 10 seconds');
-    setTimeout(client.connectToService, CONNECT_RETRY_INTERVAL,
-               client, callback);
+    var retry = function() { client.connectToService(callback); };
+    setTimeout(retry, CONNECT_RETRY_INTERVAL);
   }
 
   log.exit('Client.connectToService', client.id, null);
@@ -704,7 +704,7 @@ Client.prototype.connectToService = function(callback) {
 
 /**
  * @param {function(object)}
- *          disconnectCallback - callback, passed an error object if someting
+ *          disconnectCallback - callback, passed an error object if something
  *          goes wrong.
  * @param {String}
  *          err - an error message if a problem occurred.
