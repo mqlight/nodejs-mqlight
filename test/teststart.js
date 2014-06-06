@@ -164,8 +164,8 @@ module.exports.test_connect_retry = function(test) {
 };
 
 /**
- * Tests that calling connect with multiple endpoints, some bad, that valid
- * endpoints are successfully connected.
+ * Tests that calling connect with multiple endpoints, some bad and some valid,
+ * that the connect will be successful and connect to a valid endpoint.
  * 
  * @param {object} test the unittest interface
  */
@@ -186,8 +186,9 @@ module.exports.test_connect_multiple_endpoints = function(test) {
 };
 
 /**
- * Tests that calling connect with a function to specify endpoints will keep
- * retrying and calling the function until a valid endpoint can be connected to.
+ * Tests that calling connect with a function to specify the endpoints, that the
+ * connect operation will keep retrying, calling the function again for each
+ * retry, until a valid endpoint can be connected to.
  * @param {object} test the unittest interface
  */
 module.exports.test_connect_variable_endpoints = function(test) {
