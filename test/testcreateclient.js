@@ -266,7 +266,6 @@ module.exports.test_valid_URIs = function(test) {
                   {uri: 'aMqP://HoSt:1234', expected: 'amqp://host:1234'},
                   {uri: 'AmQpS://hOsT:4321', expected: 'amqps://host:4321'}];
   var count = 0;
-
   var clientTest = function(uri, expected) {
     var client = mqlight.createClient({service: uri});
     client.connect(function(err) {
@@ -274,13 +273,15 @@ module.exports.test_valid_URIs = function(test) {
       test.equals(expected, client.getService());
       client.disconnect();
       ++count;
-      if (count == testData.length) test.done();
+      if (count == testData.length) {
+        test.done();
+      } else {
+        clientTest(testData[count].uri, testData[count].expected);
+      }
     });
   };
 
-  for (var i = 0; i < testData.length; ++i) {
-    clientTest(testData[i].uri, testData[i].expected);
-  }
+  clientTest(testData[count].uri, testData[count].expected);
 };
 
 

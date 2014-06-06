@@ -21,6 +21,7 @@
 /** @const {string} enable unittest mode in mqlight.js */
 process.env.NODE_ENV = 'unittest';
 
+var stubproton = require('./stubs/stubproton');
 var mqlight = require('../mqlight');
 var testCase = require('nodeunit').testCase;
 
@@ -138,4 +139,78 @@ module.exports.test_connect_too_many_arguments = function(test) {
     client.disconnect();
     test.done();
   }, 'gooseberry');
+};
+
+/**
+ * Tests that calling connect to an enpoint that is currently down retries
+ * until successful.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_retry = function(test) {
+  var client = mqlight.createClient({service : 'amqp://host'});
+  var requiredConnectStatus = 2;
+
+  client.on('error', function(err) {
+    requiredConnectStatus--;
+    stubproton.setConnectStatus(requiredConnectStatus);
+  });
+
+  stubproton.setConnectStatus(requiredConnectStatus);
+  client.connect(function() {
+    test.equals(requiredConnectStatus, 0);
+    client.disconnect();
+    test.done();
+  });
+};
+
+/**
+ * Tests that calling connect with multiple endpoints, some bad, that valid
+ * endpoints are successfully connected.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_multiple_endpoints = function(test) {
+  var services = new Array();
+  services[0] = 'amqp://bad1';
+  services[1] = 'amqp://bad2';
+  services[2] = 'amqp://host';
+  services[3] = 'amqp://bad3';
+  var client = mqlight.createClient({
+    service : services
+  });
+  client.connect(function() {
+    test.equals(client.getService(), 'amqp://host:5672');
+    client.disconnect();
+    test.done();
+  });
+};
+
+/**
+ * Tests that calling connect with a function to specify endpoints will keep
+ * retrying and calling the function until a valid endpoint can be connected to.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_variable_endpoints = function(test) {
+  var services = new Array();
+  services[0] = 'amqp://bad1';
+  services[1] = 'amqp://bad2';
+  services[2] = 'amqp://host:1234';
+  services[3] = 'amqp://bad3';
+  var index = 0;
+  var client = mqlight.createClient({
+    service : function() {
+      test.ok(index < services.length);
+      var result = services[index];
+      index++;
+      return result;
+    }
+  });
+  client.on('error', function(err) {
+    test.ok(err.message.indexOf('amqp://bad') != -1);
+  });
+  client.connect(function() {
+    test.equals(client.getService(), 'amqp://host:1234');
+    client.disconnect();
+    test.done();
+  });
 };

@@ -17,12 +17,18 @@
  * </copyright>
  */
 
+var DEBUG = false;
+  
+var connectStatus = 0;
+exports.setConnectStatus = function(status) {
+  if (DEBUG) console.log("setting connect status to: "+status);
+  connectStatus = status;
+}
+
 /**
  * A no-function stub for the native Proton code.
  */
 module.exports.createProtonStub = function() {
-
-  var DEBUG = false;
   
 	return {
 	   messenger : {
@@ -39,10 +45,28 @@ module.exports.createProtonStub = function() {
 	    settle: function() {
 	      if (DEBUG) console.log('stub settle function called');
 	    },
-	    connect: function() {
-	      if (DEBUG) console.log('stub connect function called');
-	      this.stopped = false;
-	    },
+      connect: function(service) {
+        if (DEBUG) console.log('stub connect function called for service: ' + service);
+        if (!this.stopped) throw new Error("already connected");
+        var result;
+        if (service.indexOf('bad') != -1) {
+          result = -2;
+          this.lastErrorText = 'bad service '+service;
+          if (DEBUG) console.log('connect will fail, error: ' + this.lastErrorText);
+        } else {
+          if (connectStatus != 0) {
+            this.lastErrorText = 'connect error: ' + connectStatus;
+            if (DEBUG) console.log('connect will fail, error: ' + this.lastErrorText);
+          } else {
+            this.lastErrorText = '';
+            this.stopped = false;
+            if (DEBUG) console.log('successfully connected');
+          }
+          result = connectStatus;
+        }
+        if (DEBUG) console.log('stub connect function returning ' + result);
+        return result;
+      },
 	    receive: function() {
 	      // Commented - as generates a lot of output...
 	      // if (DEBUG) console.log('stub receive function called');
@@ -62,11 +86,19 @@ module.exports.createProtonStub = function() {
 	    stopped: true,
 	    subscribe: function() {
 	      if (DEBUG) console.log('stub subscribe function called');
-	    }
+	    },
+	    lastErrorText: '',
+	    getLastErrorText: function() {
+        if (DEBUG) console.log('stub getLastErrorText function called, returning: '+this.lastErrorText);
+        return this.lastErrorText;
+      }
 	  },
 	  
 	  createMessenger : function() {
 			if (DEBUG) console.log('stub createMessenger function called');
+			connectStatus = 0;
+			this.messenger.lastErrorText = '';
+			this.messenger.stopped = true;
 			return this.messenger;
 		},
 		

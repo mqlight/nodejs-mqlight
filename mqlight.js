@@ -113,6 +113,11 @@ PN_STATUS_ABORTED = 6;
 PN_STATUS_SETTLED = 7;
 
 
+/** The connection retry interval in milliseconds. */
+CONNECT_RETRY_INTERVAL = 10000;
+if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
+
+
 /**
  * Constructs a new Client object in the disconnected state.
  * <p>
@@ -495,6 +500,7 @@ Client.prototype.connect = function(callback) {
   return client;
 };
 
+
 /**
 * Function to connect to the service, trys each available service
 * in turn. If none can connect it emits an error, waits and
@@ -559,8 +565,7 @@ Client.prototype.connectToService = function(client, callback) {
         // Should not get here.
         // Means that messenger.connect has been called in an invalid way
         error = err;
-        log.log('data', client.id, err);
-        log.debug('ffdc', client.id, err);
+        log.ffdc('Client.connectToService', 'ffdc001', client.id, err);
         throw err;
       }
     }
@@ -600,7 +605,8 @@ Client.prototype.connectToService = function(client, callback) {
     client.emit('error', error);
     client.state = 'retrying';
     log.log('data', client.id, 'trying connect again after 10 seconds');
-    setTimeout(client.connectToService, 10000, client, callback);
+    setTimeout(client.connectToService, CONNECT_RETRY_INTERVAL,
+               client, callback);
   }
 
   log.exit('Client.connectToService', client.id, null);
@@ -707,6 +713,7 @@ Client.prototype.disconnect = function(callback) {
   return client;
 };
 
+
 /**
 * TODO Flesh this out for reconnects after a connection broken.
 */
@@ -714,6 +721,7 @@ Client.prototype.reconnect = function() {
   log.entry('Client.reconnect');
   log.exit('Client.reconnect', client.id, client);
 };
+
 
 /**
  * @return {String} The identifier associated with the client. This will
