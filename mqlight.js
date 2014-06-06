@@ -725,14 +725,17 @@ Client.prototype.reconnect = function() {
 
   //clear the subscriptions list, if the cause of the reconnect happens
   //during check for messages we need a 0 length so it will check once
-  //reconnected.
+  //reconnected. Also clear any left over outstanding sends
   //TODO need to resubscribe to the existing subs so this logic may change
   while (client.subscriptions.length > 0) {
     client.subscriptions.pop();
   }
+  while (client.outstandingSends.length > 0) {
+    client.outstandingSends.pop();
+  }
   //timeout to allow the original error to get output before the first
   //reconnect attempt
-  setTimeout(client.connectToService, 0, client);
+  setImmediate(client.connectToService, client);
   log.exit('Client.reconnect', client.id, client);
 };
 
@@ -1032,12 +1035,10 @@ Client.prototype.send = function(topic, data, options, callback) {
         callback(err, protonMsg);
         log.exit('Client.send.callback', client.id, null);
       }
-      if (err) {
-        log.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      }
+      log.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+      client.reconnect();
     });
-    client.reconnect();
   }
 
   log.exit('Client.send', this.id, null);
@@ -1189,8 +1190,8 @@ Client.prototype.checkForMessages = function() {
     process.nextTick(function() {
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
+      client.reconnect();
     });
-    client.reconnect();
   }
 
   log.exitLevel('entry_often', 'checkForMessages', client.id);
