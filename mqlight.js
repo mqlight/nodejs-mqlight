@@ -614,6 +614,9 @@ Client.prototype.connect = function(callback) {
 */
 Client.prototype.connectToService = function(callback) {
   var client = this;
+  if (!client) {
+    throw Error("AAAHAHH");
+  }
   log.entry('Client.connectToService', client.id);
 
   if (client.getState() === 'diconnecting' ||
@@ -695,7 +698,22 @@ Client.prototype.connectToService = function(callback) {
     client.state = 'retrying';
     log.log('data', client.id, 'trying connect again after 10 seconds');
     var retry = function() { client.connectToService(callback); };
-    setTimeout(retry, CONNECT_RETRY_INTERVAL);
+
+    // if client is using serviceFunction, re-generate the list of services
+    // TODO: merge these copy & paste
+    if (client.serviceFunction instanceof Function) {
+      client.serviceFunction(function(err, service) {
+        if (err) {
+          log.log('emit', client.id, 'error', err);
+          client.emit('error', err);
+        } else {
+          client.serviceList = generateServiceList(service);
+          setTimeout(retry, CONNECT_RETRY_INTERVAL);
+        }
+      });
+    } else {
+      setTimeout(retry, CONNECT_RETRY_INTERVAL);
+    }
   }
 
   log.exit('Client.connectToService', client.id, null);
@@ -820,7 +838,7 @@ Client.prototype.reconnect = function() {
   // stop the messenger to free the object then attempt a reconnect
   client.messenger.stop();
 
-  // Clear the subscriptions list, if the cause of the reconnect happens during
+  // clear the subscriptions list, if the cause of the reconnect happens during
   // check for messages we need a 0 length so it will check once reconnected.
   // TODO: need to resubscribe to the existing subs so this logic may change
   while (client.subscriptions.length > 0) {
@@ -830,9 +848,22 @@ Client.prototype.reconnect = function() {
   while (client.outstandingSends.length > 0) {
     client.outstandingSends.pop();
   }
-  // timeout to allow the original error to get output before the first
-  // reconnect attempt
-  setImmediate(client.connectToService, undefined);
+
+  // if client is using serviceFunction, re-generate the list of services
+  // TODO: merge these copy & paste
+  if (client.serviceFunction instanceof Function) {
+    client.serviceFunction(function(err, service) {
+      if (err) {
+        log.log('emit', client.id, 'error', err);
+        client.emit('error', err);
+      } else {
+        client.serviceList = generateServiceList(service);
+        client.connectToService(undefined);
+      }
+    });
+  } else {
+    setImmediate(client.connectToService, undefined);
+  }
 
   log.exit('Client.reconnect', client.id, client);
   return client;

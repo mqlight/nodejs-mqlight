@@ -192,19 +192,19 @@ module.exports.test_connect_multiple_endpoints = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_connect_variable_endpoints = function(test) {
-  var services = new Array();
-  services[0] = 'amqp://bad1';
-  services[1] = 'amqp://bad2';
-  services[2] = 'amqp://host:1234';
-  services[3] = 'amqp://bad3';
+var services = ['amqp://bad1',
+                'amqp://bad2',
+                'amqp://host:1234',
+                'amqp://bad3'];
   var index = 0;
+  var serviceFunction = function(callback) {
+    console.log("serviceFunction %d\n", index);
+    test.ok(index < services.length);
+    var result = services[index++];
+    callback(undefined, result);
+  };
   var client = mqlight.createClient({
-    service : function() {
-      test.ok(index < services.length);
-      var result = services[index];
-      index++;
-      return result;
-    }
+    service: serviceFunction
   });
   client.on('error', function(err) {
     test.ok(err.message.indexOf('amqp://bad') != -1);

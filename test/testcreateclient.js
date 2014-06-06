@@ -231,7 +231,6 @@ module.exports.test_invalid_URIs = function(test) {
                      'amqp://here:34/path',
                      'amqp://rupert:password@NotThere',
                      'amqp://:34',
-                     'http://host',
                      "c'est ne pas une uri"];
   test.expect(invalidUris.length);
   for (var i = 0; i < invalidUris.length; i++) {
