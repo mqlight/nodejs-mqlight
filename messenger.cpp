@@ -333,14 +333,18 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   	hostandport = index >= 0 ? address.substr(index+2) : address;
   }
   std::string validationAddress;
+  std::string traceValidationAddress;
   if ( username.length() > 0){
     if ( password.length() > 0 ){
-      validationAddress = "amqp://" + username + ":" + password + "@" + hostandport + "/$1";
+      validationAddress      = "amqp://" + username + ":" + password   + "@" + hostandport + "/$1";
+      traceValidationAddress = "amqp://" + username + ":" + "********" + "@" + hostandport + "/$1";
     } else {
       validationAddress = "amqp://" + username + "@" + hostandport + "/$1";
+      traceValidationAddress = validationAddress;
     }
   } else {
     validationAddress = address + "/$1";
+    traceValidationAddress = validationAddress;
   }
 
   /*
@@ -351,7 +355,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   std::string pattern = "amqp://"+hostandport+"/*";
   Proton::Entry("pn_messenger_route", name);
   Proton::Log("parms", name, "pattern:", pattern.c_str());
-  Proton::Log("parms", name, "substitution:", validationAddress.c_str());
+  Proton::Log("parms", name, "substitution:", traceValidationAddress.c_str());
   error = pn_messenger_route(obj->messenger, pattern.c_str(), validationAddress.c_str());
   Proton::Exit("pn_messenger_route", name, error);
   if (error) {
