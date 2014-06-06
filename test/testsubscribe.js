@@ -241,7 +241,7 @@ module.exports.test_subscribe_fail_callback = function(test) {
 module.exports.test_subscribe_when_disconnected = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
   test.throws(function() {
-    client.subscrinbe('/foo');
+    client.subscribe('/foo');
   }, Error);
   test.done();
 };

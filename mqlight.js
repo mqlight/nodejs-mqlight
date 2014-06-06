@@ -614,9 +614,6 @@ Client.prototype.connect = function(callback) {
 */
 Client.prototype.connectToService = function(callback) {
   var client = this;
-  if (!client) {
-    throw Error("AAAHAHH");
-  }
   log.entry('Client.connectToService', client.id);
 
   if (client.getState() === 'diconnecting' ||
@@ -862,7 +859,9 @@ Client.prototype.reconnect = function() {
       }
     });
   } else {
-    setImmediate(client.connectToService, undefined);
+    setImmediate(function() { 
+      client.connectToService.apply(client, undefined);
+    });
   }
 
   log.exit('Client.reconnect', client.id, client);
