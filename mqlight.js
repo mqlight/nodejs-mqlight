@@ -61,6 +61,7 @@ var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 var uuid = require('node-uuid');
 var url = require('url');
+var http = require('http');
 
 var validClientIdChars =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%/._';
@@ -273,6 +274,86 @@ var generateServiceList = function(service) {
 };
 
 
+/**
+ * Function to take a single HTTP URL and using the JSON retrieved from it to
+ * return an array of service URLs.
+ *
+ * @param {String}
+ *          serviceUrl - Required; an HTTP address to retrieve service info
+ *          from.
+ * @return {Array} a list of AMQP service URLs retrieved from the URL.
+ * @throws TypeError
+ *           If serviceUrl is not a string.
+ * @throws Error
+ *           if an unsupported or invalid URL specified.
+ */
+var getHttpServiceFunction = function(serviceUrl) {
+  log.entry('getHttpServiceFunction', log.NO_CLIENT_ID);
+  log.log('parms', log.NO_CLIENT_ID, 'serviceUrl:', serviceUrl);
+
+  if (typeof serviceUrl !== 'string') {
+    throw new TypeError('serviceUrl must be a string type');
+  }
+
+  var httpServiceFunction = function(callback) {
+    log.entry('httpServiceFunction', log.NO_CLIENT_ID);
+
+    var req = http.request(serviceUrl, function(res) {
+      log.entry('httpServiceFunction.req.callback', log.NO_CLIENT_ID);
+
+      var data = '';
+      res.setEncoding('utf8');
+      res.on('data', function(chunk) {
+        data += chunk;
+      });
+
+      res.on('end', function() {
+        log.entry('httpServiceFunction.req.on.end.callback', log.NO_CLIENT_ID);
+
+        if (res.statusCode === 200) {
+          try {
+            var obj = JSON.parse(data);
+            log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
+            log.log('parms', log.NO_CLIENT_ID, 'service:', obj.service);
+            callback(undefined, obj.service);
+            log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
+          } catch (err) {
+            log.log('error', log.NO_CLIENT_ID, err);
+            log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
+            log.log('parms', log.NO_CLIENT_ID, 'err:', err);
+            callback(err);
+            log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
+          }
+        } else {
+          var err = new Error(data);
+          log.log('error', log.NO_CLIENT_ID, err);
+          log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
+          log.log('parms', log.NO_CLIENT_ID, 'err:', err);
+          callback(err);
+          log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
+        }
+        log.exit('httpServiceFunction.req.on.end.callback', log.NO_CLIENT_ID,
+                 null);
+      });
+      log.exit('httpServiceFunction.req.callback', log.NO_CLIENT_ID, null);
+    }).on('error', function(err) {
+      log.log('error', log.NO_CLIENT_ID, err);
+      log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
+      log.log('parms', log.NO_CLIENT_ID, 'err:', err);
+      callback(err);
+      log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
+    });
+    req.setTimeout(5000);
+    req.end();
+
+    log.exit('httpServiceFunction', log.NO_CLIENT_ID, null);
+  };
+
+  log.exit('getHttpServiceFunction', log.NO_CLIENT_ID, httpServiceFunction);
+  return httpServiceFunction;
+};
+
+
 
 /**
  * Represents an MQ Light client instance.
@@ -325,7 +406,13 @@ var Client = function(service, id, user, password) {
   var serviceList, serviceFunction;
   if (service instanceof Function) {
     serviceFunction = service;
-  } else {
+  } else if (typeof service === 'string') {
+    var serviceUrl = url.parse(service);
+    if (serviceUrl.protocol === 'http:' || serviceUrl.protocol === 'https:') {
+      serviceFunction = getHttpServiceFunction(service);
+    }
+  }
+  if (!serviceFunction) {
     serviceList = generateServiceList(service);
   }
 
@@ -467,8 +554,24 @@ Client.prototype.connect = function(callback) {
 
     client.state = 'connecting';
 
-    // Connect to one of the required services, retrying if a connection cannot
-    client.connectToService(client, callback);
+    // Obtain the list of services for connect and connect to one of the
+    // services, retrying until a connection can be established
+    if (client.serviceFunction) {
+      client.serviceFunction(function(err, service) {
+        if (err) {
+          log.entry('Client.connect.performConnect.serviceFunction.callback',
+                    client.id);
+          callback(err);
+          log.exit('Client.connect.performConnect.serviceFunction.callback',
+              client.id, null);
+        } else {
+          client.serviceList = generateServiceList(service);
+          client.connectToService(callback);
+        }
+      });
+    } else {
+      connectToService(callback);
+    }
 
     log.exit('Client.connect.performConnect', client.id, null);
     return;
@@ -506,11 +609,11 @@ Client.prototype.connect = function(callback) {
 * in turn. If none can connect it emits an error, waits and
 * attempts to connect again. Callback happens once a successful
 * connect/reconnect occurs.
-* @param {Client} client object you want to connect.
 * @param {connectCallback}
 *  - callback called when connect/reconnect happens
 */
-Client.prototype.connectToService = function(client, callback) {
+Client.prototype.connectToService = function(callback) {
+  var client = this;
   log.entry('Client.connectToService', client.id);
 
   if (client.getState() === 'diconnecting' ||
@@ -525,41 +628,27 @@ Client.prototype.connectToService = function(client, callback) {
   }
 
   var connected = false;
-  var error = undefined;
-
-  var serviceList;
-  try {
-    // Obtain the list of services for connect
-    if (client.serviceFunction) {
-      var serviceFunction = client.serviceFunction();
-      serviceList = generateServiceList(serviceFunction);
-    } else {
-      serviceList = client.serviceList;
-    }
-  } catch (err) {
-    log.log('error', client.id, 'Error getting list of services. reason: ' +
-        err);
-    error = err;
-  }
+  var error;
 
   // Try each service in turn until we can successfully connect, or exhaust
   // the list
+  var serviceList = client.serviceList;
   if (!error) {
     for (var i = 0; i < serviceList.length; i++) {
       try {
         var service = serviceList[i];
         log.log('data', client.id, 'attempting connect to: ' + service);
-        var err = client.messenger.connect(service);
-        if (!err) {
+        var rc = client.messenger.connect(service);
+        if (rc) {
+          error = new Error(client.messenger.getLastErrorText());
+          log.log('data', client.id, 'failed to connect to: ' + service +
+              ' due to error: ' + error);
+        } else {
           log.log('data', client.id, 'successfully connected to: ' +
               service);
           client.service = service;
           connected = true;
           break;
-        } else {
-          error = new Error(client.messenger.getLastErrorText());
-          log.log('data', client.id, 'failed to connect to: ' + service +
-              ' due to error: ' + error);
         }
       } catch (err) {
         // Should not get here.
@@ -715,28 +804,38 @@ Client.prototype.disconnect = function(callback) {
 
 
 /**
-* TODO Flesh this out for reconnects after a connection broken.
-*/
+ * Reconnects the client to the MQ Light service, implicitly closing any
+ * subscriptions that the client has open. The 'reconnected' event will be
+ * emitted once the client has reconnected.
+ * <p>
+ * TODO: Flesh this out for reconnects after a connection is broken.
+ *
+ * @return {Object} The instance of client that it is invoked on - allowing
+ *          for chaining of other method calls on the client object.
+ */
 Client.prototype.reconnect = function() {
-  log.entry('Client.reconnect');
   var client = this;
-  //stop the messenger to free the object then attempt a reconnect
+  log.entry('Client.reconnect', client.id);
+
+  // stop the messenger to free the object then attempt a reconnect
   client.messenger.stop();
 
-  //clear the subscriptions list, if the cause of the reconnect happens
-  //during check for messages we need a 0 length so it will check once
-  //reconnected. Also clear any left over outstanding sends
-  //TODO need to resubscribe to the existing subs so this logic may change
+  // Clear the subscriptions list, if the cause of the reconnect happens during
+  // check for messages we need a 0 length so it will check once reconnected.
+  // TODO: need to resubscribe to the existing subs so this logic may change
   while (client.subscriptions.length > 0) {
     client.subscriptions.pop();
   }
+  // also clear any left over outstanding sends
   while (client.outstandingSends.length > 0) {
     client.outstandingSends.pop();
   }
-  //timeout to allow the original error to get output before the first
-  //reconnect attempt
-  setImmediate(client.connectToService, client);
+  // timeout to allow the original error to get output before the first
+  // reconnect attempt
+  setImmediate(client.connectToService, undefined);
+
   log.exit('Client.reconnect', client.id, client);
+  return client;
 };
 
 
