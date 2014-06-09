@@ -834,18 +834,35 @@ Client.prototype.reconnect = function() {
 
   // stop the messenger to free the object then attempt a reconnect
   client.messenger.stop();
-
+  var reestablishSubsList = [];
   // clear the subscriptions list, if the cause of the reconnect happens during
   // check for messages we need a 0 length so it will check once reconnected.
-  // TODO: need to resubscribe to the existing subs so this logic may change
   while (client.subscriptions.length > 0) {
-    client.subscriptions.pop();
+    reestablishSubsList.push(client.subscriptions.pop());
   }
   // also clear any left over outstanding sends
   while (client.outstandingSends.length > 0) {
     client.outstandingSends.pop();
   }
 
+  var resubscribe = function() {
+    while (reestablishSubsList.length > 0) {
+      sub = reestablishSubsList.pop();
+      client.subscribe(sub.topicPattern, sub.share, sub.options,
+          function(err, pattern) {
+            //if err we don't wanto 'lose' subs in the reestablish list add to 
+            //clients subscriptions list so the next reconnect picks them up.
+            if (err) {
+              client.subscriptions.push(sub);
+              //rather than keep looping add the rest of the loop to
+              //subscriptions here so we don't try another subscribe
+              while (reestablishSubsList.length > 0) {
+                client.subscriptions.push(reestablishSubsList.pop());
+              }
+            }
+          });
+    }
+  };
   // if client is using serviceFunction, re-generate the list of services
   // TODO: merge these copy & paste
   if (client.serviceFunction instanceof Function) {
@@ -854,13 +871,15 @@ Client.prototype.reconnect = function() {
         log.log('emit', client.id, 'error', err);
         client.emit('error', err);
       } else {
-        client.serviceList = generateServiceList(service);
-        client.connectToService(undefined);
+        setImmediate(function() {
+          client.serviceList = generateServiceList(service);
+          client.connectToService.apply(client, [resubscribe]);
+        });
       }
     });
   } else {
-    setImmediate(function() { 
-      client.connectToService.apply(client, undefined);
+    setImmediate(function() {
+      client.connectToService.apply(client, [resubscribe]);
     });
   }
 
@@ -1502,7 +1521,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       }
     }
     client.subscriptions.push({ address: subscriptionAddress,
-      qos: qos, autoConfirm: autoConfirm });
+      qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
+      share: originalShareValue, options: options });
 
   } catch (e) {
     log.log('error', client.id, e);
