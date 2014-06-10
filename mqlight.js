@@ -318,6 +318,8 @@ var getHttpServiceFunction = function(serviceUrl) {
             callback(undefined, obj.service);
             log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
           } catch (err) {
+            err.message = 'http request to ' + serviceUrl + ' returned ' +
+                          'unparseable JSON: ' + err.message;
             log.log('error', log.NO_CLIENT_ID, err);
             log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
             log.log('parms', log.NO_CLIENT_ID, 'err:', err);
@@ -325,7 +327,10 @@ var getHttpServiceFunction = function(serviceUrl) {
             log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
           }
         } else {
-          var err = new Error(data);
+          var err = new Error();
+          err.message = 'http request to ' + serviceUrl + ' failed with a ' +
+                        'status code of ' + res.statusCode;
+          if (data) err.message += ': ' + data;
           log.log('error', log.NO_CLIENT_ID, err);
           log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
           log.log('parms', log.NO_CLIENT_ID, 'err:', err);
@@ -337,6 +342,8 @@ var getHttpServiceFunction = function(serviceUrl) {
       });
       log.exit('httpServiceFunction.req.callback', log.NO_CLIENT_ID, null);
     }).on('error', function(err) {
+      err.message = 'http request to ' + serviceUrl + ' failed ' +
+                    'with an error: ' + err.message;
       log.log('error', log.NO_CLIENT_ID, err);
       log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
       log.log('parms', log.NO_CLIENT_ID, 'err:', err);

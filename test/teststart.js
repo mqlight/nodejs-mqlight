@@ -23,6 +23,8 @@ process.env.NODE_ENV = 'unittest';
 
 var stubproton = require('./stubs/stubproton');
 var mqlight = require('../mqlight');
+var http = require('http');
+var EventEmitter = require('events').EventEmitter;
 var testCase = require('nodeunit').testCase;
 
 
@@ -198,7 +200,6 @@ var services = ['amqp://bad1',
                 'amqp://bad3'];
   var index = 0;
   var serviceFunction = function(callback) {
-    console.log("serviceFunction %d\n", index);
     test.ok(index < services.length);
     var result = services[index++];
     callback(undefined, result);
@@ -237,3 +238,212 @@ module.exports.test_connect_disconnect_timing = function(test) {
     setTimeout(stubproton.unblockSendCompletion, 10);
   });
 };
+
+/**
+ * Tests that calling connect with an HTTP URI to lookup the endpoint, that
+ * the connect operation will keep retrying, performing the http request for
+ * each retry, until it returns a valid endpoint that can be connected to.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_http_changing_endpoint = function(test) {
+  var amqpServices = [
+    'amqp://bad1',
+    'amqp://bad2',
+    'amqp://host:1234',
+    'amqp://bad3'
+  ];
+  var originalHttpRequestMethod = http.request;
+  var index = 0;
+  http.request = function(url, callback) {
+    var req = new EventEmitter();
+    req.setTimeout = function() {};
+    req.end = function() {
+      try {
+        var res = new EventEmitter();
+        res.setEncoding = function() {};
+        res.statusCode = 200;
+        if (callback) callback(res);
+        test.ok(index < amqpServices.length);
+        var data = '{"service":["' + amqpServices[index++] + '"]}';
+        res.emit('data', data);
+        res.emit('end');
+      } catch(e) {
+        console.error(e);
+        test.fail(e);
+      }
+    };
+    return req;
+  };
+  var client = mqlight.createClient({
+    service: 'http://127.0.0.1:9999'
+  });
+  client.on('error', function(err) {
+    test.ok(err.message.indexOf('amqp://bad1') != -1 ||
+            err.message.indexOf('amqp://bad2') != -1);
+  });
+  client.connect(function(err) {
+    test.ifError(err);
+    test.equals(client.getService(), 'amqp://host:1234',
+                'Connected to wrong service. ');
+    client.disconnect();
+    test.done();
+    http.request = originalHttpRequestMethod;
+  });
+};
+
+/**
+ * Tests that calling connect with an HTTP URI to lookup the endpoint, that the
+ * connect operation will retry each endpoint in the returned list first,
+ * before then performing the http request again.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_http_multiple_endpoints = function(test) {
+  var amqpServices = [
+    ['amqp://bad1', 'amqp://bad2', 'amqp://bad3', 'amqp://bad4'],
+    ['amqp://bad5', 'amqp://bad6', 'amqp://host:1234', 'amqp://bad7'], 
+  ];
+  var originalHttpRequestMethod = http.request;
+  var index = 0;
+  http.request = function(url, callback) {
+    var req = new EventEmitter();
+    req.setTimeout = function() {};
+    req.end = function() {
+      try {
+        var res = new EventEmitter();
+        res.setEncoding = function() {};
+        res.statusCode = 200;
+        if (callback) callback(res);
+        test.ok(index < amqpServices.length);
+        var data = '{"service":' + JSON.stringify(amqpServices[index++]) +
+                   '}';
+        res.emit('data', data);
+        res.emit('end');
+      } catch(e) {
+        console.error(e);
+        test.fail(e);
+      }
+    };
+    return req;
+  };
+  var client = mqlight.createClient({
+    service: 'http://127.0.0.1:9999'
+  });
+  // error will be emitted for the last service in the returned endpoint list
+  client.on('error', function(err) {
+    test.ok(err.message.indexOf('amqp://bad4') != -1);
+  });
+  client.connect(function(err) {
+    test.ifError(err);
+    test.equals(client.getService(), 'amqp://host:1234',
+                'Connected to wrong service. ');
+    client.disconnect();
+    test.done();
+    http.request = originalHttpRequestMethod;
+  });
+};
+
+
+/**
+ * Tests that calling connect with a bad HTTP URI returns the underlying http
+ * error message to the connect callback.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_http_connection_refused = function(test) {
+  var originalHttpRequestMethod = http.request;
+  http.request = function(url, callback) {
+    var req = new EventEmitter();
+    req.setTimeout = function() {};
+    req.end = function() {
+      req.emit('error', new Error("connect ECONNREFUSED"));
+    };
+    return req;
+  };
+  var client = mqlight.createClient({
+    service: 'http://127.0.0.1:9999'
+  });
+  client.connect(function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/connect ECONNREFUSED/.test(err));
+    client.disconnect();
+    test.done();
+    http.request = originalHttpRequestMethod;
+  });
+};
+
+/**
+ * Tests that the HTTP URI returning malformed JSON is coped with.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_http_bad_json = function(test) {
+  var originalHttpRequestMethod = http.request;
+  http.request = function(url, callback) {
+    var req = new EventEmitter();
+    req.setTimeout = function() {};
+    req.end = function() {
+      try {
+        var res = new EventEmitter();
+        res.setEncoding = function() {};
+        res.statusCode = 200;
+        if (callback) callback(res);
+        var data = '(╯°□°)╯︵ ┻━┻';
+        res.emit('data', data);
+        res.emit('end');
+      } catch(e) {
+        console.error(e);
+        test.fail(e);
+      }
+    };
+    return req;
+  };
+  var client = mqlight.createClient({
+    service: 'http://127.0.0.1:9999'
+  });
+  client.connect(function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/unparseable JSON/.test(err));
+    test.ok(/Unexpected token \(/.test(err));
+    client.disconnect();
+    test.done();
+    http.request = originalHttpRequestMethod;
+  });
+};
+
+/**
+ * Tests that a bad HTTP status code is coped with.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_http_bad_status = function(test) {
+  var originalHttpRequestMethod = http.request;
+  http.request = function(url, callback) {
+    var req = new EventEmitter();
+    req.setTimeout = function() {};
+    req.end = function() {
+      var res = new EventEmitter();
+      res.setEncoding = function() {};
+      res.statusCode = 404;
+      try {
+        if (callback) callback(res);
+        res.emit('end');
+      } catch (e) {
+        console.error(e);
+        test.fail(e);
+      }
+    };
+    return req;
+  };
+  var client = mqlight.createClient({
+    service: 'http://127.0.0.1:9999'
+  });
+  client.connect(function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/failed with a status code of 404/.test(err));
+    client.disconnect();
+    test.done();
+    http.request = originalHttpRequestMethod;
+  });
+};
+
