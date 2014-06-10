@@ -143,13 +143,14 @@ module.exports.test_connect_too_many_arguments = function(test) {
   }, 'gooseberry');
 };
 
+
 /**
  * Tests that calling connect to an enpoint that is currently down retries
  * until successful.
  * @param {object} test the unittest interface
  */
 module.exports.test_connect_retry = function(test) {
-  var client = mqlight.createClient({service : 'amqp://host'});
+  var client = mqlight.createClient({service: 'amqp://host'});
   var requiredConnectStatus = 2;
 
   client.on('error', function(err) {
@@ -165,20 +166,17 @@ module.exports.test_connect_retry = function(test) {
   });
 };
 
+
 /**
  * Tests that calling connect with multiple endpoints, some bad and some valid,
  * that the connect will be successful and connect to a valid endpoint.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_connect_multiple_endpoints = function(test) {
-  var services = new Array();
-  services[0] = 'amqp://bad1';
-  services[1] = 'amqp://bad2';
-  services[2] = 'amqp://host';
-  services[3] = 'amqp://bad3';
+  var services = ['amqp://bad1', 'amqp://bad2', 'amqp://host', 'amqp://bad3'];
   var client = mqlight.createClient({
-    service : services
+    service: services
   });
   client.connect(function() {
     test.equals(client.getService(), 'amqp://host:5672');
@@ -187,6 +185,7 @@ module.exports.test_connect_multiple_endpoints = function(test) {
   });
 };
 
+
 /**
  * Tests that calling connect with a function to specify the endpoints, that the
  * connect operation will keep retrying, calling the function again for each
@@ -194,10 +193,10 @@ module.exports.test_connect_multiple_endpoints = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_connect_variable_endpoints = function(test) {
-var services = ['amqp://bad1',
-                'amqp://bad2',
-                'amqp://host:1234',
-                'amqp://bad3'];
+  var services = ['amqp://bad1',
+    'amqp://bad2',
+    'amqp://host:1234',
+    'amqp://bad3'];
   var index = 0;
   var serviceFunction = function(callback) {
     test.ok(index < services.length);
@@ -217,6 +216,7 @@ var services = ['amqp://bad1',
   });
 };
 
+
 /**
  * Tests that calling connect whilst still disconnecting will be
  * successful only when the disconnect completes
@@ -224,20 +224,21 @@ var services = ['amqp://bad1',
  */
 module.exports.test_connect_disconnect_timing = function(test) {
   var client = mqlight.createClient({
-    service : 'amqp://host'
+    service: 'amqp://host'
   });
   client.connect(function() {
     stubproton.blockSendCompletion();
     client.send('topic', 'message');
     client.disconnect();
     client.connect(function(err) {
-      test.ok(err == undefined);
+      test.ifError(err);
       client.disconnect();
       test.done();
     });
     setTimeout(stubproton.unblockSendCompletion, 10);
   });
 };
+
 
 /**
  * Tests that calling connect with an HTTP URI to lookup the endpoint, that
@@ -267,7 +268,7 @@ module.exports.test_connect_http_changing_endpoint = function(test) {
         var data = '{"service":["' + amqpServices[index++] + '"]}';
         res.emit('data', data);
         res.emit('end');
-      } catch(e) {
+      } catch (e) {
         console.error(e);
         test.fail(e);
       }
@@ -291,6 +292,7 @@ module.exports.test_connect_http_changing_endpoint = function(test) {
   });
 };
 
+
 /**
  * Tests that calling connect with an HTTP URI to lookup the endpoint, that the
  * connect operation will retry each endpoint in the returned list first,
@@ -301,7 +303,7 @@ module.exports.test_connect_http_changing_endpoint = function(test) {
 module.exports.test_connect_http_multiple_endpoints = function(test) {
   var amqpServices = [
     ['amqp://bad1', 'amqp://bad2', 'amqp://bad3', 'amqp://bad4'],
-    ['amqp://bad5', 'amqp://bad6', 'amqp://host:1234', 'amqp://bad7'], 
+    ['amqp://bad5', 'amqp://bad6', 'amqp://host:1234', 'amqp://bad7']
   ];
   var originalHttpRequestMethod = http.request;
   var index = 0;
@@ -319,7 +321,7 @@ module.exports.test_connect_http_multiple_endpoints = function(test) {
                    '}';
         res.emit('data', data);
         res.emit('end');
-      } catch(e) {
+      } catch (e) {
         console.error(e);
         test.fail(e);
       }
@@ -356,7 +358,7 @@ module.exports.test_connect_http_connection_refused = function(test) {
     var req = new EventEmitter();
     req.setTimeout = function() {};
     req.end = function() {
-      req.emit('error', new Error("connect ECONNREFUSED"));
+      req.emit('error', new Error('connect ECONNREFUSED'));
     };
     return req;
   };
@@ -371,6 +373,7 @@ module.exports.test_connect_http_connection_refused = function(test) {
     http.request = originalHttpRequestMethod;
   });
 };
+
 
 /**
  * Tests that the HTTP URI returning malformed JSON is coped with.
@@ -391,7 +394,7 @@ module.exports.test_connect_http_bad_json = function(test) {
         var data = '(╯°□°)╯︵ ┻━┻';
         res.emit('data', data);
         res.emit('end');
-      } catch(e) {
+      } catch (e) {
         console.error(e);
         test.fail(e);
       }
@@ -410,6 +413,7 @@ module.exports.test_connect_http_bad_json = function(test) {
     http.request = originalHttpRequestMethod;
   });
 };
+
 
 /**
  * Tests that a bad HTTP status code is coped with.
