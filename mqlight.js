@@ -840,6 +840,17 @@ Client.prototype.reconnect = function() {
   var client = this;
   log.entry('Client.reconnect', client.id);
 
+  if (client.getState() !== 'connected') {
+    if (client.getState() === 'disconnected' ||
+         client.getState() === 'disconnecting') {
+      return undefined;
+    } else if (client.getState() === 'retrying') {
+      return client;
+    }
+  }
+  client.state = 'retrying';
+
+
   // stop the messenger to free the object then attempt a reconnect
   client.messenger.stop();
   var reestablishSubsList = [];
@@ -854,6 +865,7 @@ Client.prototype.reconnect = function() {
   }
 
   var resubscribe = function() {
+    log.entry('Client.reconnect.resubscribe', client.id);
     while (reestablishSubsList.length > 0) {
       sub = reestablishSubsList.pop();
       client.subscribe(sub.topicPattern, sub.share, sub.options,
@@ -870,6 +882,7 @@ Client.prototype.reconnect = function() {
             }
           });
     }
+    log.exit('Client.reconnect.resubscribe');
   };
   // if client is using serviceFunction, re-generate the list of services
   // TODO: merge these copy & paste
