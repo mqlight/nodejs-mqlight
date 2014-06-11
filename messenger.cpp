@@ -323,8 +323,8 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   pn_messenger_set_incoming_window(obj->messenger, std::numeric_limits<int>::max());
 
   // if we have a username make sure we set a route to force auth
-  int index = address.find("//");
-  int endIndex = index >= 0 ? address.find("/", index+2) : -1;
+  int index = (int)address.find("//");
+  int endIndex = index >= 0 ? (int)address.find("/", index+2) : -1;
   std::string hostandport;
   if (endIndex >= 0) {
   	size_t len = endIndex - (index+2);
@@ -568,7 +568,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
     }
   }
 
-  Local<Array> messages = Array::New(vector.size());
+  Local<Array> messages = Array::New((int)vector.size());
   for (unsigned int i = 0; i < vector.size(); i++)
   {
     messages->Set(Number::New(i), vector[i]);
