@@ -842,7 +842,7 @@ Client.prototype.reconnect = function() {
 
   if (client.getState() !== 'connected') {
     if (client.getState() === 'disconnected' ||
-         client.getState() === 'disconnecting') {
+        client.getState() === 'disconnecting') {
       return undefined;
     } else if (client.getState() === 'retrying') {
       return client;
@@ -850,9 +850,12 @@ Client.prototype.reconnect = function() {
   }
   client.state = 'retrying';
 
-
   // stop the messenger to free the object then attempt a reconnect
-  client.messenger.stop();
+  var messenger = client.messenger;
+  if (messenger && !messenger.stopped) {
+    messenger.stop();
+  }
+
   var reestablishSubsList = [];
   // clear the subscriptions list, if the cause of the reconnect happens during
   // check for messages we need a 0 length so it will check once reconnected.
