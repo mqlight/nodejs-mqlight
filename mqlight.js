@@ -143,7 +143,7 @@ if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
  *            one instance can be connected to the MQ Light service at a given
  *            moment in time.  If two instances of Client have the same id and
  *            both try to connect then the first instance to establish its
- *            connection is diconnected in favour of the second instance. If
+ *            connection is disconnected in favour of the second instance. If
  *            this property is not specified then the client will generate a
  *            probabalistically unique ID.
  * </li>
@@ -623,8 +623,8 @@ Client.prototype.connectToService = function(callback) {
   var client = this;
   log.entry('Client.connectToService', client.id);
 
-  if (client.getState() === 'diconnecting' ||
-      client.getState() === 'diconnected') {
+  if (client.getState() === 'disconnecting' ||
+      client.getState() === 'disconnected') {
     if (callback) {
       log.entry('Client.connectToService.callback', client.id);
       callback(new Error('connect aborted due to disconnect'));
@@ -769,8 +769,9 @@ Client.prototype.disconnect = function(callback) {
 
     // Only disconnect when all outstanding send operations are complete
     if (client.outstandingSends.length === 0) {
-      if (client.messenger) {
-        client.messenger.stop();
+      var messenger = client.messenger;
+      if (messenger && !messenger.stopped) {
+        messenger.stop();
       }
 
       // Indicate that we've disconnected
