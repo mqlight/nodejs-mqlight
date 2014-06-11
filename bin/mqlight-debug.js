@@ -93,7 +93,7 @@ if (parsed.help) {
 if (parsed.eval) {
   command = parsed.eval;
 } else if (parsed.ffdc) {
-  command = 'log.debug()';
+  command = 'log.ffdc()';
 } else if (parsed.log) {
   command = 'log.setLevel(\'' + parsed.log + '\')';
 } else {

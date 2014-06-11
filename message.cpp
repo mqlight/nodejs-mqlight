@@ -253,7 +253,7 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
 
     Proton::Log("debug", name, "address:", pn_message_get_address(msg->message));
     Proton::Log("debug", name, "subject:", pn_message_get_subject(msg->message));
-    Proton::Log("debug", name, "content:", buffer);
+    Proton::LogBody(name, result);
 
     free(buffer);
   }
@@ -281,8 +281,8 @@ void ProtonMessage::PutBody(Local<String> property,
     if (value->IsString()) {
       String::Utf8Value param(value->ToString());
       std::string msgtext = std::string(*param);
-      Proton::Log("parms", name, "msgtext:", msgtext.c_str());
       Proton::Log("data", name, "format:", "PN_TEXT");
+      Proton::LogBody(name, msgtext.c_str());
       pn_message_set_format(msg->message, PN_TEXT);
       pn_message_load_text(msg->message, msgtext.c_str(), strlen(msgtext.c_str()));
       V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgtext.c_str()));
@@ -290,8 +290,8 @@ void ProtonMessage::PutBody(Local<String> property,
       Local<Object> buffer = value->ToObject();
       char *msgdata = Buffer::Data(buffer);
       size_t msglen = Buffer::Length(buffer);
-      Proton::Log("data", name, "msglen:", (int)msglen);
       Proton::Log("data", name, "format:", "PN_DATA");
+      Proton::LogBody(name, buffer);
       pn_message_set_format(msg->message, PN_DATA);
       pn_message_load_data(msg->message, msgdata, msglen);
       V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgdata));

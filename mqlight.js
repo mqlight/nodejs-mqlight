@@ -30,7 +30,7 @@ log = require('./mqlight-log');
  * The logging level can be set programmatically by calling
  *   log.setLevel(level)
  * An ffdc can be generated programmatically by calling
- *   log.debug()
+ *   log.ffdc()
  */
 exports.log = log;
 
@@ -318,8 +318,6 @@ var getHttpServiceFunction = function(serviceUrl) {
             callback(undefined, obj.service);
             log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
           } catch (err) {
-            err.message = 'http request to ' + serviceUrl + ' returned ' +
-                          'unparseable JSON: ' + err.message;
             log.log('error', log.NO_CLIENT_ID, err);
             log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
             log.log('parms', log.NO_CLIENT_ID, 'err:', err);
@@ -327,10 +325,7 @@ var getHttpServiceFunction = function(serviceUrl) {
             log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
           }
         } else {
-          var err = new Error();
-          err.message = 'http request to ' + serviceUrl + ' failed with a ' +
-                        'status code of ' + res.statusCode;
-          if (data) err.message += ': ' + data;
+          var err = new Error(data);
           log.log('error', log.NO_CLIENT_ID, err);
           log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
           log.log('parms', log.NO_CLIENT_ID, 'err:', err);
@@ -342,8 +337,6 @@ var getHttpServiceFunction = function(serviceUrl) {
       });
       log.exit('httpServiceFunction.req.callback', log.NO_CLIENT_ID, null);
     }).on('error', function(err) {
-      err.message = 'http request to ' + serviceUrl + ' failed ' +
-                    'with an error: ' + err.message;
       log.log('error', log.NO_CLIENT_ID, err);
       log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
       log.log('parms', log.NO_CLIENT_ID, 'err:', err);
@@ -857,7 +850,7 @@ Client.prototype.reconnect = function() {
       sub = reestablishSubsList.pop();
       client.subscribe(sub.topicPattern, sub.share, sub.options,
           function(err, pattern) {
-            //if err we don't wanto 'lose' subs in the reestablish list add to 
+            //if err we don't wanto 'lose' subs in the reestablish list add to
             //clients subscriptions list so the next reconnect picks them up.
             if (err) {
               client.subscriptions.push(sub);
@@ -994,12 +987,12 @@ Client.prototype.send = function(topic, data, options, callback) {
     topic = String(topic);
   }
   log.log('parms', this.id, 'topic:', topic);
+  log.log('parms', this.id, 'data: typeof', typeof data);
   if (data === undefined) {
     throw new TypeError('Cannot send undefined data');
   } else if (data instanceof Function) {
     throw new TypeError('Cannot send a function');
   }
-  log.log('parms', this.id, 'data:', data);
 
   // If the last argument is a Function then it must be a callback, and not
   // options
@@ -1213,7 +1206,7 @@ Client.prototype.checkForMessages = function() {
   log.entryLevel('entry_often', 'checkForMessages', client.id);
   var messenger = client.messenger;
   if (client.state !== 'connected' || client.subscriptions.length === 0) {
-    log.exitLevel('entry_often', 'checkForMessages', client.id);
+    log.exitLevel('exit_often', 'checkForMessages', client.id);
     return;
   }
 
@@ -1320,7 +1313,7 @@ Client.prototype.checkForMessages = function() {
             throw new Error('No listener for "malformed" event.');
           }
         } else {
-          log.log('emit', client.id, 'message', data, delivery);
+          log.log('emit', client.id, 'message', delivery);
           try {
             client.emit('message', data, delivery);
           } catch (err) {
@@ -1349,7 +1342,7 @@ Client.prototype.checkForMessages = function() {
     });
   }
 
-  log.exitLevel('entry_often', 'checkForMessages', client.id);
+  log.exitLevel('exit_often', 'checkForMessages', client.id);
 
   setImmediate(function() {
     if (client.state === 'connected') {

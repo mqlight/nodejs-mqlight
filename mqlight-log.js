@@ -31,6 +31,7 @@ var startLevel;
 var historyLevel;
 var ffdcSequence = 0;
 var fd = 0;
+var dataSize;
 
 var ENTRY_IND = '>-----------------------------------------------------------';
 var EXIT_IND = '<-----------------------------------------------------------';
@@ -85,6 +86,7 @@ var header = function(lvl, clientId, options) {
     write(lvl, clientId, '| Installation Path :-', __dirname);
     write(lvl, clientId, '| Uptime            :-', process.uptime());
     write(lvl, clientId, '| Log Level         :-', logger.level);
+    write(lvl, clientId, '| Data Size         :-', dataSize);
     if ('fnc' in options) {
       write(lvl, clientId, '| Function          :-', options.fnc);
     }
@@ -204,6 +206,38 @@ log.setStream = function(stream) {
 
 
 /**
+ * Set the amount of message data that will get logged.
+ *
+ * @param {Number} size amount of message data that will get logged.
+ */
+log.setDataSize = function(size) {
+  log.entry('log.setDataSize', log.NO_CLIENT_ID);
+  log.log('parms', log.NO_CLIENT_ID, 'size:', size);
+
+  if (typeof size === 'string') {
+    dataSize = parseInt(size);
+    if (isNaN(dataSize)) {
+      throw new TypeError('MQLIGHT_NODE_MESSAGE_DATA_SIZE is not a number');
+    }
+  } else {
+    dataSize = size;
+  }
+
+  log.exit('log.setDataSize', log.NO_CLIENT_ID);
+};
+
+
+/**
+ * Get the amount of message data that will get logged.
+ *
+ * @return {Number} The data size.
+ */
+log.getDataSize = function() {
+  return dataSize;
+};
+
+
+/**
  * Log entry into a function, specifying the logging level to
  * write at.
  *
@@ -283,73 +317,99 @@ log.log = function(lvl, id, args) {
 
 
 /**
- * Dump First Failure Data Capture information in the event of
- * failure to aid in diagnosis of an error.
+ * Log message body.
  *
- * @param {String} fnc The name of the calling function.
- * @param {Number} probeId An identifier for the error location.
- * @param {Client} client The client having a problem.
- * @param {Object} data Extra data to aid in problem diagnosis.
- */
-log.ffdc = function(fnc, probeId, client, data) {
-  var clientId = client ? client.Id : log.NO_CLIENT_ID;
-
-  log.entry('log.ffdc', clientId);
-  log.log('parms', clientId, 'fnc:', fnc);
-  log.log('parms', clientId, 'probeId:', probeId);
-  log.log('parms', clientId, 'data:', data);
-
-  if (logger.levels[logger.level] <= logger.levels.ffdc) {
-    header('ffdc', clientId, {
-      title: 'First Failure Data Capture',
-      fnc: fnc,
-      probeId: probeId,
-      ffdcSequence: ffdcSequence++
-    });
-    write('ffdc', clientId, new Error().stack);
-    write('ffdc', clientId, '');
-    write('ffdc', clientId, 'Function Stack');
-    write('ffdc', clientId, stack.slice(1));
-    write('ffdc', clientId, '');
-    write('ffdc', clientId, 'Function History');
-    for (var idx = 0; idx < logger.record.length; idx++) {
-      var rec = logger.record[idx];
-      if ((rec.level !== 'ffdc') &&
-          (logger.levels[rec.level] >= logger.levels[historyLevel])) {
-        write('ffdc', clientId, '%d %s %s %s',
-              rec.id, logger.disp[rec.level], rec.prefix, rec.message);
+ * @this {log}
+ * @param {String} id The id of the client logging the data.
+ * @param {Object} data The message body to be logged subject to
+ *        specified data size. Must be either a string or a
+ *        Buffer object.
+                                                                */
+log.body = function(id, data) {
+  if (logger.levels[logger.level] <= logger.levels['data']) {
+    write('data', id, '! length:', data.length);
+    if (typeof data === 'string') {
+      if ((dataSize >= data.length) || (dataSize < 0)) {
+        write('data', id, '! string:', data);
+      } else {
+        write('data', id, '! string:', data.substring(0, dataSize), '...');
+      }
+    } else {
+      if ((dataSize >= data.length) || (dataSize < 0)) {
+        write('data', id, '! buffer:',
+              data.toString('hex'));
+      } else {
+        write('data', id, '! buffer:',
+              data.toString('hex', 0, dataSize), '...');
       }
     }
-    if (client) {
-      write('ffdc', clientId, '');
-      write('ffdc', clientId, 'Client');
-      write('ffdc', clientId, client);
-    }
-    if (data) {
-      write('ffdc', clientId, '');
-      write('ffdc', clientId, 'Data');
-      write('ffdc', clientId, data);
-    }
-    write('ffdc', clientId, '');
-    write('ffdc', clientId, 'Memory Usage');
-    write('ffdc', clientId, process.memoryUsage());
-    if ((ffdcSequence === 1) || (probeId === 255)) {
-      write('ffdc', clientId, '');
-      write('ffdc', clientId, 'Environment Variables');
-      write('ffdc', clientId, process.env);
-    }
-    write('ffdc', clientId, '');
   }
-
-  log.exit('log.ffdc', clientId, null);
 };
 
 
 /**
- * Easily dump an FFDC when running under the node debugger.
+ * Dump First Failure Data Capture information in the event of
+ * failure to aid in diagnosis of an error.
+ *
+ * @param {String=} opt_fnc The name of the calling function.
+ * @param {Number=} opt_probeId An identifier for the error
+ *        location.
+ * @param {Client=} opt_client The client having a problem.
+ * @param {Object=} opt_data Extra data to aid in problem
+ *        diagnosis.
  */
-log.debug = function() {
-  log.ffdc('log.debug', 255, null, 'User-requested FFDC by function');
+log.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
+  var opts = {
+    title: 'First Failure Data Capture',
+    fnc: opt_fnc || 'User-requested FFDC by function',
+    probeId: opt_probeId || 255,
+    ffdcSequence: ffdcSequence++,
+    clientId: opt_client ? client.Id : log.NO_CLIENT_ID
+  };
+
+  log.entry('log.ffdc', opts.clientId);
+  log.log('parms', opts.clientId, 'fnc:', opt_fnc);
+  log.log('parms', opts.clientId, 'probeId:', opt_probeId);
+  log.log('parms', opts.clientId, 'data:', opt_data);
+
+  if (logger.levels[logger.level] <= logger.levels.ffdc) {
+    header('ffdc', opts.clientId, opts);
+    write('ffdc', opts.clientId, new Error().stack);
+    write('ffdc', opts.clientId, '');
+    write('ffdc', opts.clientId, 'Function Stack');
+    write('ffdc', opts.clientId, stack.slice(1));
+    write('ffdc', opts.clientId, '');
+    write('ffdc', opts.clientId, 'Function History');
+    for (var idx = 0; idx < logger.record.length; idx++) {
+      var rec = logger.record[idx];
+      if ((rec.level !== 'ffdc') &&
+          (logger.levels[rec.level] >= logger.levels[historyLevel])) {
+        write('ffdc', opts.clientId, '%d %s %s %s',
+              rec.id, logger.disp[rec.level], rec.prefix, rec.message);
+      }
+    }
+    if (opt_client) {
+      write('ffdc', opts.clientId, '');
+      write('ffdc', opts.clientId, 'Client');
+      write('ffdc', opts.clientId, opt_client);
+    }
+    if (opt_data) {
+      write('ffdc', opts.clientId, '');
+      write('ffdc', opts.clientId, 'Data');
+      write('ffdc', opts.clientId, opt_data);
+    }
+    write('ffdc', opts.clientId, '');
+    write('ffdc', opts.clientId, 'Memory Usage');
+    write('ffdc', opts.clientId, process.memoryUsage());
+    if ((ffdcSequence === 1) || (opts.probeId === 255)) {
+      write('ffdc', opts.clientId, '');
+      write('ffdc', opts.clientId, 'Environment Variables');
+      write('ffdc', opts.clientId, process.env);
+    }
+    write('ffdc', opts.clientId, '');
+  }
+
+  log.exit('log.ffdc', opts.clientId, null);
 };
 
 
@@ -385,6 +445,15 @@ logger.addLevel('ffdc', 2000, styles.red, 'ffdc  ');
  * variable MQLIGHT_NODE_LOG_STREAM=stdout.
  */
 log.setStream(process.env.MQLIGHT_NODE_LOG_STREAM || 'stderr');
+
+
+/**
+ * Set the amount of message data that will get logged. The
+ * default is 100 bytes, but this can be altered by setting the
+ * environment variable MQLIGHT_NODE_MESSAGE_DATA_SIZE to a
+ * different number.
+ */
+log.setDataSize(process.env.MQLIGHT_NODE_MESSAGE_DATA_SIZE || 100);
 
 
 /**
