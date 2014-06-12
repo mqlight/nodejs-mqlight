@@ -32,6 +32,7 @@ var historyLevel;
 var ffdcSequence = 0;
 var fd = 0;
 var dataSize;
+var exceptionThrown = null;
 
 var ENTRY_IND = '>-----------------------------------------------------------';
 var EXIT_IND = '<-----------------------------------------------------------';
@@ -247,6 +248,16 @@ log.getDataSize = function() {
  *        to be entered.
  */
 log.entryLevel = function(lvl, name, id) {
+  if (exceptionThrown) {
+    log.log('error', id, '* Uncaught exception');
+    exceptionThrown = null;
+    while(stack.length > 1) {
+      if (stack[stack.length - 1] === name) {
+        break;
+      }
+      stack.pop();
+    }
+  }
   write(lvl, id, ENTRY_IND.substring(0, stack.length), name);
   stack.push(name);
 };
@@ -297,7 +308,7 @@ log.exitLevel = function(lvl, name, id, rc) {
  * @param {Object} rc The function return code.
  */
 log.exit = function(name, id, rc) {
-  log.exitLevel('exit', name, id);
+  log.exitLevel('exit', name, id, rc);
 };
 
 
@@ -344,6 +355,82 @@ log.body = function(id, data) {
       }
     }
   }
+};
+
+
+/**
+ * Log an exception being thrown, specifying the logging level to
+ * write at.
+ *
+ * @this {log}
+ * @param {String} lvl The logging level to write at.
+ * @param {String} name The name of the function throwing the
+ *        exception.
+ * @param {String} id The id of the client logging the
+ *        exception.
+ * @param {Object} err The exception being thrown.
+                                                                */
+log.throwLevel = function(lvl, name, id, err) {
+  log.log('error', id, '* Thrown exception:', err);
+  exceptionThrown = err;
+  log.exitLevel(lvl, name, id, 'Exception thrown');
+};
+
+
+/**
+ * Log an exception being thrown.
+ *
+ * @this {log}
+ * @param {String} name The name of the function throwing the
+ *        exception.
+ * @param {String} id The id of the client logging the
+ *        exception.
+ * @param {Error} err The exception being thrown.
+                                                                */
+log.throw = function(name, id, err) {
+  log.throwLevel('exit', name, id, err);
+};
+
+
+/**
+ * Log an exception being caught, specifying the logging level to
+ * write at.
+ *
+ * @this {log}
+ * @param {String} lvl The logging level to write at.
+ * @param {String} name The name of the function catching the
+ *        exception.
+ * @param {String} id The id of the client logging the data.
+ * @param {Error} err The exception being caught.
+                                                                */
+log.caughtLevel = function(lvl, name, id, err) {
+  log.log('error', id, '* Caught exception:', err);
+  if (exceptionThrown) {
+    exceptionThrown = null;
+    while(stack.length > 1) {
+      if (stack[stack.length - 1] === name) {
+        break;
+      }
+      stack.pop();
+    }
+    if (stack.length == 1) {
+      log.entryLevel(lvl, name, id);
+    }
+  }
+};
+
+
+/**
+ * Log an exception being caught.
+ *
+ * @this {log}
+ * @param {String} name The name of the function catching the
+ *        exception.
+ * @param {String} id The id of the client logging the data.
+ * @param {Error} err The exception being caught.
+                                                                */
+log.caught = function(name, id, err) {
+  log.caughtLevel('entry', name, id, err);
 };
 
 

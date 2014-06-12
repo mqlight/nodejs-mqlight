@@ -163,18 +163,28 @@ if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
 exports.createClient = function(options) {
   log.entry('createClient', log.NO_CLIENT_ID);
 
-  if (!options) throw TypeError('options object missing');
+  if (!options) {
+    err = TypeError('options object missing');
+    log.throw('createClient', log.NO_CLIENT_ID, err);
+    throw err;
+  }
   var client = new Client(options.service, options.id,
                           options.user, options.password);
 
   process.setMaxListeners(0);
   process.once('exit', function() {
+    log.entry('createClient.on.exit', log.NO_CLIENT_ID);
+
     if (client && client.getState() == 'connected') {
       try {
         client.messenger.send();
         client.disconnect();
-      } catch (_) {}
+      } catch (err) {
+        log.caught('createClient.on.exit', client.id, err);
+      }
     }
+
+    log.exit('createClient.on.exit', log.NO_CLIENT_ID);
   });
 
   log.exit('createClient', client.id, client);
@@ -202,24 +212,34 @@ var generateServiceList = function(service) {
 
   // Validate the parameter list length
   if (arguments.length > 1) {
-    throw new Error('Too many arguments');
+    err = new Error('Too many arguments');
+    log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+    throw err;
   }
 
   // Ensure the service is an Array
   var inputServiceList = [];
   if (!service) {
-    throw new Error('service is undefined');
+    err = new Error('service is undefined');
+    log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+    throw err;
   } else if (service instanceof Function) {
-    throw new TypeError('service cannot be a function');
+    err = new TypeError('service cannot be a function');
+    log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+    throw err;
   } else if (service instanceof Array) {
     if (service.length === 0) {
-      throw new Error('service array is empty');
+      err = new Error('service array is empty');
+      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+      throw err;
     }
     inputServiceList = service;
   } else if (typeof service === 'string') {
     inputServiceList[0] = service;
   } else {
-    throw new TypeError('service must be a string or array type');
+    err = new TypeError('service must be a string or array type');
+    log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+    throw err;
   }
 
   /*
@@ -241,20 +261,26 @@ var generateServiceList = function(service) {
     if (auth) {
       msg = 'Unsupported URL, auth details e.g user:pass@localhost should ' +
             'be supplied as options for createClient';
-      throw new Error(msg);
+      err = new Error(msg);
+      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+      throw err;
     }
     // Check we are trying to use the amqp protocol
     if (!protocol || protocol !== 'amqp:' && protocol !== 'amqps:') {
       msg = "Unsupported URL '" + inputServiceList[i] +
             "' specified for service. Only the amqp or amqps protocol are " +
             ' supported.';
-      throw new Error(msg);
+      err = new Error(msg);
+      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+      throw err;
     }
     // Check we have a hostname
     if (!host) {
       msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
             'service. Must supply a hostname.';
-      throw new Error(msg);
+      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+      err = new Error(msg);
+      throw err;
     }
     // Set default port if not supplied
     if (!port) {
@@ -264,7 +290,9 @@ var generateServiceList = function(service) {
     if (path) {
       msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
             " ) can't be part of a service URL.";
-      throw new Error(msg);
+      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+      err = new Error(msg);
+      throw err;
     }
     serviceList[i] = protocol + '//' + host + ':' + port;
   }
@@ -292,7 +320,9 @@ var getHttpServiceFunction = function(serviceUrl) {
   log.log('parms', log.NO_CLIENT_ID, 'serviceUrl:', serviceUrl);
 
   if (typeof serviceUrl !== 'string') {
-    throw new TypeError('serviceUrl must be a string type');
+    err = new TypeError('serviceUrl must be a string type');
+    log.throw('getHttpServiceFunction', log.NO_CLIENT_ID, err);
+    throw err;
   }
 
   var httpServiceFunction = function(callback) {
@@ -320,7 +350,8 @@ var getHttpServiceFunction = function(serviceUrl) {
           } catch (err) {
             err.message = 'http request to ' + serviceUrl + ' returned ' +
                           'unparseable JSON: ' + err.message;
-            log.log('error', log.NO_CLIENT_ID, err);
+            log.caught('httpServiceFunction.req.on.end.callback',
+                       log.NO_CLIENT_ID, err);
             log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
             log.log('parms', log.NO_CLIENT_ID, 'err:', err);
             callback(err);
@@ -430,7 +461,9 @@ var Client = function(service, id, user, password) {
   if (id.length > 48) {
     var msg = "Client identifier '" + id + "' is longer than the maximum ID " +
               'length of 48.';
-    throw new RangeError(msg);
+    err = new RangeError(msg);
+    log.throw('Client.constructor', log.NO_CLIENT_ID, err);
+    throw err;
   }
 
   id = String(id);
@@ -438,16 +471,20 @@ var Client = function(service, id, user, password) {
   // currently client ids are restricted, reject any invalid ones
   for (var i in id) {
     if (validClientIdChars.indexOf(id[i]) == -1) {
-      var err = "Client Identifier '" + id + "' contains invalid char: " +
+      var msg = "Client Identifier '" + id + "' contains invalid char: " +
           id[i];
-      throw new Error(err);
+      err = new Error(msg);
+      log.throw('Client.constructor', log.NO_CLIENT_ID, err);
+      throw err;
     }
   }
 
   // User/password must either both be present, or both be absent.
   if ((user && !password) || (!user && password)) {
-    throw new TypeError('both user and password properties ' +
+    err = new TypeError('both user and password properties ' +
                         'must be specified together');
+    log.throw('Client.constructor', id, err);
+    throw err;
   }
   // Save the required data as client fields
   this.serviceFunction = serviceFunction;
@@ -530,7 +567,9 @@ Client.prototype.connect = function(callback) {
   log.entry('Client.connect', this.id);
 
   if (callback && (typeof callback !== 'function')) {
-    throw new TypeError('Callback must be a function');
+    err = new TypeError('Callback must be a function');
+    log.throw('Client.connect', this.id, err);
+    throw err;
   }
 
   // Performs the connect
@@ -661,7 +700,9 @@ Client.prototype.connectToService = function(callback) {
         // Should not get here.
         // Means that messenger.connect has been called in an invalid way
         error = err;
+        log.caught('Client.connectToService', client.id, err);
         log.ffdc('Client.connectToService', 'ffdc001', client.id, err);
+        log.throw('Client.connectToService', client.id, err);
         throw err;
       }
     }
@@ -799,7 +840,9 @@ Client.prototype.disconnect = function(callback) {
   };
 
   if (callback && !(callback instanceof Function)) {
-    throw new TypeError('callback must be a function');
+    err = new TypeError('callback must be a function');
+    log.throw('Client.disconnect', client.id, err);
+    throw err;
   }
 
   //just return if already disconnected or in the process of disconnecting
@@ -1006,16 +1049,22 @@ Client.prototype.send = function(topic, data, options, callback) {
 
   // Validate the passed parameters
   if (!topic) {
-    throw new TypeError('Cannot send to undefined topic');
+    err = new TypeError('Cannot send to undefined topic');
+    log.throw('Client.send', this.id, err);
+    throw err;
   } else {
     topic = String(topic);
   }
   log.log('parms', this.id, 'topic:', topic);
   log.log('parms', this.id, 'data: typeof', typeof data);
   if (data === undefined) {
-    throw new TypeError('Cannot send undefined data');
+    err = new TypeError('Cannot send undefined data');
+    log.throw('Client.send', this.id, err);
+    throw err;
   } else if (data instanceof Function) {
-    throw new TypeError('Cannot send a function');
+    err = new TypeError('Cannot send a function');
+    log.throw('Client.send', this.id, err);
+    throw err;
   }
 
   // If the last argument is a Function then it must be a callback, and not
@@ -1032,8 +1081,10 @@ Client.prototype.send = function(topic, data, options, callback) {
     if (typeof options == 'object') {
       log.log('parms', this.id, 'options:', options);
     } else {
-      throw new TypeError('options must be an object type not a ' +
+      err = new TypeError('options must be an object type not a ' +
                           (typeof options) + ')');
+      log.throw('Client.send', this.id, err);
+      throw err;
     }
   }
 
@@ -1045,8 +1096,10 @@ Client.prototype.send = function(topic, data, options, callback) {
       } else if (options.qos === exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
-        throw new TypeError("options:qos value '" + options.qos +
+        err = new TypeError("options:qos value '" + options.qos +
                             "' is invalid must evaluate to 0 or 1");
+        log.throw('Client.send', this.id, err);
+        throw err;
       }
     }
   }
@@ -1055,15 +1108,23 @@ Client.prototype.send = function(topic, data, options, callback) {
   // (and must be specified for QoS of ALO)
   if (callback) {
     if (!(callback instanceof Function)) {
-      throw new TypeError('callback must be a function type');
+      err = new TypeError('callback must be a function type');
+      log.throw('Client.send', this.id, err);
+      throw err;
     }
   } else if (qos === exports.QOS_AT_LEAST_ONCE) {
-    throw new TypeError('callback must be specified when options:qos value ' +
+    err = new TypeError('callback must be specified when options:qos value ' +
                         'of 1 (at least once) is specified');
+    log.throw('Client.send', this.id, err);
+    throw err;
   }
 
   // Ensure we have attempted a connect
-  if (!this.hasConnected()) throw new Error('not connected');
+  if (!this.hasConnected()) {
+    err = new Error('not connected');
+    log.throw('Client.send', this.id, err);
+    throw err;
+  }
 
   // Send the data as a message to the specified topic
   var client = this;
@@ -1174,7 +1235,7 @@ Client.prototype.send = function(topic, data, options, callback) {
           return;
         }
       } catch (e) {
-        log.log('error', client.id, e);
+        log.caught('Client.send.utilSendComplete', client.id, e);
         //error condition so won't retry send remove from list of unsent
         index = client.outstandingSends.indexOf(localMessageId);
         if (index >= 0) client.outstandingSends.splice(index, 1);
@@ -1197,7 +1258,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     // start the timer to trigger it to keep sending until msg has sent
     setImmediate(untilSendComplete, protonMsg, localMessageId, callback);
   } catch (err) {
-    log.log('error', client.id, err);
+    log.caught('Client.send', client.id, err);
     //error condition so won't retry send need to remove it from list of unsent
     index = client.outstandingSends.indexOf(localMessageId);
     if (index >= 0) client.outstandingSends.splice(index, 1);
@@ -1249,7 +1310,7 @@ Client.prototype.checkForMessages = function() {
           try {
             data = JSON.parse(protonMsg.body);
           } catch (_) {
-            log.log('error', client.id, _);
+            log.caughtLevel('entry_often', 'checkForMessages', client.id, _);
             console.warn(_);
           }
         } else {
@@ -1334,13 +1395,16 @@ Client.prototype.checkForMessages = function() {
             client.emit('malformed', protonMsg.body, delivery);
           } else {
             protonMsg.destroy();
-            throw new Error('No listener for "malformed" event.');
+            err = new Error('No listener for "malformed" event.');
+            log.throwLevel('exit_often', 'checkForMessages', this.id, err);
+            throw err;
           }
         } else {
           log.log('emit', client.id, 'message', delivery);
           try {
             client.emit('message', data, delivery);
           } catch (err) {
+            log.caughtLevel('entry_often', 'checkForMessages', client.id, err);
             log.log('emit', client.id, 'error', err);
             client.emit('error', err);
           }
@@ -1358,7 +1422,7 @@ Client.prototype.checkForMessages = function() {
       }
     }
   } catch (err) {
-    log.log('error', client.id, err);
+    log.caughtLevel('entry_often', 'checkForMessages', client.id, err);
     process.nextTick(function() {
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
@@ -1424,10 +1488,14 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   // Must accept at least one option - and first option is always a
   // topicPattern.
   if (arguments.length === 0) {
-    throw new TypeError("You must specify a 'topicPattern' argument");
+    err = new TypeError("You must specify a 'topicPattern' argument");
+    log.throw('Client.subscribe', this.id, err);
+    throw err;
   }
   if (!topicPattern) {
-    throw new TypeError("You must specify a 'topicPattern' argument");
+    err = new TypeError("You must specify a 'topicPattern' argument");
+    log.throw('Client.subscribe', this.id, err);
+    throw err;
   }
   topicPattern = String(topicPattern);
 
@@ -1465,8 +1533,10 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   if (share) {
     share = String(share);
     if (share.indexOf(':') >= 0) {
-      throw new Error("share argument value '" + share + "' is invalid " +
+      err = new Error("share argument value '" + share + "' is invalid " +
                       "because it contains a colon (\':\') character");
+      log.throw('Client.subscribe', this.id, err);
+      throw err;
     }
     share = 'share:' + share + ':';
   } else {
@@ -1478,8 +1548,10 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     if (typeof options == 'object') {
       log.log('parms', this.id, 'options:', options);
     } else {
-      throw new TypeError('options must be an object type not a ' +
+      err = new TypeError('options must be an object type not a ' +
                           (typeof options) + ')');
+      log.throw('Client.subscribe', this.id, err);
+      throw err;
     }
   }
 
@@ -1492,8 +1564,10 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       } else if (options.qos === exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
-        throw new TypeError("options:qos value '" + options.qos +
+        err = new TypeError("options:qos value '" + options.qos +
                             "' is invalid must evaluate to 0 or 1");
+        log.throw('Client.subscribe', this.id, err);
+        throw err;
       }
     }
     if ('autoConfirm' in options) {
@@ -1502,9 +1576,11 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       } else if (options.autoConfirm === false) {
         autoConfirm = false;
       } else {
-        throw new TypeError("options:autoConfirm value '" +
+        err = new TypeError("options:autoConfirm value '" +
                             options.autoConfirm +
                             "' is invalid must evaluate to true or false");
+        log.throw('Client.subscribe', this.id, err);
+        throw err;
       }
     }
   }
@@ -1513,11 +1589,17 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   log.log('parms', this.id, 'options:', options);
 
   if (callback && !(callback instanceof Function)) {
-    throw new TypeError('callback must be a function type');
+    err = new TypeError('callback must be a function type');
+    log.throw('Client.subscribe', this.id, err);
+    throw err;
   }
 
   // Ensure we have attempted a connect
-  if (!this.hasConnected()) throw new Error('not connected');
+  if (!this.hasConnected()) {
+    err = new Error('not connected');
+    log.throw('Client.subscribe', this.id, err);
+    throw err;
+  }
 
   // Subscribe using the specified topic pattern and share options
   var messenger = this.messenger;
@@ -1549,7 +1631,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       share: originalShareValue, options: options });
 
   } catch (e) {
-    log.log('error', client.id, e);
+    log.caught('Client.subscribe', client.id, e);
     err = e;
   }
 
