@@ -42,6 +42,7 @@ public:
     static v8::Persistent<v8::Function> logLog;
     static v8::Persistent<v8::Function> logBody;
     static v8::Persistent<v8::Function> logFFDC;
+    static v8::Persistent<v8::Function> logThrow;
     static void Entry(const char *name, const char *id);
     static void Entry(const char *lvl, const char *name, const char *id);
     static void Exit(const char *name, const char *id, int rc);
@@ -54,6 +55,8 @@ public:
     static void LogBody(const char *id, const char *data);
     static void LogBody(const char *id, v8::Handle<v8::Value> data);
     static void FFDC(const char *fnc, int probeId, const char *data);
+    static void Throw(const char *name, const char *id, const char *err);
+    static void Throw(const char *lvl, const char *name, const char *id, const char *err);
 };
 
 #endif /* PROTON_HPP */

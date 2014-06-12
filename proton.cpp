@@ -41,6 +41,7 @@ Persistent<Function> Proton::logExit;
 Persistent<Function> Proton::logLog;
 Persistent<Function> Proton::logBody;
 Persistent<Function> Proton::logFFDC;
+Persistent<Function> Proton::logThrow;
 
 #define NO_CLIENT_ID "*"
 
@@ -142,6 +143,22 @@ void Proton::FFDC(const char *fnc, int probeId, const char *data)
   scope.Close(Undefined());
 }
 
+void Proton::Throw(const char *name, const char *id, const char *err)
+{
+  Proton::Throw("exit", name, id, err);
+}
+
+void Proton::Throw(const char *lvl, const char *name, const char *id, const char *err)
+{
+  HandleScope scope;
+  Local<Value> args[4] = {Local<Value>::New(String::New(lvl)),
+                          Local<Value>::New(String::New(name)),
+                          Local<Value>::New(String::New(id ? id : NO_CLIENT_ID)),
+                          Local<Value>::New(String::New(err ? err : "null"))};
+  Proton::logThrow->Call(Context::GetCurrent()->Global(), 4, args);
+  scope.Close(Undefined());
+}
+
 Handle<Value> CreateMessage(const Arguments& args) {
   HandleScope scope;
   return scope.Close(ProtonMessage::NewInstance(args));
@@ -170,11 +187,13 @@ void RegisterModule(Handle<Object> exports)
   Local<Function> logFnc = Local<Function>::Cast(logObj->Get(String::New("log")));
   Local<Function> bodyFnc = Local<Function>::Cast(logObj->Get(String::New("body")));
   Local<Function> ffdcFnc = Local<Function>::Cast(logObj->Get(String::New("ffdc")));
+  Local<Function> throwFnc = Local<Function>::Cast(logObj->Get(String::New("throwLevel")));
   Proton::logEntry = Persistent<Function>::New(Local<Function>::Cast(entryFnc));
   Proton::logExit = Persistent<Function>::New(Local<Function>::Cast(exitFnc));
   Proton::logLog = Persistent<Function>::New(Local<Function>::Cast(logFnc));
   Proton::logBody = Persistent<Function>::New(Local<Function>::Cast(bodyFnc));
   Proton::logFFDC = Persistent<Function>::New(Local<Function>::Cast(ffdcFnc));
+  Proton::logThrow = Persistent<Function>::New(Local<Function>::Cast(throwFnc));
 
   scope.Close(Undefined());
 }

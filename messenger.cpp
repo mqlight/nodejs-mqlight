@@ -51,7 +51,12 @@ typedef unsigned __int32 uint32_t;
 using namespace v8;
 
 #define THROW_EXCEPTION(error, fnc, id) \
-    Proton::Exit((fnc), (id), "Exception thrown"); \
+    Proton::Throw((fnc), (id), error); \
+    ThrowException(Exception::TypeError(String::New((error) == NULL ? "unknown error" : (error)))); \
+    return scope.Close(Undefined());
+
+#define THROW_EXCEPTION_LEVEL(error, lvl, fnc, id) \
+    Proton::Throw((lvl), (fnc), (id), error); \
     ThrowException(Exception::TypeError(String::New((error) == NULL ? "unknown error" : (error)))); \
     return scope.Close(Undefined());
 
@@ -508,7 +513,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
 
   // throw exception if not enough args
   if (args.Length() < 1) {
-    THROW_EXCEPTION("Missing required expiry time argument.", "ProtonMessenger::Receive", name);
+    THROW_EXCEPTION_LEVEL("Missing required expiry time argument.", "exit_often", "ProtonMessenger::Receive", name);
   }
 
   Local<Integer> integer = args[0]->ToInteger();
@@ -518,7 +523,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Receive", name);
+    THROW_EXCEPTION_LEVEL("Not connected", "exit_often", "ProtonMessenger::Receive", name);
   }
 
   Proton::Entry("entry_often", "pn_messenger_recv", name);
@@ -527,7 +532,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
   Proton::Exit("exit_often", "pn_messenger_recv", name, error);
   if (error)
   {
-    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Receive", name)
+    THROW_EXCEPTION_LEVEL(pn_error_text(pn_messenger_error(obj->messenger)), "exit_often", "ProtonMessenger::Receive", name)
   }
 
   Proton::Entry("entry_often", "pn_messenger_work", name);
@@ -537,7 +542,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
   if (error)
   {
     const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Receive", name)
+    THROW_EXCEPTION_LEVEL(text, "exit_often", "ProtonMessenger::Receive", name)
   }
 
   std::vector< Local<Object> > vector;
@@ -556,7 +561,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
     if (error)
     {
       const char *text = pn_error_text(pn_messenger_error(obj->messenger));
-      THROW_EXCEPTION(text, "ProtonMessenger::Receive", name)
+      THROW_EXCEPTION_LEVEL(text, "exit_often", "ProtonMessenger::Receive", name)
     }
 
     vector.push_back(msgObj);

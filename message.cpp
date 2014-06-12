@@ -41,9 +41,9 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 using namespace v8;
 using namespace node;
 
-#define THROW_EXCEPTION(error, fnc) \
+#define THROW_EXCEPTION(error, fnc, id) \
+    Proton::Throw((fnc), (id), error); \
     ThrowException(Exception::TypeError(String::New(error == NULL ? "unknown error" : error))); \
-    Proton::Exit(fnc, NULL, -1); \
     return scope.Close(Undefined());
 
 #ifdef _WIN32
@@ -129,7 +129,7 @@ Handle<Value> ProtonMessage::New(const Arguments& args)
 
   if (!args.IsConstructCall())
   {
-    THROW_EXCEPTION("Use the new operator to create instances of this object.", "ProtonMessage::New")
+    THROW_EXCEPTION("Use the new operator to create instances of this object.", "ProtonMessage::New", NULL)
   }
 
   // create a new instance of this type and wrap it in 'this' v8 Object
