@@ -735,8 +735,11 @@ Client.prototype.connectToService = function(callback) {
 
     // Setup heartbeat timer to ensure that while connected we send heartbeat
     // frames to keep the connection alive, when required.
-    var heartbeatInterval =
-        client.messenger.getHeartbeatInterval(client.service);
+    var remoteIdleTimeout =
+        client.messenger.getRemoteIdleTimeout(client.service);
+    var heartbeatInterval = remoteIdleTimeout > 0 ?
+        remoteIdleTimeout/2 : remoteIdleTimeout;
+    log.log('data', client.id, 'set heartbeatInterval to: ', heartbeatInterval);
     if (heartbeatInterval > 0) {
       var performHeartbeat = function(client, heartbeatInterval) {
         log.entry('Client.connectToService.performHeartbeat', client.id);

@@ -35,12 +35,12 @@ exports.unblockSendCompletion = function() {
   sendStatus = 7;
 }
 
-var heartbeatInterval = -1;
-var heartbeatCallback = undefined;
-exports.setHeartbeatInterval = function(interval, callback) {
-  if (DEBUG) console.log('setHeartbeatInterval to '+interval);
-  heartbeatInterval = interval;
-  heartbeatCallback = callback;
+var remoteIdleTimeout = -1;
+var workCallback = undefined;
+exports.setRemoteIdleTimeout = function(interval, callback) {
+  if (DEBUG) console.log('setRemoteIdleTimeout to '+interval);
+  remoteIdleTimeout = interval;
+  workCallback = callback;
 }
 
 /**
@@ -110,13 +110,13 @@ module.exports.createProtonStub = function() {
         if (DEBUG) console.log('stub getLastErrorText function called, returning: '+this.lastErrorText);
         return this.lastErrorText;
       },
-	    getHeartbeatInterval:  function(address) {
-        if (DEBUG) console.log('stub getHeartbeatInterval function called, returning: '+heartbeatInterval);
-        return heartbeatInterval;
+      getRemoteIdleTimeout:  function(address) {
+        if (DEBUG) console.log('stub getRemoteIdleTimeout function called, returning: '+remoteIdleTimeout);
+        return remoteIdleTimeout;
       },
       work: function(timeout) {
         if (DEBUG) console.log('stub work function called with timeout: '+timeout);
-        if (heartbeatCallback) heartbeatCallback.apply();
+        if (workCallback) workCallback.apply();
         return 0;
       }
 	  },

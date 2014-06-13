@@ -82,7 +82,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
   NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
   NODE_SET_PROTOTYPE_METHOD(constructor, "getLastErrorText", GetLastErrorText);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "getHeartbeatInterval", GetHeartbeatInterval);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
   NODE_SET_PROTOTYPE_METHOD(constructor, "work", Work);
 
 
@@ -721,18 +721,18 @@ Handle<Value> ProtonMessenger::GetLastErrorText(const Arguments& args) {
   return scope.Close(String::New(errorText));
 }
 
-Handle<Value> ProtonMessenger::GetHeartbeatInterval(const Arguments& args) {
+Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args) {
   HandleScope scope;
   ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char *name = obj->name.c_str();
 
-  Proton::Entry("ProtonMessenger::GetHeartbeatInterval", name);
+  Proton::Entry("ProtonMessenger::GetRemoteIdleTimeout", name);
 
   // throw exception if not enough args
   if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
       || args[0]->IsUndefined())
   {
-    THROW_EXCEPTION("Missing required address argument.", "ProtonMessenger::GetHeartbeatInterval", name);
+    THROW_EXCEPTION("Missing required address argument.", "ProtonMessenger::GetRemoteIdleTimeout", name);
   }
 
   String::Utf8Value param(args[0]->ToString());
@@ -741,14 +741,13 @@ Handle<Value> ProtonMessenger::GetHeartbeatInterval(const Arguments& args) {
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::GetHeartbeatInterval", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::GetRemoteIdleTimeout", name);
   }
 
-  // Set the heartbeat interval to half that of the remote idle timeout
-  const int heartbeatInterval = pn_messenger_get_remote_idle_timeout(obj->messenger, address.c_str()) / 2;
+  const int remoteIdleTimeout = pn_messenger_get_remote_idle_timeout(obj->messenger, address.c_str());
 
-  Proton::Exit("ProtonMessenger::GetHeartbeatInterval", name, heartbeatInterval);
-  return scope.Close(Number::New(heartbeatInterval));
+  Proton::Exit("ProtonMessenger::GetRemoteIdleTimeout", name, remoteIdleTimeout);
+  return scope.Close(Number::New(remoteIdleTimeout));
 }
 
 Handle<Value> ProtonMessenger::Work(const Arguments& args)
