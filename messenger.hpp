@@ -67,6 +67,8 @@ protected:
     static v8::Handle<v8::Value> HasOutgoing(v8::Local<v8::String> property,
                                              const v8::AccessorInfo &info);
     static v8::Handle<v8::Value> GetLastErrorText(const v8::Arguments& args);
+    static v8::Handle<v8::Value> GetHeartbeatInterval(const v8::Arguments& args);
+    static v8::Handle<v8::Value> Work(const v8::Arguments& args);
     static void Tracer(pn_transport_t *transport, const char *message);
 
     /**

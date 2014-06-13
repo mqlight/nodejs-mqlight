@@ -733,6 +733,24 @@ Client.prototype.connectToService = function(callback) {
       });
     }
 
+    // Setup heartbeat timer to ensure that while connected we send heartbeat
+    // frames to keep the connection alive, when required.
+    var heartbeatInterval =
+        client.messenger.getHeartbeatInterval(client.service);
+    if (heartbeatInterval > 0) {
+      var performHeartbeat = function(client, heartbeatInterval) {
+        log.entry('Client.connectToService.performHeartbeat', client.id);
+        if (client.messenger) {
+          client.messenger.work(0);
+          client.heartbeatTimeout = setTimeout(performHeartbeat,
+              heartbeatInterval, client, heartbeatInterval);
+        }
+        log.exit('Client.connectToService.performHeartbeat', client.id);
+      };
+      client.heartbeatTimeout = setTimeout(performHeartbeat, heartbeatInterval,
+          client, heartbeatInterval);
+    }
+
   } else {
     // We've tried all services without success. Pause for a while before
     // trying again
@@ -813,6 +831,7 @@ Client.prototype.disconnect = function(callback) {
       var messenger = client.messenger;
       if (messenger && !messenger.stopped) {
         messenger.stop();
+        if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
       }
 
       // Indicate that we've disconnected
@@ -897,6 +916,7 @@ Client.prototype.reconnect = function() {
   var messenger = client.messenger;
   if (messenger && !messenger.stopped) {
     messenger.stop();
+    if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
   }
 
   var reestablishSubsList = [];

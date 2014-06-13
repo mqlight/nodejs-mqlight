@@ -451,3 +451,45 @@ module.exports.test_connect_http_bad_status = function(test) {
   });
 };
 
+/**
+ * Tests that after successfully connecting a heartheat is
+ * setup to call pn_messeger_work at the rate required by
+ * the server.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_heartbeat = function(test) {
+  var heartbeatCount = 0;
+  var heartbeatInterval = 10;
+  stubproton.setHeartbeatInterval(heartbeatInterval, function() { heartbeatCount++; });
+  var client = mqlight.createClient({service: 'amqp://host:1234'});
+  client.connect(function() {
+    // Function to check for heartbeats. Invoked at half the rate of heartbeats
+    // This is a little crude as it is not possible to get exact timings
+    waitForHeartbeats = function(count) {
+      count++;
+      // If out of time then there have not been enough heartbeats
+      if (count === 100) {
+        client.disconnect();
+        stubproton.setHeartbeatInterval(-1);
+        test.fail('insufficient heartbeats, only saw '+heartbeatCount+' heartbeats');
+        test.done();
+      // If too many heartbeats then fail (note this is only an approximation)
+      } else if (heartbeatCount/count > 2) {
+        client.disconnect();
+        stubproton.setHeartbeatInterval(-1);
+        test.fail('too many/few heartbeats (heartbeat count: '+heartbeatCount+' loop count: '+count+')');
+        test.done();
+      // We've had enough heartbeats within half the time, so pass
+      } else if (heartbeatCount >= 100) {
+        client.disconnect();
+        stubproton.setHeartbeatInterval(-1);
+        test.ok(heartbeatCount >= 100);
+        test.done();
+      } else {
+        setTimeout(waitForHeartbeats, heartbeatInterval*2, count);
+      }
+    }
+    setTimeout(waitForHeartbeats,  heartbeatInterval*2, 0);
+  });
+};
