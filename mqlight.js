@@ -1340,7 +1340,8 @@ Client.prototype.checkForMessages = function() {
           data = protonMsg.body;
         }
 
-        var topic = url.parse(protonMsg.address).path.substring(1);
+        var topic =
+          decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
         var autoConfirm = true;
         var qos = exports.QOS_AT_MOST_ONCE;
         for (var i = 0; i < client.subscriptions.length; i++) {
