@@ -278,8 +278,8 @@ var generateServiceList = function(service) {
     if (!host) {
       msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
             'service. Must supply a hostname.';
-      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
       err = new Error(msg);
+      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
       throw err;
     }
     // Set default port if not supplied
@@ -290,8 +290,8 @@ var generateServiceList = function(service) {
     if (path) {
       msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
             " ) can't be part of a service URL.";
-      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
       err = new Error(msg);
+      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
       throw err;
     }
     serviceList[i] = protocol + '//' + host + ':' + port;
