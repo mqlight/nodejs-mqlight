@@ -16,6 +16,9 @@
  * IBM Corp.
  * </copyright>
  */
+/* jslint node: true */
+/* jshint -W083,-W097 */
+'use strict';
 
 
 /**
@@ -23,7 +26,7 @@
  * configured by the value of the MQLIGHT_NODE_LOG environment
  * variable. The default is 'ffdc'.
  */
-log = require('./mqlight-log');
+GLOBAL.log = require('./mqlight-log');
 
 
 /**
@@ -32,7 +35,7 @@ log = require('./mqlight-log');
  * An ffdc can be generated programmatically by calling
  *   log.ffdc()
  */
-exports.log = log;
+exports.log = GLOBAL.log;
 
 var os = require('os');
 var _system = os.platform() + '-' + process.arch;
@@ -83,39 +86,39 @@ exports.QOS_EXACTLY_ONCE = 2;
 
 
 /** The status unknown. */
-PN_STATUS_UNKNOWN = 0;
+var PN_STATUS_UNKNOWN = 0;
 
 
 /** The message is in flight. */
-PN_STATUS_PENDING = 1;
+var PN_STATUS_PENDING = 1;
 
 
 /** The message was accepted. */
-PN_STATUS_ACCEPTED = 2;
+var PN_STATUS_ACCEPTED = 2;
 
 
 /** The message was rejected. */
-PN_STATUS_REJECTED = 3;
+var PN_STATUS_REJECTED = 3;
 
 
 /** The message was released. */
-PN_STATUS_RELEASED = 4;
+var PN_STATUS_RELEASED = 4;
 
 
 /** The message was modified. */
-PN_STATUS_MODIFIED = 5;
+var PN_STATUS_MODIFIED = 5;
 
 
 /** The message was aborted. */
-PN_STATUS_ABORTED = 6;
+var PN_STATUS_ABORTED = 6;
 
 
 /** The remote party has settled the message. */
-PN_STATUS_SETTLED = 7;
+var PN_STATUS_SETTLED = 7;
 
 
 /** The connection retry interval in milliseconds. */
-CONNECT_RETRY_INTERVAL = 10000;
+var CONNECT_RETRY_INTERVAL = 10000;
 if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
 
 
@@ -164,7 +167,7 @@ exports.createClient = function(options) {
   log.entry('createClient', log.NO_CLIENT_ID);
 
   if (!options) {
-    err = TypeError('options object missing');
+    var err = new TypeError('options object missing');
     log.throw('createClient', log.NO_CLIENT_ID, err);
     throw err;
   }
@@ -209,6 +212,8 @@ exports.createClient = function(options) {
 var generateServiceList = function(service) {
   log.entry('generateServiceList', log.NO_CLIENT_ID);
   log.log('parms', log.NO_CLIENT_ID, 'service:', service);
+
+  var err;
 
   // Validate the parameter list length
   if (arguments.length > 1) {
@@ -320,7 +325,7 @@ var getHttpServiceFunction = function(serviceUrl) {
   log.log('parms', log.NO_CLIENT_ID, 'serviceUrl:', serviceUrl);
 
   if (typeof serviceUrl !== 'string') {
-    err = new TypeError('serviceUrl must be a string type');
+    var err = new TypeError('serviceUrl must be a string type');
     log.throw('getHttpServiceFunction', log.NO_CLIENT_ID, err);
     throw err;
   }
@@ -457,10 +462,12 @@ var Client = function(service, id, user, password) {
   // If client id has not been specified then generate an id
   if (!id) id = 'AUTO_' + uuid.v4().substring(0, 7);
 
+  var err, msg;
+
   // If the client id is incorrectly formatted then throw an error
   if (id.length > 48) {
-    var msg = "Client identifier '" + id + "' is longer than the maximum ID " +
-              'length of 48.';
+    msg = "Client identifier '" + id + "' is longer than the maximum ID " +
+          'length of 48.';
     err = new RangeError(msg);
     log.throw('Client.constructor', log.NO_CLIENT_ID, err);
     throw err;
@@ -471,8 +478,7 @@ var Client = function(service, id, user, password) {
   // currently client ids are restricted, reject any invalid ones
   for (var i in id) {
     if (validClientIdChars.indexOf(id[i]) == -1) {
-      var msg = "Client Identifier '" + id + "' contains invalid char: " +
-          id[i];
+      msg = "Client Identifier '" + id + "' contains invalid char: " + id[i];
       err = new Error(msg);
       log.throw('Client.constructor', log.NO_CLIENT_ID, err);
       throw err;
@@ -567,7 +573,7 @@ Client.prototype.connect = function(callback) {
   log.entry('Client.connect', this.id);
 
   if (callback && (typeof callback !== 'function')) {
-    err = new TypeError('Callback must be a function');
+    var err = new TypeError('Callback must be a function');
     log.throw('Client.connect', this.id, err);
     throw err;
   }
@@ -738,7 +744,7 @@ Client.prototype.connectToService = function(callback) {
     var remoteIdleTimeout =
         client.messenger.getRemoteIdleTimeout(client.service);
     var heartbeatInterval = remoteIdleTimeout > 0 ?
-        remoteIdleTimeout/2 : remoteIdleTimeout;
+        remoteIdleTimeout / 2 : remoteIdleTimeout;
     log.log('data', client.id, 'set heartbeatInterval to: ', heartbeatInterval);
     if (heartbeatInterval > 0) {
       var performHeartbeat = function(client, heartbeatInterval) {
@@ -862,7 +868,7 @@ Client.prototype.disconnect = function(callback) {
   };
 
   if (callback && !(callback instanceof Function)) {
-    err = new TypeError('callback must be a function');
+    var err = new TypeError('callback must be a function');
     log.throw('Client.disconnect', client.id, err);
     throw err;
   }
@@ -936,7 +942,7 @@ Client.prototype.reconnect = function() {
   var resubscribe = function() {
     log.entry('Client.reconnect.resubscribe', client.id);
     while (reestablishSubsList.length > 0) {
-      sub = reestablishSubsList.pop();
+      var sub = reestablishSubsList.pop();
       client.subscribe(sub.topicPattern, sub.share, sub.options,
           function(err, pattern) {
             //if err we don't wanto 'lose' subs in the reestablish list add to
@@ -1069,6 +1075,8 @@ Client.prototype.hasConnected = function() {
  */
 Client.prototype.send = function(topic, data, options, callback) {
   log.entry('Client.send', this.id);
+
+  var err;
 
   // Validate the passed parameters
   if (!topic) {
@@ -1283,7 +1291,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   } catch (err) {
     log.caught('Client.send', client.id, err);
     //error condition so won't retry send need to remove it from list of unsent
-    index = client.outstandingSends.indexOf(localMessageId);
+    var index = client.outstandingSends.indexOf(localMessageId);
     if (index >= 0) client.outstandingSends.splice(index, 1);
     process.nextTick(function() {
       if (callback) {
@@ -1341,7 +1349,7 @@ Client.prototype.checkForMessages = function() {
         }
 
         var topic =
-          decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
+            decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
         var autoConfirm = true;
         var qos = exports.QOS_AT_MOST_ONCE;
         for (var i = 0; i < client.subscriptions.length; i++) {
@@ -1419,7 +1427,7 @@ Client.prototype.checkForMessages = function() {
             client.emit('malformed', protonMsg.body, delivery);
           } else {
             protonMsg.destroy();
-            err = new Error('No listener for "malformed" event.');
+            var err = new Error('No listener for "malformed" event.');
             log.throwLevel('exit_often', 'checkForMessages', this.id, err);
             throw err;
           }

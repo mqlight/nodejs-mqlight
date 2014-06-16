@@ -181,6 +181,11 @@ void RegisterModule(Handle<Object> exports)
                FunctionTemplate::New(CreateMessenger)->GetFunction());
 
   Local<Value> logVal = Context::GetCurrent()->Global()->Get(String::New("log"));
+  if (logVal->IsUndefined()) {
+    ThrowException(Exception::TypeError(
+                     String::New("global 'log' object is undefined")));
+    return;
+  }
   Local<Object> logObj = Local<Object>::Cast(logVal);
   Local<Function> entryFnc = Local<Function>::Cast(logObj->Get(String::New("entryLevel")));
   Local<Function> exitFnc = Local<Function>::Cast(logObj->Get(String::New("exitLevel")));

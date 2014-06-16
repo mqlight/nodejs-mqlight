@@ -16,6 +16,9 @@
  * IBM Corp.
  * </copyright>
  */
+/* jslint node: true */
+/* jshint -W083,-W097 */
+'use strict';
 var log = exports;
 
 var pkg = require('./package.json');
@@ -117,24 +120,24 @@ log.setLevel = function(lvl) {
     if (logger.levels[logger.level] <= logger.levels.detail) {
       // Set PN_TRACE_FRM if detailed data level logging is enabled.
       log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
-      process.env['PN_TRACE_FRM'] = '1';
+      process.env.PN_TRACE_FRM = '1';
       if (logger.levels[logger.level] <= logger.levels.raw) {
         // Set PN_TRACE_RAW if raw level logging is enabled.
         log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
-        process.env['PN_TRACE_RAW'] = '1';
+        process.env.PN_TRACE_RAW = '1';
       } else {
         log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
-        delete process.env['PN_TRACE_RAW'];
+        delete process.env.PN_TRACE_RAW;
       }
     }
     else {
-      if (process.env['PN_TRACE_RAW']) {
+      if (process.env.PN_TRACE_RAW) {
         log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
-        delete process.env['PN_TRACE_RAW'];
+        delete process.env.PN_TRACE_RAW;
       }
-      if (process.env['PN_TRACE_FRM']) {
+      if (process.env.PN_TRACE_FRM) {
         log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
-        delete process.env['PN_TRACE_FRM'];
+        delete process.env.PN_TRACE_FRM;
       }
     }
   } else {
@@ -188,7 +191,7 @@ log.setStream = function(stream) {
     }
 
     // Open the specified file.
-    fd = fs.openSync(stream, 'a', 0644);
+    fd = fs.openSync(stream, 'a', '0644');
 
     // Set up a listener for log events.
     logger.on('log', function(m) {
@@ -288,13 +291,14 @@ log.entry = function(name, id) {
 log.exitLevel = function(lvl, name, id, rc) {
   write(lvl, id, EXIT_IND.substring(0, stack.length - 1),
         name, rc ? rc : '');
+  var last;
   do
   {
     if (stack.length == 1) {
       log.ffdc('log.exitLevel', 10, null, name);
       break;
     }
-    var last = stack.pop();
+    last = stack.pop();
   } while (last != name);
 };
 
@@ -337,7 +341,7 @@ log.log = function(lvl, id, args) {
  *        Buffer object.
                                                                 */
 log.body = function(id, data) {
-  if (logger.levels[logger.level] <= logger.levels['data']) {
+  if (logger.levels[logger.level] <= logger.levels.data) {
     write('data', id, '! length:', data.length);
     if (typeof data === 'string') {
       if ((dataSize >= data.length) || (dataSize < 0)) {
@@ -451,7 +455,7 @@ log.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
     fnc: opt_fnc || 'User-requested FFDC by function',
     probeId: opt_probeId || 255,
     ffdcSequence: ffdcSequence++,
-    clientId: opt_client ? client.Id : log.NO_CLIENT_ID
+    clientId: opt_client ? opt_client.id : log.NO_CLIENT_ID
   };
 
   log.entry('log.ffdc', opts.clientId);
