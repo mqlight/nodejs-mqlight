@@ -274,7 +274,7 @@ var generateServiceList = function(service) {
     if (!protocol || protocol !== 'amqp:' && protocol !== 'amqps:') {
       msg = "Unsupported URL '" + inputServiceList[i] +
             "' specified for service. Only the amqp or amqps protocol are " +
-            ' supported.';
+            'supported.';
       err = new Error(msg);
       log.throw('generateServiceList', log.NO_CLIENT_ID, err);
       throw err;
@@ -589,6 +589,8 @@ Client.prototype.connect = function(callback) {
         setImmediate(function() {
           stillDisconnecting(client, callback);
         });
+
+        log.exit('Client.connect.performConnect', client.id, null);
         return;
       } else {
         process.nextTick(function() {
@@ -865,6 +867,8 @@ Client.prototype.disconnect = function(callback) {
 
     // try disconnect again
     setImmediate(performDisconnect, client, callback);
+
+    log.exit('Client.disconnect.performDisconnect', client.id, null);
   };
 
   if (callback && !(callback instanceof Function)) {
@@ -914,8 +918,10 @@ Client.prototype.reconnect = function() {
   if (client.getState() !== 'connected') {
     if (client.getState() === 'disconnected' ||
         client.getState() === 'disconnecting') {
+      log.exit('Client.reconnect', client.id, null);
       return undefined;
     } else if (client.getState() === 'retrying') {
+      log.exit('Client.reconnect', client.id, client);
       return client;
     }
   }

@@ -36,6 +36,7 @@ var ffdcSequence = 0;
 var fd = 0;
 var dataSize;
 var exceptionThrown = null;
+var processedExceptions = 0;
 
 var ENTRY_IND = '>-----------------------------------------------------------';
 var EXIT_IND = '<-----------------------------------------------------------';
@@ -100,6 +101,7 @@ var header = function(lvl, clientId, options) {
     if ('ffdcSequence' in options) {
       write(lvl, clientId, '| FDCSequenceNumber :-', options.ffdcSequence++);
     }
+    write(lvl, clientId, '| Exceptions        :-', processedExceptions);
     write(lvl, clientId, HEADER_BANNER);
     write(lvl, clientId, '');
   }
@@ -253,11 +255,9 @@ log.getDataSize = function() {
 log.entryLevel = function(lvl, name, id) {
   if (exceptionThrown) {
     log.log('error', id, '* Uncaught exception');
+    processedExceptions++;
     exceptionThrown = null;
     while(stack.length > 1) {
-      if (stack[stack.length - 1] === name) {
-        break;
-      }
       stack.pop();
     }
   }
@@ -289,13 +289,15 @@ log.entry = function(name, id) {
  * @param {Object} rc The function return code.
  */
 log.exitLevel = function(lvl, name, id, rc) {
-  write(lvl, id, EXIT_IND.substring(0, stack.length - 1),
+  write(lvl, id, EXIT_IND.substring(0, Math.max(1, stack.length - 1)),
         name, rc ? rc : '');
   var last;
   do
   {
     if (stack.length == 1) {
-      log.ffdc('log.exitLevel', 10, null, name);
+      if (processedExceptions == 0) {
+        log.ffdc('log.exitLevel', 10, null, name);
+      }
       break;
     }
     last = stack.pop();
@@ -410,6 +412,7 @@ log.throw = function(name, id, err) {
 log.caughtLevel = function(lvl, name, id, err) {
   log.log('error', id, '* Caught exception:', err);
   if (exceptionThrown) {
+    processedExceptions++;
     exceptionThrown = null;
     while(stack.length > 1) {
       if (stack[stack.length - 1] === name) {
