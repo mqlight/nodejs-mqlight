@@ -40,7 +40,9 @@ module.exports = testCase({
         'mqlight-log.js',
         'bin/mqlight-debug.js',
         'samples/send.js',
-        'samples/recv.js'
+        'samples/recv.js',
+        'tests/*.js',
+        'tests/stubs/*.js'
       ], { stdio: 'inherit' });
       child.on('exit', function(code, signal) {
         if (signal) {

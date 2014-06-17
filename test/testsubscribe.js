@@ -329,6 +329,7 @@ module.exports.test_subscribe_share_names = function(test) {
   });
 };
 
+
 /**
  * Test a variety of valid and invalid options values. Invalid options
  * should result in the client.subscribe(...) method throwing a TypeError.
@@ -339,17 +340,16 @@ module.exports.test_subscribe_share_names = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_options = function(test) {
-  var data = Array();
   var data = [{valid: false, options: ''},
-              {valid: true, options: undefined},   // effectively the same as not providing options
-              {valid: true, options: null},        // effectively the same as not providing options
+              {valid: true, options: undefined},
+              {valid: true, options: null},
               {valid: false, options: function() {}},
               {valid: false, options: '1'},
               {valid: false, options: 2},
               {valid: false, options: true},
               {valid: true, options: {}},
               {valid: true, options: data},
-              {valid: true, options: { a:1 } }];
+              {valid: true, options: { a: 1 } }];
 
   var client = mqlight.createClient({service: 'amqp://host'});
   client.connect(function() {
@@ -357,13 +357,15 @@ module.exports.test_subscribe_options = function(test) {
       if (data[i].valid) {
         test.doesNotThrow(
             function() {
-              client.subscribe('testpattern', 'share', data[i].options, function(){});
+              client.subscribe('testpattern', 'share', data[i].options,
+                               function() {});
             }
         );
       } else {
         test.throws(
             function() {
-              client.subscribe('testpattern', 'share', data[i].options, function(){});
+              client.subscribe('testpattern', 'share', data[i].options,
+                               function() {});
             },
             TypeError,
             'options should have been rejected: ' + data[i].options
@@ -374,6 +376,7 @@ module.exports.test_subscribe_options = function(test) {
     test.done();
   });
 };
+
 
 /**
  * Test a variety of valid and invalid QoS options.  Invalid QoS values
@@ -391,14 +394,14 @@ module.exports.test_subscribe_qos = function(test) {
               {valid: true, qos: 0},
               {valid: true, qos: 1},
               {valid: true, qos: number},
-              {valid: true, qos: 9-8},
+              {valid: true, qos: 9 - 8},
               {valid: true, qos: mqlight.QOS_AT_MOST_ONCE},
               {valid: true, qos: mqlight.QOS_AT_LEAST_ONCE}];
 
   var client = mqlight.createClient({service: 'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
-      var opts = { qos : data[i].qos };
+      var opts = { qos: data[i].qos };
       if (data[i].valid) {
         test.doesNotThrow(function() {
           client.subscribe('testpattern', opts);
@@ -414,9 +417,12 @@ module.exports.test_subscribe_qos = function(test) {
   });
 };
 
+
 /**
- * Test a variety of valid and invalid autoConfirm options.  Invalid autoConfirm values
- * should result in the client.subscribe(...) method throwing a TypeError.
+ * Test a variety of valid and invalid autoConfirm options.  Invalid
+ * autoConfirm values should result in the client.subscribe(...) method
+ * throwing a TypeError.
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_autoConfirm = function(test) {
@@ -430,10 +436,10 @@ module.exports.test_subscribe_autoConfirm = function(test) {
               {valid: false, opts: { autoConfirm: 2 } },
               {valid: true, opts: { autoConfirm: true } },
               {valid: true, opts: { autoConfirm: false } },
-              {valid: true, opts: { qos:0, autoConfirm: true } },
-              {valid: true, opts: { qos:0, autoConfirm: false } },
-              {valid: true, opts: { qos:1, autoConfirm: true } },
-              {valid: true, opts: { qos:1, autoConfirm: false } },
+              {valid: true, opts: { qos: 0, autoConfirm: true } },
+              {valid: true, opts: { qos: 0, autoConfirm: false } },
+              {valid: true, opts: { qos: 1, autoConfirm: true } },
+              {valid: true, opts: { qos: 1, autoConfirm: false } },
               {valid: true, opts: { autoConfirm: 1 == 1 } },
               {valid: true, opts: { autoConfirm: 'abc' == 'abc' } },
               {valid: true, opts: { autoConfirm: a } }];

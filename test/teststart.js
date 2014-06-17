@@ -451,6 +451,7 @@ module.exports.test_connect_http_bad_status = function(test) {
   });
 };
 
+
 /**
  * Tests that after successfully connecting a heartheat is
  * setup to call pn_messeger_work at the rate required by
@@ -461,7 +462,9 @@ module.exports.test_connect_http_bad_status = function(test) {
 module.exports.test_connect_heartbeat = function(test) {
   var heartbeatCount = 0;
   var remoteIdleTimeout = 20;
-  stubproton.setRemoteIdleTimeout(remoteIdleTimeout, function() { heartbeatCount++; });
+  stubproton.setRemoteIdleTimeout(remoteIdleTimeout, function() {
+    heartbeatCount++;
+  });
   var client = mqlight.createClient({service: 'amqp://host:1234'});
   client.connect(function() {
     // Function to check for heartbeats. Invoked at half the rate of heartbeats
@@ -472,13 +475,15 @@ module.exports.test_connect_heartbeat = function(test) {
       if (count === 100) {
         client.disconnect();
         stubproton.setRemoteIdleTimeout(-1);
-        test.fail('insufficient heartbeats, only saw '+heartbeatCount+' heartbeats');
+        test.fail('insufficient heartbeats, only saw ' + heartbeatCount +
+                  'heartbeats');
         test.done();
       // If too many heartbeats then fail (note this is only an approximation)
-      } else if (heartbeatCount/count > 2) {
+      } else if (heartbeatCount / count > 2) {
         client.disconnect();
         stubproton.setRemoteIdleTimeout(-1);
-        test.fail('too many/few heartbeats (heartbeat count: '+heartbeatCount+' loop count: '+count+')');
+        test.fail('too many/few heartbeats (heartbeat count: ' +
+                  heartbeatCount + ' loop count: ' + count + ')');
         test.done();
       // We've had enough heartbeats within half the time, so pass
       } else if (heartbeatCount >= 100) {
@@ -489,7 +494,7 @@ module.exports.test_connect_heartbeat = function(test) {
       } else {
         setTimeout(waitForHeartbeats, remoteIdleTimeout, count);
       }
-    }
+    };
     setTimeout(waitForHeartbeats, remoteIdleTimeout, 0);
   });
 };
