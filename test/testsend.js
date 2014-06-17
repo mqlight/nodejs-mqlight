@@ -16,6 +16,9 @@
  * IBM Corp.
  * </copyright>
  */
+/* jslint node: true */
+/* jshint -W083,-W097 */
+'use strict';
 
 
 /** @const {string} enable unittest mode in mqlight.js */
@@ -35,12 +38,12 @@ module.exports.test_send_too_few_arguments = function(test) {
   client.connect(function() {
     test.throws(
         function() {
-          send();
+          client.send();
         }
     );
     test.throws(
         function() {
-          send('topic');
+          client.send('topic');
         }
     );
     client.disconnect();
@@ -218,7 +221,7 @@ module.exports.test_send_callback = function(test) {
         clearTimeout(timeout);
         test.done();
       }
-    }
+    };
   };
   client.connect(function() {
     for (var i = 0; i < testData.length; ++i) {
@@ -258,7 +261,6 @@ module.exports.test_send_fails_if_disconneced = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_send_options = function(test) {
-  var data = Array();
   var data = [{valid: false, options: ''},
               {valid: true, options: undefined},
               {valid: true, options: null},

@@ -16,6 +16,9 @@
  * IBM Corp.
  * </copyright>
  */
+/* jslint node: true */
+/* jshint -W083,-W097 */
+'use strict';
 
 
 /** @const {string} enable unittest mode in mqlight.js */
@@ -469,7 +472,7 @@ module.exports.test_connect_heartbeat = function(test) {
   client.connect(function() {
     // Function to check for heartbeats. Invoked at half the rate of heartbeats
     // This is a little crude as it is not possible to get exact timings
-    waitForHeartbeats = function(count) {
+    var waitForHeartbeats = function(count) {
       count++;
       // If out of time then there have not been enough heartbeats
       if (count === 100) {

@@ -16,9 +16,9 @@
  * IBM Corp.
  * </copyright>
  */
-// ***********************************************************************
-// Example unit test, that can be used as the starting point for new tests
-// ***********************************************************************
+/* jslint node: true */
+/* jshint -W083,-W097 */
+'use strict';
 
 
 /** @const {string} enable unittest mode in mqlight.js */
@@ -45,7 +45,7 @@ var testMessage = function(sentTopic, subscribedPattern) {
     linkAddress: 'private:' + subscribedPattern,
     deliveryAnnotations: undefined,
     destroy: function() {
-      destoyed = true;
+      this.destroyed = true;
     }
   };
 };
@@ -170,8 +170,8 @@ module.exports.test_bad_listener = function(test) {
 
   var handler = function(err) {
     var err_stack = err.stack.split('\n');
-    if (err_stack[2].indexOf('testreceivemessage.js') < 0) {
-      test.ok(false, 'Unexpected stack trace at ' + err_stack[2]);
+    if (err_stack[1].indexOf('testreceivemessage.js') < 0) {
+      test.ok(false, 'Unexpected stack trace at ' + err_stack[1]);
       test.done();
     }
   };
@@ -184,7 +184,7 @@ module.exports.test_bad_listener = function(test) {
       // purposefully throw an exception the first time
       if (first === true) {
         first = false;
-        throw Error();
+        throw new Error();
       }
       process.removeListener('uncaughtException', handler);
       test.done();

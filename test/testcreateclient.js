@@ -16,6 +16,9 @@
  * IBM Corp.
  * </copyright>
  */
+/* jslint node: true */
+/* jshint -W083,-W097 */
+'use strict';
 
 
 /** NODE_ENV = 'unittest' loads a stub instead of the Proton library */
@@ -136,7 +139,7 @@ module.exports.test_id_types_values = function(test) {
                   {data: ':1234', valid: false},
                   {data: '1234:', valid: false},
                   {data: '12:34', valid: false},
-                  {data: '%.\_', valid: true}];
+                  {data: '%._', valid: true}];
   for (var i = 0; i < testData.length; ++i) {
     try {
       mqlight.createClient({
@@ -179,8 +182,8 @@ module.exports.test_user_password_types_values = function(test) {
                   {user: 'abc', password: '123', valid: true},
                   {user: 1234, password: 'abc', valid: true},
                   {user: 'abc', password: 1234, valid: true},
-                  {user: '!"$%^&*()-_=+[{]};:\'@#~|\<,>.?/',
-          password: '!"$%^&*()-_=+[{]};:\'@#~|\<,>.?/',
+                  {user: '!"$%^&*()-_=+[{]};:\'@#~|<,>.?/',
+          password: '!"$%^&*()-_=+[{]};:\'@#~|<,>.?/',
           valid: true}];
   for (var i = 0; i < testData.length; ++i) {
     try {

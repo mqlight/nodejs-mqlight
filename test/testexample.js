@@ -16,6 +16,10 @@
  * IBM Corp.
  * </copyright>
  */
+/* jslint node: true */
+/* jshint -W083,-W097 */
+'use strict';
+
 // ***********************************************************************
 // Example unit test, that can be used as the starting point for new tests
 // ***********************************************************************
