@@ -36,6 +36,7 @@ GLOBAL.log = require('./mqlight-log');
  *   log.ffdc()
  */
 exports.log = GLOBAL.log;
+var log = GLOBAL.log;
 
 var os = require('os');
 var _system = os.platform() + '-' + process.arch;
@@ -64,6 +65,7 @@ var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 var uuid = require('node-uuid');
 var url = require('url');
+var fs = require('fs');
 var http = require('http');
 
 var validClientIdChars =
@@ -308,13 +310,83 @@ var generateServiceList = function(service) {
 
 
 /**
+ * Function to take a single FILE URL and using the JSON retrieved from it to
+ * return an array of service URLs.
+ *
+ * @param {String}
+ *          fileUrl - Required; a FILE address to retrieve service info
+ *          from (e.g., file:///tmp/config.json).
+ * @return {function(callback)} a function which will call the given callback
+ *          with a list of AMQP service URLs retrieved from the FILE.
+ * @throws TypeError
+ *           If fileUrl is not a string.
+ * @throws Error
+ *           if an unsupported or invalid FILE address is specified.
+ */
+var getFileServiceFunction = function(fileUrl) {
+  log.entry('getFileServiceFunction', log.NO_CLIENT_ID);
+  log.log('parms', log.NO_CLIENT_ID, 'fileUrl:', fileUrl);
+
+  if (typeof fileUrl !== 'string') {
+    var err = new TypeError('fileUrl must be a string type');
+    log.throw('getFileServiceFunction', log.NO_CLIENT_ID, err);
+    throw err;
+  }
+
+  var fileServiceFunction = function(callback) {
+    log.entry('fileServiceFunction', log.NO_CLIENT_ID);
+
+    fs.readFile(fileUrl, { encoding: 'utf8' }, function(err, data) {
+      log.entry('fileServiceFunction.readFile.callback', log.NO_CLIENT_ID);
+      log.log('parms', log.NO_CLIENT_ID, 'err:', err);
+      log.log('parms', log.NO_CLIENT_ID, 'data:', data);
+
+      if (err) {
+        err.message = 'attempt to read ' + fileUrl + ' failed with the ' +
+                      'following error: ' + err.message;
+        log.log('error', log.NO_CLIENT_ID, err);
+        log.entry('fileServiceFunction.callback', log.NO_CLIENT_ID);
+        log.log('parms', log.NO_CLIENT_ID, 'err:', err);
+        callback(err);
+        log.exit('fileServiceFunction.callback', log.NO_CLIENT_ID, null);
+      } else {
+        try {
+          var obj = JSON.parse(data);
+          log.entry('fileServiceFunction.callback', log.NO_CLIENT_ID);
+          log.log('parms', log.NO_CLIENT_ID, 'service:', obj.service);
+          callback(undefined, obj.service);
+          log.exit('fileServiceFunction.callback', log.NO_CLIENT_ID, null);
+        } catch (err) {
+          err.message = 'the content read from ' + fileUrl + ' contained ' +
+                        'unparseable JSON: ' + err.message;
+          log.caught('fileServiceFunction.readFile.callback',
+                     log.NO_CLIENT_ID, err);
+          log.entry('fileServiceFunction.callback', log.NO_CLIENT_ID);
+          log.log('parms', log.NO_CLIENT_ID, 'err:', err);
+          callback(err);
+          log.exit('fileServiceFunction.callback', log.NO_CLIENT_ID, null);
+        }
+      }
+      log.exit('fileServiceFunction.readFile.callback', log.NO_CLIENT_ID, null);
+    });
+
+    log.exit('fileServiceFunction', log.NO_CLIENT_ID, null);
+  };
+
+  log.exit('getFileServiceFunction', log.NO_CLIENT_ID, fileServiceFunction);
+  return fileServiceFunction;
+};
+
+
+/**
  * Function to take a single HTTP URL and using the JSON retrieved from it to
  * return an array of service URLs.
  *
  * @param {String}
  *          serviceUrl - Required; an HTTP address to retrieve service info
  *          from.
- * @return {Array} a list of AMQP service URLs retrieved from the URL.
+ * @return {function(callback)} a function which will call the given callback
+ *          with a list of AMQP service URLs retrieved from the URL.
  * @throws TypeError
  *           If serviceUrl is not a string.
  * @throws Error
@@ -453,6 +525,8 @@ var Client = function(service, id, user, password) {
     var serviceUrl = url.parse(service);
     if (serviceUrl.protocol === 'http:' || serviceUrl.protocol === 'https:') {
       serviceFunction = getHttpServiceFunction(service);
+    } else if (serviceUrl.protocol === 'file:') {
+      serviceFunction = getFileServiceFunction(service);
     }
   }
   if (!serviceFunction) {

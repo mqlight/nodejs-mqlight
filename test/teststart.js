@@ -26,6 +26,7 @@ process.env.NODE_ENV = 'unittest';
 
 var stubproton = require('./stubs/stubproton');
 var mqlight = require('../mqlight');
+var fs = require('fs');
 var http = require('http');
 var EventEmitter = require('events').EventEmitter;
 var testCase = require('nodeunit').testCase;
@@ -451,6 +452,142 @@ module.exports.test_connect_http_bad_status = function(test) {
     client.disconnect();
     test.done();
     http.request = originalHttpRequestMethod;
+  });
+};
+
+
+/**
+ * Tests that calling connect with a FILE URI to lookup the endpoint, that
+ * the connect operation will keep retrying, performing the file read for
+ * each retry, until it returns a valid endpoint that can be connected to.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_file_changing_endpoint = function(test) {
+  var amqpServices = [
+    'amqp://bad1',
+    'amqp://bad2',
+    'amqp://host:1234',
+    'amqp://bad3'
+  ];
+  var originalReadFileMethod = fs.readFile;
+  var index = 0;
+  fs.readFile = function(filename, options, callback) {
+    try {
+      test.ok(index < amqpServices.length);
+      var data = '{"service":["' + amqpServices[index++] + '"]}';
+      if (callback) callback(undefined, data);
+    } catch (e) {
+      console.error(e);
+      test.fail(e);
+    }
+  };
+  var client = mqlight.createClient({
+    service: 'file:///tmp/filename.json'
+  });
+  client.on('error', function(err) {
+    test.ok(err.message.indexOf('amqp://bad1') != -1 ||
+            err.message.indexOf('amqp://bad2') != -1);
+  });
+  client.connect(function(err) {
+    test.ifError(err);
+    test.ok(client.getService());
+    test.equals(client.getService(), 'amqp://host:1234',
+                'Connected to wrong service. ' + client.getService());
+    client.disconnect();
+    test.done();
+    fs.readFile = originalReadFileMethod;
+  });
+};
+
+
+/**
+ * Tests that calling connect with a FILE URI to lookup the endpoint, that the
+ * connect operation will retry each endpoint in the returned list first,
+ * before then performing the file read again.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_file_multiple_endpoints = function(test) {
+  var amqpServices = [
+    ['amqp://bad1', 'amqp://bad2', 'amqp://bad3', 'amqp://bad4'],
+    ['amqp://bad5', 'amqp://bad6', 'amqp://host:1234', 'amqp://bad7']
+  ];
+  var originalReadFileMethod = fs.readFile;
+  var index = 0;
+  fs.readFile = function(filename, options, callback) {
+    try {
+      test.ok(index < amqpServices.length);
+      var data = '{"service":' + JSON.stringify(amqpServices[index++]) +
+                 '}';
+      if (callback) callback(undefined, data);
+    } catch (e) {
+      console.error(e);
+      test.fail(e);
+    }
+  };
+  var client = mqlight.createClient({
+    service: 'file:///tmp/filename.json'
+  });
+  // error will be emitted for the last service in the returned endpoint list
+  client.on('error', function(err) {
+    test.ok(err.message.indexOf('amqp://bad4') != -1);
+  });
+  client.connect(function(err) {
+    test.ifError(err);
+    test.equals(client.getService(), 'amqp://host:1234',
+                'Connected to wrong service. ');
+    client.disconnect();
+    test.done();
+    fs.readFile = originalReadFileMethod;
+  });
+};
+
+
+/**
+ * Tests that calling connect with a bad FILE URI returns the underlying 
+ * error message to the connect callback.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_bad_file = function(test) {
+  var client = mqlight.createClient({
+    service: 'file:///badfile.json'
+  });
+  client.connect(function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/ENOENT/.test(err));
+    client.disconnect();
+    test.done();
+  });
+};
+
+
+/**
+ * Tests that the FILE URI returning malformed JSON is coped with.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_file_bad_json = function(test) {
+  var originalReadFileMethod = fs.readFile;
+  fs.readFile = function(filename, options, callback) {
+    try {
+      var data = '(╯°□°)╯︵ ┻━┻';
+      if (callback) callback(undefined, data);
+    } catch (e) {
+      console.error(e);
+      test.fail(e);
+    }
+  };
+  var client = mqlight.createClient({
+    service: 'file://badjson.json'
+  });
+  client.connect(function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/unparseable JSON/.test(err));
+    test.ok(/Unexpected token \(/.test(err));
+    client.disconnect();
+    test.done();
+    fs.readFile = originalReadFileMethod;
   });
 };
 
