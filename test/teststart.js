@@ -426,7 +426,6 @@ module.exports.test_connect_http_bad_json = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_connect_http_bad_amqp_service = function(test) {
-
   var originalHttpRequestMethod = http.request;
   http.request = function(url, callback) {
     var req = new EventEmitter();
@@ -454,6 +453,35 @@ module.exports.test_connect_http_bad_amqp_service = function(test) {
     test.ok(err instanceof Error);
     test.ok(/Unsupported URL/.test(err));
     test.ok(/amqp:\/\/myserver:\*\*\*\*/.test(err));
+    client.disconnect();
+    test.done();
+    http.request = originalHttpRequestMethod;
+  });
+};
+
+
+/**
+ * Tests that a timeout during the HTTP request is coped with.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_http_timeout = function(test) {
+  var originalHttpRequestMethod = http.request;
+  http.request = function(url, callback) {
+    var req = new EventEmitter();
+    req.setTimeout = function(timeout, callback) {
+      // trigger the timeout callback immediately
+      setTimeout(callback, 0);
+    };
+    req.end = function() {};
+    return req;
+  };
+  var client = mqlight.createClient({
+    service: 'http://127.0.0.1:9999'
+  });
+  client.connect(function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/http request to http:\/\/127.0.0.1:9999 timed out/.test(err));
     client.disconnect();
     test.done();
     http.request = originalHttpRequestMethod;
@@ -586,7 +614,7 @@ module.exports.test_connect_file_multiple_endpoints = function(test) {
 
 
 /**
- * Tests that calling connect with a bad FILE URI returns the underlying 
+ * Tests that calling connect with a bad FILE URI returns the underlying
  * error message to the connect callback.
  *
  * @param {object} test the unittest interface

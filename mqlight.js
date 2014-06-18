@@ -464,7 +464,15 @@ var getHttpServiceFunction = function(serviceUrl) {
       callback(err);
       log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
     });
-    req.setTimeout(5000);
+    req.setTimeout(5000, function() {
+      var err = new Error('http request to ' + serviceUrl + ' timed out ' +
+          'after 5000 milliseconds');
+      log.log('error', log.NO_CLIENT_ID, err);
+      log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
+      log.log('parms', log.NO_CLIENT_ID, 'err:', err);
+      callback(err);
+      log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
+    });
     req.end();
 
     log.exit('httpServiceFunction', log.NO_CLIENT_ID, null);
