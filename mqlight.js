@@ -350,12 +350,9 @@ var getFileServiceFunction = function(fileUrl) {
         callback(err);
         log.exit('fileServiceFunction.callback', log.NO_CLIENT_ID, null);
       } else {
+        var obj;
         try {
-          var obj = JSON.parse(data);
-          log.entry('fileServiceFunction.callback', log.NO_CLIENT_ID);
-          log.log('parms', log.NO_CLIENT_ID, 'service:', obj.service);
-          callback(undefined, obj.service);
-          log.exit('fileServiceFunction.callback', log.NO_CLIENT_ID, null);
+          obj = JSON.parse(data);
         } catch (err) {
           err.message = 'the content read from ' + fileUrl + ' contained ' +
                         'unparseable JSON: ' + err.message;
@@ -364,6 +361,12 @@ var getFileServiceFunction = function(fileUrl) {
           log.entry('fileServiceFunction.callback', log.NO_CLIENT_ID);
           log.log('parms', log.NO_CLIENT_ID, 'err:', err);
           callback(err);
+          log.exit('fileServiceFunction.callback', log.NO_CLIENT_ID, null);
+        }
+        if (obj) {
+          log.entry('fileServiceFunction.callback', log.NO_CLIENT_ID);
+          log.log('parms', log.NO_CLIENT_ID, 'service:', obj.service);
+          callback(undefined, obj.service);
           log.exit('fileServiceFunction.callback', log.NO_CLIENT_ID, null);
         }
       }
@@ -418,12 +421,9 @@ var getHttpServiceFunction = function(serviceUrl) {
         log.entry('httpServiceFunction.req.on.end.callback', log.NO_CLIENT_ID);
 
         if (res.statusCode === 200) {
+          var obj;
           try {
-            var obj = JSON.parse(data);
-            log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
-            log.log('parms', log.NO_CLIENT_ID, 'service:', obj.service);
-            callback(undefined, obj.service);
-            log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
+            obj = JSON.parse(data);
           } catch (err) {
             err.message = 'http request to ' + serviceUrl + ' returned ' +
                           'unparseable JSON: ' + err.message;
@@ -432,6 +432,12 @@ var getHttpServiceFunction = function(serviceUrl) {
             log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
             log.log('parms', log.NO_CLIENT_ID, 'err:', err);
             callback(err);
+            log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
+          }
+          if (obj) {
+            log.entry('httpServiceFunction.callback', log.NO_CLIENT_ID);
+            log.log('parms', log.NO_CLIENT_ID, 'service:', obj.service);
+            callback(undefined, obj.service);
             log.exit('httpServiceFunction.callback', log.NO_CLIENT_ID, null);
           }
         } else {
@@ -693,8 +699,16 @@ Client.prototype.connect = function(callback) {
           log.exit('Client.connect.performConnect.serviceFunction.callback',
               client.id, null);
         } else {
-          client.serviceList = generateServiceList(service);
-          client.connectToService(callback);
+          try {
+            client.serviceList = generateServiceList(service);
+            client.connectToService(callback);
+          } catch (err) {
+            log.entry('Client.connect.performConnect.serviceFunction.callback',
+                      client.id);
+            callback(err);
+            log.exit('Client.connect.performConnect.serviceFunction.callback',
+                client.id, null);
+          }
         }
       });
     } else {

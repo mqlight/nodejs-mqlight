@@ -420,6 +420,48 @@ module.exports.test_connect_http_bad_json = function(test) {
 
 
 /**
+ * Tests that a malformed AMQP service URL returned by HTTP function is coped
+ * with.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_http_bad_amqp_service = function(test) {
+
+  var originalHttpRequestMethod = http.request;
+  http.request = function(url, callback) {
+    var req = new EventEmitter();
+    req.setTimeout = function() {};
+    req.end = function() {
+      try {
+        var res = new EventEmitter();
+        res.setEncoding = function() {};
+        res.statusCode = 200;
+        if (callback) callback(res);
+        var data = '{"service":' + ' [ "amqp://myserver:****" ]}';
+        res.emit('data', data);
+        res.emit('end');
+      } catch (e) {
+        console.error(e);
+        test.fail(e);
+      }
+    };
+    return req;
+  };
+  var client = mqlight.createClient({
+    service: 'http://127.0.0.1:9999'
+  });
+  client.connect(function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/Unsupported URL/.test(err));
+    test.ok(/amqp:\/\/myserver:\*\*\*\*/.test(err));
+    client.disconnect();
+    test.done();
+    http.request = originalHttpRequestMethod;
+  });
+};
+
+
+/**
  * Tests that a bad HTTP status code is coped with.
  *
  * @param {object} test the unittest interface
