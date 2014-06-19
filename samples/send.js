@@ -23,11 +23,13 @@ var uuid = require('node-uuid');
 
 // parse the commandline arguments
 var types = {
-  address: String,
+  service: String,
+  topic: String,
   delay: Number
 };
 var shorthands = {
-  a: ['--address'],
+  s: ['--service'],
+  t: ['--topic'],
   d: ['--delay'],
   h: ['--help']
 };
@@ -38,40 +40,19 @@ if (parsed.help) {
   console.log('');
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
-  console.log('  -a ADDRESS, --address=ADDRESS');
-  console.log('                        address: amqp://<domain>/<name>');
-  console.log('                        (default amqp://localhost/public)');
+  console.log('  -s URL, --service=URL service to connect to');
+  console.log('                        (default: amqp://localhost/public)');
+  console.log('  -t TOPIC, --topic=TOPIC');
+  console.log('                        send messages to topic TOPIC' +
+              ' (default: public)');
   console.log('  -d NUM, --delay=NUM   add a NUM seconds time delay between' +
               ' each request');
   console.log('');
   process.exit(0);
 }
 
-// defaults
-var hostname = 'localhost';
-var port = 5672;
-var topic = 'public';
-
-// extract override values from cmdline arguments (if given)
-if (parsed.address) {
-  var addr = parsed.address;
-  if (addr.indexOf('amqp://') === 0) {
-    hostname = addr.replace('amqp://', '');
-  }
-  if (hostname.indexOf('/') > -1) {
-    topic = hostname.substring(hostname.indexOf('/') + 1);
-    hostname = hostname.substring(0, hostname.indexOf('/'));
-  } else {
-    topic = addr;
-  }
-  if (hostname.indexOf(':') > -1) {
-    var split = hostname.split(':');
-    hostname = split[0];
-    port = split[1];
-  }
-}
-
-var service = 'amqp://' + hostname + ':' + port;
+var topic = parsed.topic ? parsed.topic : 'public';
+var service = parsed.service ? parsed.service : 'amqp://localhost';
 
 // create client to connect to broker with
 var opts = {

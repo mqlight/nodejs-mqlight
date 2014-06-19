@@ -23,26 +23,33 @@ var uuid = require('node-uuid');
 
 // parse the commandline arguments
 var types = {
-  share: String
+  'share-name': String,
+  service: String,
+  'topic-pattern': String
 };
 var shorthands = {
   h: ['--help'],
-  s: ['--share']
+  n: ['--share-name'],
+  s: ['--service'],
+  t: ['--topic-pattern']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
 
-if (parsed.help || remain.length > 1) {
-  console.log('Usage: recv.js [options] <address>');
-  console.log('                          address: amqp://<domain>/<name>');
-  console.log('                          (default amqp://localhost/public)');
+if (parsed.help || remain.length > 0) {
+  console.log('Usage: recv.js [options]');
   console.log('');
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
-  console.log('  -s, --share           specify an optional share name to ' +
-              'create or join a');
-  console.log('                        shared subscription for the given ' +
-              'topic');
+  console.log('  -s URL, --service=URL service to connect to');
+  console.log('                        (default: amqp://localhost/public)');
+  console.log('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN');
+  console.log('                        subscribe to receive messages matching' +
+              ' TOPICPATTERN');
+  console.log('                        (default: public)');
+  console.log('  -n NAME, --share-name NAME');
+  console.log('                        specify an optional shared destination');
+  console.log('                        name of NAME to subscribe to');
   console.log('');
   if (parsed.help) {
     process.exit(0);
@@ -51,31 +58,8 @@ if (parsed.help || remain.length > 1) {
   }
 }
 
-// defaults
-var hostname = 'localhost';
-var port = 5672;
-var topic = 'public';
-
-// extract override values from cmdline arguments (if given)
-if (remain[0]) {
-  var addr = remain[0];
-  if (addr.indexOf('amqp://') === 0) {
-    hostname = addr.replace('amqp://', '');
-  }
-  if (hostname.indexOf('/') > -1) {
-    topic = hostname.substring(hostname.indexOf('/') + 1);
-    hostname = hostname.substring(0, hostname.indexOf('/'));
-  } else {
-    topic = addr;
-  }
-  if (hostname.indexOf(':') > -1) {
-    var split = hostname.split(':');
-    hostname = split[0];
-    port = split[1];
-  }
-}
-
-var service = 'amqp://' + hostname + ':' + port;
+var service = parsed.service ? parsed.service : 'amqp://localhost';
+var topic = parsed['topic-pattern'] ? parsed['topic-pattern'] : 'public';
 
 // connect client to broker
 var opts = {
@@ -89,7 +73,7 @@ client.on('connected', function() {
   console.log('Connected to %s using client-id %s', service, client.getId());
 
   // now subscribe to topic for publications
-  client.subscribe(topic, parsed.share, function(err, pattern) {
+  client.subscribe(topic, parsed['share-name'], function(err, pattern) {
     if (err) {
       console.error('Problem with subscribe request: %s', err.message);
       process.exit(1);
