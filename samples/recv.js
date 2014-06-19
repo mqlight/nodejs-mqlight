@@ -41,16 +41,18 @@ if (parsed.help || remain.length > 0) {
   console.log('');
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
-  console.log('  -s URL, --service=URL service to connect to');
-  console.log('                        (default: amqp://localhost/public)');
+  console.log('  -s URL, --service=URL service to connect to' +
+              ' (default: amqp://localhost)');
   console.log('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN');
   console.log('                        subscribe to receive messages matching' +
               ' TOPICPATTERN');
   console.log('                        (default: public)');
   console.log('  -n NAME, --share-name NAME');
-  console.log('                        specify an optional shared destination');
-  console.log('                        name of NAME to subscribe to');
+  console.log('                        optionally, subscribe to a shared' +
+              ' destination using');
+  console.log('                        NAME as the share name.');
   console.log('');
+
   if (parsed.help) {
     process.exit(0);
   } else {

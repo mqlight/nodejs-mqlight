@@ -238,12 +238,17 @@ Usage:
 Receiver Example:
 
 ```
-Usage: recv.js [options] <address>
-                          address: amqp://<domain>/<name>
-                          (default amqp://localhost/public)
+Usage: recv.js [options]
 
 Options:
   -h, --help            show this help message and exit
+  -s URL, --service=URL service to connect to (default: amqp://localhost)
+  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN
+                        subscribe to receive messages matching TOPICPATTERN
+                        (default: public)
+  -n NAME, --share-name NAME
+                        optionally, subscribe to a shared destination using
+                        NAME as the share name.
 ```
 
 Sender Example:
@@ -253,9 +258,9 @@ Usage: send.js [options] <msg_1> ... <msg_n>
 
 Options:
   -h, --help            show this help message and exit
-  -a ADDRESS, --address=ADDRESS
-                        address: amqp://<domain>/<name>
-                        (default amqp://localhost/public)
+  -s URL, --service=URL service to connect to (default: amqp://localhost)
+  -t TOPIC, --topic=TOPIC
+                        send messages to topic TOPIC (default: public)
   -d NUM, --delay=NUM   add a NUM seconds time delay between each request
 ```
 
@@ -281,4 +286,5 @@ that goes to stderr when you run your application.
 * Support for sending and receiving 'at-most-once' messages.
 * Support for wildcard subscriptions.
 * Support for shared subscriptions.
+* Switch samples to use service/topic arguments instead of address.
 

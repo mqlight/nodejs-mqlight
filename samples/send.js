@@ -40,8 +40,8 @@ if (parsed.help) {
   console.log('');
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
-  console.log('  -s URL, --service=URL service to connect to');
-  console.log('                        (default: amqp://localhost/public)');
+  console.log('  -s URL, --service=URL service to connect to' +
+              ' (default: amqp://localhost)');
   console.log('  -t TOPIC, --topic=TOPIC');
   console.log('                        send messages to topic TOPIC' +
               ' (default: public)');
