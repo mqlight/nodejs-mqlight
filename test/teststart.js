@@ -543,6 +543,8 @@ module.exports.test_connect_file_changing_endpoint = function(test) {
   var index = 0;
   fs.readFile = function(filename, options, callback) {
     try {
+      test.equals(filename, '/tmp/filename.json',
+                  'Incorrect filename passed: ' + filename);
       test.ok(index < amqpServices.length);
       var data = '{"service":["' + amqpServices[index++] + '"]}';
       if (callback) callback(undefined, data);
@@ -586,6 +588,8 @@ module.exports.test_connect_file_multiple_endpoints = function(test) {
   var index = 0;
   fs.readFile = function(filename, options, callback) {
     try {
+      test.equals(filename, '/tmp/filename.json',
+                  'Incorrect filename passed: ' + filename);
       test.ok(index < amqpServices.length);
       var data = '{"service":' + JSON.stringify(amqpServices[index++]) +
                  '}';
@@ -633,6 +637,25 @@ module.exports.test_connect_bad_file = function(test) {
 
 
 /**
+ * Tests that calling connect with a non-localhost FILE URI throws an error.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_bad_remote_file_uri = function(test) {
+  test.throws(
+      function() {
+        mqlight.createClient({
+          service: 'file://remote.example.com/badfile.json'
+        });
+      },
+      Error,
+      /unsupported file URI/
+  );
+  test.done();
+};
+
+
+/**
  * Tests that the FILE URI returning malformed JSON is coped with.
  *
  * @param {object} test the unittest interface
@@ -640,6 +663,8 @@ module.exports.test_connect_bad_file = function(test) {
 module.exports.test_connect_file_bad_json = function(test) {
   var originalReadFileMethod = fs.readFile;
   fs.readFile = function(filename, options, callback) {
+    test.equals(filename, '/badjson.json',
+                'Incorrect filename passed: ' + filename);
     try {
       var data = '(╯°□°)╯︵ ┻━┻';
       if (callback) callback(undefined, data);
@@ -649,7 +674,7 @@ module.exports.test_connect_file_bad_json = function(test) {
     }
   };
   var client = mqlight.createClient({
-    service: 'file://badjson.json'
+    service: 'file://localhost/badjson.json'
   });
   client.connect(function(err) {
     test.ok(err instanceof Error);

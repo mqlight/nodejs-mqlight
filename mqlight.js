@@ -531,6 +531,8 @@ var Client = function(service, id, user, password) {
 
   EventEmitter.call(this);
 
+  var err, msg;
+
   // Ensure the service is an Array or Function
   var serviceList, serviceFunction;
   if (service instanceof Function) {
@@ -540,7 +542,14 @@ var Client = function(service, id, user, password) {
     if (serviceUrl.protocol === 'http:' || serviceUrl.protocol === 'https:') {
       serviceFunction = getHttpServiceFunction(service);
     } else if (serviceUrl.protocol === 'file:') {
-      serviceFunction = getFileServiceFunction(service);
+      if (serviceUrl.host.length > 0 && serviceUrl.host !== 'localhost') {
+        msg = 'service contains unsupported file URI of ' + service +
+            ', only file:///path or file://localhost/path are supported.';
+        err = new Error(msg);
+        log.throw('Client.constructor', log.NO_CLIENT_ID, err);
+        throw err;
+      }
+      serviceFunction = getFileServiceFunction(serviceUrl.path);
     }
   }
   if (!serviceFunction) {
@@ -549,8 +558,6 @@ var Client = function(service, id, user, password) {
 
   // If client id has not been specified then generate an id
   if (!id) id = 'AUTO_' + uuid.v4().substring(0, 7);
-
-  var err, msg;
 
   // If the client id is incorrectly formatted then throw an error
   if (id.length > 48) {
