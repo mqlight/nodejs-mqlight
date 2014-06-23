@@ -280,11 +280,18 @@ that goes to stderr when you run your application.
 
 ## Release notes
 
-### 0.1.0
+### 0.1.0000000000
+
+* Second beta release.
+* Support for Mac OS X.
+* Support for sending and receiving 'at-least-once' messages either with
+  automatic or manual confirmation by the receiver.
+* Updated samples to use service/topic arguments instead of address.
+
+### 0.1.2014042204
 
 * Initial beta release.
 * Support for sending and receiving 'at-most-once' messages.
 * Support for wildcard subscriptions.
 * Support for shared subscriptions.
-* Switch samples to use service/topic arguments instead of address.
 
