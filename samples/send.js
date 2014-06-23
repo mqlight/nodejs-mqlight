@@ -16,6 +16,9 @@
  * IBM Corp.
  * </copyright>
  */
+/* jslint node: true */
+/* jshint -W083,-W097 */
+'use strict';
 
 var mqlight = require('mqlight');
 var nopt = require('nopt');
@@ -103,12 +106,12 @@ client.on('connected', function() {
 });
 
 client.on('error', function(error) {
-  console.log('*** error ***');
+  console.error('*** error ***');
   if (error) {
-    if (error.message) console.log('message: '+error.message);
-    else if (error.stack) console.log(error.stack);
+    if (error.message) console.error('message: %s', error.message);
+    else if (error.stack) console.error(error.stack);
   }
-  console.log('exiting.');
+  console.error('exiting.');
   process.exit(1);
 });
 
