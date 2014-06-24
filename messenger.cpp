@@ -450,16 +450,19 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
   Proton::Entry("ProtonMessenger::Subscribe", name);
 
   // throw exception if not enough args
-  if (args.Length() < 2 || args[0].IsEmpty() || args[1].IsEmpty() ) {
-    THROW_EXCEPTION("Missing required pattern or qos argument.", "ProtonMessenger::Subscribe", name);
+  if (args.Length() < 3 || args[0].IsEmpty() || args[1].IsEmpty()
+          || args[2].IsEmpty()) {
+  	THROW_EXCEPTION("Missing required pattern or qos argument.",
+  	                "ProtonMessenger::Subscribe", name);
   }
 
   String::Utf8Value param(args[0]->ToString());
   std::string address = std::string(*param);
-  Local<Integer> integer = args[1]->ToInteger();
-  int qos = (int)integer->Value();
+  int qos = (int)args[1]->ToInteger()->Value();
+  int ttl = (int) args[2]->ToInteger()->Value();
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("parms", name, "qos:", qos);
+  Proton::Log("parms", name, "ttl:", ttl);
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -480,9 +483,9 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
   }
 
 
-  Proton::Entry("pn_messenger_subscribe", name);
-  pn_messenger_subscribe(obj->messenger, address.c_str());
-  Proton::Exit("pn_messenger_subscribe", name, 0);
+  Proton::Entry("pn_messenger_subscribe_ttl", name);
+  pn_messenger_subscribe_ttl(obj->messenger, address.c_str(), ttl);
+  Proton::Exit("pn_messenger_subscribe_ttl", name, 0);
 
   Proton::Entry("pn_messenger_recv", name);
   pn_messenger_recv(obj->messenger, -1);
