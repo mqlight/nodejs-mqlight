@@ -616,6 +616,8 @@ var Client = function(service, id, user, password) {
   // List of outstanding send operations waiting to be accepted, settled, etc
   // by the listener.
   this.outstandingSends = [];
+  // List of queuedSends for resending on a reconnect
+  this.queuedSends = [];
 
   log.exit('Client.constructor', this.id, this);
 };
@@ -947,7 +949,18 @@ Client.prototype.disconnect = function(callback) {
         messenger.stop();
         if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
       }
-
+      //clear queuedSends as we are disconnecting
+      while (client.queuedSends.length > 0) {
+        var msg = client.queuedSends.pop();
+        //call the callback in error as we have disconnected
+        process.nextTick(function() {
+          log.entry('Client.disconnect.performDisconnect.queuedSendCallback',
+              client.id);
+          msg.callback(new Error('send aborted due to disconnect'));
+          log.exit('Client.disconnect.performDisconnect.queuedSendCallback',
+              client.id, null);
+        });
+      }
       // Indicate that we've disconnected
       client.state = 'disconnected';
       process.nextTick(function() {
@@ -981,8 +994,7 @@ Client.prototype.disconnect = function(callback) {
   }
 
   //just return if already disconnected or in the process of disconnecting
-  if (client.getState() === 'disconnected' ||
-      client.getState() === 'disconnecting') {
+  if (client.isDisconnected()) {
     process.nextTick(function() {
       if (callback) {
         log.entry('Client.disconnect.callback', client.id);
@@ -1019,8 +1031,7 @@ Client.prototype.reconnect = function() {
   log.entry('Client.reconnect', client.id);
 
   if (client.getState() !== 'connected') {
-    if (client.getState() === 'disconnected' ||
-        client.getState() === 'disconnecting') {
+    if (client.isDisconnected()) {
       log.exit('Client.reconnect', client.id, null);
       return undefined;
     } else if (client.getState() === 'retrying') {
@@ -1066,6 +1077,12 @@ Client.prototype.reconnect = function() {
             }
           });
     }
+    while (client.queuedSends.length > 0 &&
+            client.getState() === 'connected') {
+      var msg = client.queuedSends.pop();
+      client.send(msg.topic, msg.data, msg.options, msg.callback);
+    }
+
     log.exit('Client.reconnect.resubscribe');
   };
   // if client is using serviceFunction, re-generate the list of services
@@ -1134,11 +1151,11 @@ Client.prototype.getState = function() {
 
 
 /**
- * @return {Boolean} <code>true</code> if a connection has been made (i.e.
- * state is connected), <code>false</code> otherwise.
+ * @return {Boolean} <code>true</code> true if in disconnected or
+ * disconnecting state, <code>false</code> otherwise.
  */
-Client.prototype.hasConnected = function() {
-  return this.state === 'connected';
+Client.prototype.isDisconnected = function() {
+  return (this.state === 'disconnected' || this.state === 'disconnecting');
 };
 
 /**
@@ -1184,7 +1201,6 @@ Client.prototype.hasConnected = function() {
  */
 Client.prototype.send = function(topic, data, options, callback) {
   log.entry('Client.send', this.id);
-
   var err;
 
   // Validate the passed parameters
@@ -1260,7 +1276,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   // Ensure we have attempted a connect
-  if (!this.hasConnected()) {
+  if (this.isDisconnected()) {
     err = new Error('not connected');
     log.throw('Client.send', this.id, err);
     throw err;
@@ -1379,20 +1395,32 @@ Client.prototype.send = function(topic, data, options, callback) {
         //error condition so won't retry send remove from list of unsent
         index = client.outstandingSends.indexOf(localMessageId);
         if (index >= 0) client.outstandingSends.splice(index, 1);
-        client.disconnect();
+        // an error here could still mean the message made it over
+        // so we only care about at least once messages
+        if (qos === exports.QOS_AT_LEAST_ONCE) {
+          client.queuedSends.push({topic: topic, data: data, options: options,
+            callback: callback});
+        }
         process.nextTick(function() {
           if (sendCallback) {
-            log.entry('Client.send.utilSendComplete.callback', client.id);
-            sendCallback.apply(client, [e, topic, protonMsg.body, options]);
-            log.exit('Client.send.utilSendComplete.callback', client.id, null);
+            if (qos === exports.QOS_AT_MOST_ONCE) {
+              //we don't know if an at most once message made it across
+              //call the callback with undefined to indicate success to
+              //avoid user resending on error.
+              log.entry('Client.send.utilSendComplete.callback', client.id);
+              sendCallback.apply(client, [undefined, topic, protonMsg.body,
+                options]);
+              log.exit('Client.send.utilSendComplete.callback', client.id,
+                  null);
+            }
           }
           if (e) {
             log.log('emit', client.id, 'error', e);
             client.emit('error', e);
           }
+          client.reconnect();
         });
       }
-
       log.exit('Client.send.utilSendComplete', client.id, null);
     };
     // start the timer to trigger it to keep sending until msg has sent
@@ -1402,11 +1430,17 @@ Client.prototype.send = function(topic, data, options, callback) {
     //error condition so won't retry send need to remove it from list of unsent
     var index = client.outstandingSends.indexOf(localMessageId);
     if (index >= 0) client.outstandingSends.splice(index, 1);
+    if (qos === exports.QOS_AT_LEAST_ONCE) {
+      client.queuedSends.push({topic: topic, data: data, options: options,
+        callback: callback});
+    }
     process.nextTick(function() {
       if (callback) {
-        log.entry('Client.send.callback', client.id);
-        callback(err, protonMsg);
-        log.exit('Client.send.callback', client.id, null);
+        if (qos === exports.QOS_AT_MOST_ONCE) {
+          log.entry('Client.send.callback', client.id);
+          callback(err, topic, protonMsg.body, options);
+          log.exit('Client.send.callback', client.id, null);
+        }
       }
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
@@ -1748,7 +1782,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   }
 
   // Ensure we have attempted a connect
-  if (!this.hasConnected()) {
+  if (this.isDisconnected()) {
     err = new Error('not connected');
     log.throw('Client.subscribe', this.id, err);
     throw err;
