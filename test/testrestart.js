@@ -43,21 +43,22 @@ module.exports.test_successful_reconnect = function(test) {
     test.done();
     if (client) client.disconnect();
   }, 5000);
+
   client.on('connected', function(x, y) {
-    test.equals(client.getState(), 'connected',
+    test.deepEqual(client.getState(), 'connected',
         'client status connected after connect');
     stubproton.setConnectStatus(2);
     client.reconnect();
   });
 
   client.on('error', function(err) {
-    test.equals(client.getState(), 'retrying',
+    test.deepEqual(client.getState(), 'retrying',
         'client in retrying state after error');
     stubproton.setConnectStatus(0);
   });
 
   client.on('reconnected', function(x, y) {
-    test.equals(client.getState(), 'connected', 'client has reconnected');
+    test.deepEqual(client.getState(), 'connected', 'client has reconnected');
     client.disconnect();
     test.done();
     clearTimeout(timeout);
@@ -105,7 +106,7 @@ module.exports.test_multi_reconnect_call = function(test) {
   });
   client.on('error', function(x, y) {
     //second reconnect should return immediately
-    test.equals(client.reconnect().getState(), 'retrying');
+    test.deepEqual(client.reconnect().getState(), 'retrying');
     stubproton.setConnectStatus(0);
   });
 
@@ -201,13 +202,65 @@ module.exports.test_disconnect_while_reconnecting = function(test) {
   });
 
   client.on('disconnected', function(x, y) {
-    test.equals(client.getState(), 'disconnected', 'state disconected');
+    test.deepEqual(client.getState(), 'disconnected', 'state disconected');
     //set connect state to 0 and wait a second incase of reconnect
     stubproton.setConnectStatus(0);
     setTimeout(function() {
       test.done();
       clearTimeout(timeout);
     },1000);
+  });
+
+  client.connect();
+};
+
+
+/**
+*
+* Test that an error during send result in the queuing of an
+* AT_LEAST_ONCE message. Then when reconnected this gets sent
+* and the queue of messages to send is 0.
+* @param {object} test the unittest interface
+*/
+module.exports.test_single_queued_send = function(test) {
+  test.expect(4);
+  var client = mqlight.createClient({service: 'amqp://host'});
+  var savedSendFunction = mqlight.proton.messenger.send;
+  var reconnected = 0;
+  mqlight.proton.messenger.send = function() {
+    throw new Error('error during send');
+  };
+
+
+  var timeout = setTimeout(function() {
+    test.ok(false, 'Test timed out waiting for event emitions');
+    mqlight.proton.messenger.send = savedSendFunction;
+    test.done();
+    if (client) client.disconnect();
+  }, 5000);
+
+  var opts = {qos: mqlight.QOS_AT_LEAST_ONCE};
+  client.on('connected', function(x,y) {
+    stubproton.setConnectStatus(1);
+    client.send('test', 'message', opts, function() {
+      //this callback should only happen after reconnect
+      test.equals(reconnected, 1, 'has reconnected');
+      test.deepEqual(client.getState(), 'connected', 'state is connected');
+      test.equals(client.queuedSends.length, 0, 'queued sends now 0');
+      client.disconnect();
+      clearTimeout(timeout);
+      test.done();
+    });
+  });
+
+  client.on('error', function(x, y) {
+    stubproton.setConnectStatus(0);
+    test.equals(client.queuedSends.length, 1, 'check for queued send'); 
+  });
+
+  client.on('reconnected', function(x, y) {
+    reconnected++;
+    mqlight.proton.messenger.send = savedSendFunction;
   });
 
   client.connect();

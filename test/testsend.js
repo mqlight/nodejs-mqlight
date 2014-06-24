@@ -24,6 +24,7 @@
 /** @const {string} enable unittest mode in mqlight.js */
 process.env.NODE_ENV = 'unittest';
 
+var stubproton = require('./stubs/stubproton');
 var testCase = require('nodeunit').testCase;
 var mqlight = require('../mqlight');
 
@@ -375,5 +376,50 @@ module.exports.test_send_qos_function = function(test) {
     }
     client.disconnect();
     test.done();
+  });
+};
+
+
+/**
+* Test that any queued sends are cleared when disconnect is called
+* and that the sends callback is called with an error to indicate
+* failure.
+* @param {object} test the unittest inteface
+*/
+module.exports.test_clear_queuedsends_disconnect = function(test) {
+  test.expect(3);
+  var client = mqlight.createClient({service: 'amqp://host'});
+  var savedSendFunction = mqlight.proton.messenger.send;
+  mqlight.proton.messenger.send = function() {
+    throw new Error('stub error during send');
+  };
+
+  var timeout = setTimeout(function(){
+    test.ok(false, 'test timed out before callback');
+    mqlight.proton.messenger.send = savedSendFunction;
+    client.disconnect();
+  }, 5000)
+  var opts = {qos: mqlight.QOS_AT_LEAST_ONCE};
+           
+  client.on('connected', function(x,y) {
+    stubproton.setConnectStatus(1);
+    client.send('test', 'message', opts, function(err){
+      test.deepEqual(client.getState(), 'disconnected',
+          'callback called when disconnected');
+      test.notDeepEqual(err, undefined, 'not undefined so err set');
+      test.equal(client.queuedSends.length, 0, 'no queued sends left');
+      mqlight.proton.messenger.send = savedSendFunction;
+      clearTimeout(timeout);
+      test.done();
+    });
+  });
+  
+  client.on('error', function(x,y){
+    client.disconnect();
+  });
+
+  client.connect();
+  process.on('uncaughtException', function(err) {
+    console.log(err);
   });
 };
