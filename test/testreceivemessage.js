@@ -156,7 +156,8 @@ module.exports.test_receive_topic_pattern = function(test) {
  */
 module.exports.test_bad_listener = function(test) {
   var originalReceiveMethod = mqlight.proton.messenger.receive;
-  var messages = [testMessage('x', 'x'), testMessage('x', 'x')];
+  var messages = [testMessage('/public', '/public'), 
+                  testMessage('/public', '/public')];
   mqlight.proton.messenger.receive = function() {
     var result = messages;
     messages = [];

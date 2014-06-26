@@ -612,6 +612,8 @@ var Client = function(service, id, user, password) {
 
   // List of message subscriptions
   this.subscriptions = [];
+  // List of queued subscriptions
+  this.queuedSubscriptions = [];
 
   // List of outstanding send operations waiting to be accepted, settled, etc
   // by the listener.
@@ -1048,11 +1050,10 @@ Client.prototype.reconnect = function() {
     if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
   }
 
-  var reestablishSubsList = [];
   // clear the subscriptions list, if the cause of the reconnect happens during
   // check for messages we need a 0 length so it will check once reconnected.
   while (client.subscriptions.length > 0) {
-    reestablishSubsList.push(client.subscriptions.pop());
+    client.queuedSubscriptions.push(client.subscriptions.pop());
   }
   // also clear any left over outstanding sends
   while (client.outstandingSends.length > 0) {
@@ -1061,21 +1062,10 @@ Client.prototype.reconnect = function() {
 
   var resubscribe = function() {
     log.entry('Client.reconnect.resubscribe', client.id);
-    while (reestablishSubsList.length > 0) {
-      var sub = reestablishSubsList.pop();
-      client.subscribe(sub.topicPattern, sub.share, sub.options,
-          function(err, pattern) {
-            //if err we don't wanto 'lose' subs in the reestablish list add to
-            //clients subscriptions list so the next reconnect picks them up.
-            if (err) {
-              client.subscriptions.push(sub);
-              //rather than keep looping add the rest of the loop to
-              //subscriptions here so we don't try another subscribe
-              while (reestablishSubsList.length > 0) {
-                client.subscriptions.push(reestablishSubsList.pop());
-              }
-            }
-          });
+    while (client.queuedSubscriptions.length > 0 && 
+            client.getState() === 'connected') {
+      var sub = client.queuedSubscriptions.pop();
+      client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
     }
     while (client.queuedSends.length > 0 &&
             client.getState() === 'connected') {
@@ -1282,6 +1272,14 @@ Client.prototype.send = function(topic, data, options, callback) {
     throw err;
   }
 
+  // Ensure we are not retrying otherwise queue message and return
+  if (this.getState() === 'retrying') {
+    this.queuedSends.push({topic: topic, data: data, options: options,
+      callback: callback});
+    log.exit('Client.send', this.id);
+    return;
+  }
+
   // Send the data as a message to the specified topic
   var client = this;
   var messenger = client.messenger;
@@ -1418,8 +1416,8 @@ Client.prototype.send = function(topic, data, options, callback) {
             log.log('emit', client.id, 'error', e);
             client.emit('error', e);
           }
-          client.reconnect();
         });
+        client.reconnect();
       }
       log.exit('Client.send.utilSendComplete', client.id, null);
     };
@@ -1434,7 +1432,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       client.queuedSends.push({topic: topic, data: data, options: options,
         callback: callback});
     }
-    process.nextTick(function() {
+    setImmediate(function() {
       if (callback) {
         if (qos === exports.QOS_AT_MOST_ONCE) {
           log.entry('Client.send.callback', client.id);
@@ -1444,8 +1442,8 @@ Client.prototype.send = function(topic, data, options, callback) {
       }
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
-      client.reconnect();
     });
+    client.reconnect();
   }
 
   log.exit('Client.send', this.id, null);
@@ -1495,14 +1493,41 @@ Client.prototype.checkForMessages = function() {
             decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
         var autoConfirm = true;
         var qos = exports.QOS_AT_MOST_ONCE;
-        for (var i = 0; i < client.subscriptions.length; i++) {
-          if (client.subscriptions[i].address === protonMsg.address) {
-            qos = client.subscriptions[i].qos;
-            if (qos === exports.QOS_AT_LEAST_ONCE) {
-              autoConfirm = client.subscriptions[i].autoConfirm;
+        var matchedSubs = client.subscriptions.filter(function(el){
+          // 1 added to length to account for the / we add
+          var addressNoService = el.address.slice(client.getService().length + 
+                                 1);
+          //possible to have 2 matches work out whether this is
+          //for a share or private topic
+          if (el.share === undefined && 
+              protonMsg.linkAddress.indexOf('private:') === 0){
+            //slice off private: and compare to the no service address
+            var linkNoPrivShare = protonMsg.linkAddress.slice(8);
+            if ( addressNoService === linkNoPrivShare ){
+              return el;
             }
-            break;
+          } else if (el.share !== undefined && 
+                     protonMsg.linkAddress.indexOf('share:') === 0){
+            //starting after the share: look for the next : denoting the end
+            //of the share name and get everything past that
+            var linkNoShare = protonMsg.linkAddress.slice
+            (protonMsg.linkAddress.indexOf(':',7) + 1);
+            if ( addressNoService === linkNoShare ){           
+              return el;
+            }
           }
+        });
+        //should only ever be one entry in matchedSubs
+        if ( matchedSubs[0] !== undefined ){
+          qos = matchedSubs[0].qos;
+          if ( qos === exports.QOS_AT_LEAST_ONCE ){
+            autoConfirm = matchedSubs[0].autoConfirm;
+          }
+        } else {
+          //shouldn't get here
+          var err = new Error('No listener matched for this message: ' +
+                              data + ' going to address: ' + protonMsg.address);
+          throw err;
         }
 
         var delivery = {
@@ -1792,7 +1817,22 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var messenger = this.messenger;
   var address = this.getService() + '/' + share + topicPattern;
   var client = this;
-
+  var subscriptionAddress = this.getService() + '/' + topicPattern;
+  // If retrying queue this subscribe
+  if ( client.getState() === 'retrying' ){
+    //first check if its already there and if so remove old and add new
+    for ( var qs = 0; qs < client.queuedSubscriptions; qs++ ){
+      if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
+          client.queuedSubscriptions[qs].share === originalShareValue){
+        client.queuedSubscriptions.splice(qs,1);
+      }
+    }
+    client.queuedSubscriptions.push({address: subscriptionAddress,
+      qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
+      share: originalShareValue, options: options, callback: callback });
+    return client;
+  }
+  
   var err;
   try {
     messenger.subscribe(address, qos, ttl);
@@ -1806,34 +1846,47 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
 
     // Add address to list of subscriptions, replacing any existing entry
-    var subscriptionAddress = this.getService() + '/' + topicPattern;
     for (var i = 0; i < client.subscriptions.length; i++) {
-      if (client.subscriptions[i].address === subscriptionAddress) {
+      if (client.subscriptions[i].address === subscriptionAddress &&
+          client.subscriptions[i].share === originalShareValue) {
         client.subscriptions.splice(i, 1);
         break;
       }
     }
     client.subscriptions.push({ address: subscriptionAddress,
       qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
-      share: originalShareValue, options: options });
+      share: originalShareValue, options: options, callback: callback });
 
   } catch (e) {
     log.caught('Client.subscribe', client.id, e);
     err = e;
+    //error during subscribe so add to list of queued to resub
+    client.queuedSubscriptions.push({address: subscriptionAddress,
+      qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
+      share: originalShareValue, options: options, callback: callback });
+    client.reconnect();
   }
 
   setImmediate(function() {
     if (callback) {
-      log.entry('Client.subscribe.callback', client.id);
-      log.log('parms', client.id, 'err:', err, 'topicPattern:', topicPattern,
-              'originalShareValue:', originalShareValue);
-      callback.apply(client, [err, topicPattern, originalShareValue]);
-      log.exit('Client.subscribe.callback', client.id, null);
+      //call if success or if disconnected otherwise it will be retried
+      if ( err === undefined ){
+        log.entry('Client.subscribe.callback', client.id);
+        log.log('parms', client.id, 'err:', err, 'topicPattern:', topicPattern,
+                'originalShareValue:', originalShareValue);
+        callback.apply(client, [err, topicPattern, originalShareValue]);
+        log.exit('Client.subscribe.callback', client.id, null);
+      } else if ( client.isDisconnected() ){
+        log.entry('Client.subscribe.callback', client.id);
+        log.log('parms', client.id, 'err:', err, 'topicPattern:', topicPattern,
+                'originalShareValue:', originalShareValue);
+        callback.apply(client, [err, topicPattern, originalShareValue]);
+        log.exit('Client.subscribe.callback', client.id, null);
+      }
     }
     if (err) {
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
-      client.reconnect();
     }
   });
 

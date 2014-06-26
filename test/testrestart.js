@@ -231,7 +231,6 @@ module.exports.test_single_queued_send = function(test) {
     throw new Error('error during send');
   };
 
-
   var timeout = setTimeout(function() {
     test.ok(false, 'Test timed out waiting for event emitions');
     mqlight.proton.messenger.send = savedSendFunction;
@@ -266,3 +265,118 @@ module.exports.test_single_queued_send = function(test) {
   client.connect();
 };
 
+
+/**
+* Test that when in a retrying state that any attempted
+* sends are queued and then go through following a reconnect.
+* @param {object} test the unittest interface.
+*/
+module.exports.test_queue_sends_retrying = function(test) {
+  test.expect();
+  var client = mqlight.createClient({service: 'amqp://host'});
+  var savedSendFunction = mqlight.proton.messenger.send;
+  var callbacksCalled = 0;
+  var callbacksCalledInError = 0;
+  var first = true;
+  mqlight.proton.messenger.send = function() {
+    throw new Error('error on send');
+  };
+  
+  client.on('connected', function(x,y) {
+    stubproton.setConnectStatus(1);
+    //this send should result in a callback with an err
+    client.send('test', 'message', function(err) {
+      if (err){
+        callbacksCalledInError++;
+      } else {
+        callbacksCalled++;
+      }
+    });
+  });
+
+  client.on('error', function() {
+    mqlight.proton.messenger.send = savedSendFunction;
+    //these 3 sends should get queued
+    for ( var i = 0; i < 3; i++ ){ 
+      client.send('test', 'message', function(err) {
+        if (err){
+          callbacksCalledInError++;
+        } else {
+          callbacksCalled++;
+        }
+        if (first){
+          setTimeout(function(){client.disconnect()},500);
+          first = false;
+        }
+      });
+    }
+    test.equal(client.queuedSends.length, 3, '3 queued sends');
+    stubproton.setConnectStatus(0);
+  });
+
+  client.on('disconnected', function() {
+    test.equal(client.queuedSends.length,0,'queued sends drained');
+    test.equal(callbacksCalled, 3, '3 callbacks called with success');
+    test.equal(callbacksCalledInError, 1, '1 callback in error');
+    test.done();
+  });
+  client.connect();
+
+};
+
+
+/**
+* Test that when in a retrying state that any attempted
+* subscribes are queued and then go through following a reconnect.
+* @param {object} test the unittest interface.
+*/
+module.exports.test_queued_subs_retrying = function(test){
+
+  var first = true; 
+  var successCallbacks = 0; 
+  var client = mqlight.createClient({service: 'amqp://host'}); 
+  var savedSubFunction = mqlight.proton.messenger.subscribe;
+  mqlight.proton.messenger.subscribe = function() {
+    throw new Error('error on subscribe');
+  };
+
+  client.on('connected', function() {
+    stubproton.setConnectStatus(1);
+    client.subscribe('/test', function(err){
+      if(err){
+        test.ok(false, 'should not be called in err');
+      } else {
+        successCallbacks++;
+      }
+    });
+  });
+
+  client.on('error', function(err){
+    if ( first ){
+      first = false;
+      //queue up 3 subscribes
+      for (var i = 0; i < 3; i++){
+        client.subscribe('queue'+i, function(err){
+          if (err){
+            test.ok(false, 'should not be called in err');
+          } else {
+            successCallbacks++;
+          }
+        });
+      }
+    } else {
+      test.equals(client.queuedSubscriptions.length, 4, 
+          'all 4 attempted subs queued');
+      mqlight.proton.messenger.subscribe = savedSubFunction;
+      stubproton.setConnectStatus(0);
+      setTimeout(function(){client.disconnect()},500);
+    }
+
+  });
+  
+  client.on('disconnected', function() {
+    test.equal(successCallbacks, 4, 'expecting 4 success callbacks');
+    test.done();
+  });
+  client.connect();
+};
