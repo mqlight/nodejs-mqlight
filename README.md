@@ -111,6 +111,8 @@ Creates an MQ Light client instance.
   *  **id** (String, default: AUTO_[0-9a-f]{7}), a unique identifier for
      this client. A client with a duplicate `id` will be prevented from
      connecting to the messaging service.
+  *  **user** (String) (optional) user name for authentication
+  *  **password** (String) (optional) password for authentication
 
 Returns a `Client` object representing the client instance. The client is an
 event emitter and listeners can be registered for the following events:
