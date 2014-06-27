@@ -1294,7 +1294,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   var qos = exports.QOS_AT_MOST_ONCE;
-  var ttl = undefined;
+  var ttl;
   if (options) {
     if ('qos' in options) {
       if (options.qos === exports.QOS_AT_MOST_ONCE) {
