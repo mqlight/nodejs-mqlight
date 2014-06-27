@@ -1294,6 +1294,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   var qos = exports.QOS_AT_MOST_ONCE;
+  var ttl = undefined;
   if (options) {
     if ('qos' in options) {
       if (options.qos === exports.QOS_AT_MOST_ONCE) {
@@ -1305,6 +1306,18 @@ Client.prototype.send = function(topic, data, options, callback) {
                             "' is invalid must evaluate to 0 or 1");
         log.throw('Client.send', this.id, err);
         throw err;
+      }
+    }
+
+    if ('ttl' in options) {
+      ttl = Number(options.ttl);
+      if (Number.isNaN(ttl) || !Number.isFinite(ttl) || ttl <= 0) {
+        err = new TypeError("options:ttl value '" +
+            options.ttl +
+            "' is invalid, must be an unsigned non-zero integer number");
+        throw err;
+      } else if (ttl > 4294967295) {
+        ttl = 4294967295; // Cap at max AMQP value for TTL (2^32-1)
       }
     }
   }
@@ -1357,6 +1370,9 @@ Client.prototype.send = function(topic, data, options, callback) {
       });
       var encodedTopic = encodedTopicLevels.join('/');
       protonMsg.address += '/' + encodedTopic;
+    }
+    if (ttl) {
+      protonMsg.ttl = ttl;
     }
     if (typeof data === 'string') {
       protonMsg.body = data;
@@ -1621,6 +1637,9 @@ Client.prototype.checkForMessages = function() {
           } else {
             delivery.destination.topicPattern = split[1];
           }
+        }
+        if (protonMsg.ttl > 0) {
+          delivery.message.ttl = protonMsg.ttl;
         }
 
         var da = protonMsg.deliveryAnnotations;

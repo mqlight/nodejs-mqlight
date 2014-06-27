@@ -276,3 +276,45 @@ module.exports.test_malformed_message = function(test) {
   });
 };
 
+
+/**
+ * Tests that the time-to-live value presented to applications is correctly
+ * set from the value carried in the proton message object.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_receive_ttl = function(test) {
+  var originalReceiveMethod = mqlight.proton.messenger.receive;
+  var testMessageWithTtl = function(sentTopic, subscribedPattern, ttl) {
+    var result = testMessage(sentTopic, subscribedPattern);
+    result.ttl = ttl;
+    return result;
+  };
+  var messages = [testMessageWithTtl('/public', '/public', 0), 
+                  testMessageWithTtl('/public', '/public', 1000),
+                  testMessageWithTtl('/public', '/public', Number.MAX_VALUE)
+                 ];
+  mqlight.proton.messenger.receive = function() {
+    mqlight.proton.messenger.receive = originalReceiveMethod;
+    return messages;
+  };
+  var count = 0;
+  var client = mqlight.createClient({service: 'amqp://localhost'});
+  client.connect(function() {
+    client.subscribe('/public');
+  }).on('message', function(data, delivery) {
+    if (messages[count].ttl == 0) {
+      test.ok(!delivery.message.ttl,
+              'default ttl value in received message should result in ' +
+              'no ttl property being present in delivery object');
+    } else {
+      test.deepEqual(messages[count].ttl, delivery.message.ttl,
+                     'ttl presented via API (' + delivery.message.ttl +
+                     ') should match that of received message (' +
+                     messages[count].ttl + ')');
+    }
+    if (++count === messages.length) {
+      client.disconnect();
+      test.done();
+    }
+  });
+};

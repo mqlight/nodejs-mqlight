@@ -381,11 +381,11 @@ module.exports.test_send_qos_function = function(test) {
 
 
 /**
-* Test that any queued sends are cleared when disconnect is called
-* and that the sends callback is called with an error to indicate
-* failure.
-* @param {object} test the unittest inteface
-*/
+ * Test that any queued sends are cleared when disconnect is called
+ * and that the sends callback is called with an error to indicate
+ * failure.
+ * @param {object} test the unittest interface
+ */
 module.exports.test_clear_queuedsends_disconnect = function(test) {
   test.expect(3);
   var client = mqlight.createClient({service: 'amqp://host'});
@@ -421,5 +421,59 @@ module.exports.test_clear_queuedsends_disconnect = function(test) {
   client.connect();
   process.on('uncaughtException', function(err) {
     console.log(err);
+  });
+};
+
+
+/**
+ * Test that supplying a valid time-to-live value for a send operation is
+ * correctly propagated to the proton message object.  Also test that
+ * supplying invalid values result in the client.send(...) method throwing
+ * a TypeError.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_send_ttl = function(test) {
+  var data = [
+              {valid: false, ttl: undefined},
+              {valid: false, ttl: function() {}},
+              {valid: false, ttl: -9007199254740992},
+              {valid: false, ttl: -NaN},
+              {valid: false, ttl: NaN},
+              {valid: false, ttl: -Infinity},
+              {valid: false, ttl: Infinity},
+              {valid: false, ttl: -1},
+              {valid: false, ttl: 0},
+              {valid: false, ttl: null}, // treated as 0
+              {valid: false, ttl: ''},   // treated as 0
+              {expected: 1, valid: true, ttl: 1},
+              {expected: 1, valid: true, ttl: 9 - 8},
+              {expected: 4294967295, valid: true, ttl: 9007199254740992}
+  ];
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+  var savedPutFunction = mqlight.proton.messenger.put;
+  mqlight.proton.messenger.put = function(msg, qos) {
+    mqlight.proton.messenger.putMessage = msg;
+  };
+  client.connect(function() {
+    for (var i = 0; i < data.length; ++i) {
+      var opts = { ttl: data[i].ttl };
+      if (data[i].valid) {
+        test.doesNotThrow(function() {
+          client.send('topic', 'data', opts);
+          test.deepEqual(mqlight.proton.messenger.putMessage.ttl,
+                         data[i].expected,
+                         'ttl value in proton message should match that ' +
+                         'passed into the send(...) method');
+        });
+      } else {
+        test.throws(function() {
+          client.send('topic', 'data', opts);
+        }, TypeError, 'ttl should have been rejected: ' + data[i].ttl);
+      }
+    }
+    client.disconnect();
+    mqlight.proton.messenger.put = savedPutFunction;
+    test.done();
   });
 };
