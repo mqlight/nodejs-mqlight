@@ -50,6 +50,10 @@ if (process.env.NODE_ENV === 'unittest') {
       return proton;
     }
   });
+  /**
+  * exported for unittest purposes
+  */
+  exports.reconnect = reconnect;
 } else {
   try {
     var proton = require('./lib/' + _system + '/proton');
@@ -1025,11 +1029,11 @@ Client.prototype.disconnect = function(callback) {
  * <p>
  * TODO: Flesh this out for reconnects after a connection is broken.
  *
+ * @param {client} client - the client object to reconnect
  * @return {Object} The instance of client that it is invoked on - allowing
  *          for chaining of other method calls on the client object.
  */
-Client.prototype.reconnect = function() {
-  var client = this;
+function reconnect(client){
   log.entry('Client.reconnect', client.id);
 
   if (client.getState() !== 'connected') {
@@ -1097,7 +1101,7 @@ Client.prototype.reconnect = function() {
 
   log.exit('Client.reconnect', client.id, client);
   return client;
-};
+}
 
 
 /**
@@ -1417,7 +1421,7 @@ Client.prototype.send = function(topic, data, options, callback) {
             client.emit('error', e);
           }
         });
-        client.reconnect();
+        reconnect(client);
       }
       log.exit('Client.send.utilSendComplete', client.id, null);
     };
@@ -1443,7 +1447,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
     });
-    client.reconnect();
+    reconnect(client);
   }
 
   log.exit('Client.send', this.id, null);
@@ -1626,7 +1630,7 @@ Client.prototype.checkForMessages = function() {
     process.nextTick(function() {
       log.log('emit', client.id, 'error', err);
       client.emit('error', err);
-      client.reconnect();
+      reconnect(client);
     });
   }
 
@@ -1864,7 +1868,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     client.queuedSubscriptions.push({address: subscriptionAddress,
       qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
       share: originalShareValue, options: options, callback: callback });
-    client.reconnect();
+    reconnect(client);
   }
 
   setImmediate(function() {

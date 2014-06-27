@@ -48,7 +48,7 @@ module.exports.test_successful_reconnect = function(test) {
     test.deepEqual(client.getState(), 'connected',
         'client status connected after connect');
     stubproton.setConnectStatus(2);
-    client.reconnect();
+    mqlight.reconnect(client);
   });
 
   client.on('error', function(err) {
@@ -76,7 +76,7 @@ module.exports.test_successful_reconnect = function(test) {
 module.exports.test_reconnect_when_disconnected = function(test) {
   test.expect(1);
   var client = mqlight.createClient({service: 'amqp://host'});
-  test.equals(client.reconnect(), undefined,
+  test.equals(mqlight.reconnect(client), undefined,
       'reconnect when disconnected returns undefined');
   test.done();
 };
@@ -100,13 +100,13 @@ module.exports.test_multi_reconnect_call = function(test) {
   }, 5000);
   client.on('connected', function(x, y) {
     stubproton.setConnectStatus(1);
-    client.reconnect();
-    client.reconnect();
-    client.reconnect();
+    mqlight.reconnect(client);
+    mqlight.reconnect(client);
+    mqlight.reconnect(client);
   });
   client.on('error', function(x, y) {
     //second reconnect should return immediately
-    test.deepEqual(client.reconnect().getState(), 'retrying');
+    test.deepEqual(mqlight.reconnect(client).getState(), 'retrying');
     stubproton.setConnectStatus(0);
   });
 
@@ -147,7 +147,7 @@ module.exports.test_resubscribe_on_reconnect = function(test) {
     client.subscribe('/final/topic/', 'diffshare');
     origSubsList = origSubsList.concat(client.subscriptions);
     stubproton.setConnectStatus(1);
-    client.reconnect();
+    mqlight.reconnect(client);
   });
 
   client.on('error', function(x, y) {
@@ -190,7 +190,7 @@ module.exports.test_disconnect_while_reconnecting = function(test) {
 
   client.on('connected', function(x, y) {
     stubproton.setConnectStatus(1);
-    client.reconnect();
+    mqlight.reconnect(client);
   });
 
   client.on('error', function(x, y) {

@@ -221,12 +221,13 @@ module.exports.test_subscribe_fail_callback = function(test) {
       test.deepEqual(arguments[2], 'share');
       test.ok(this === client);
 
-      client.disconnect();
       mqlight.proton.messenger.subscribe = savedSubscribe;
       if (++count == 2) test.done();
     });
-  });
 
+    client.disconnect();
+  });
+  
   client.on('error', function(err) {
     test.ok(err instanceof Error);
     test.equals(arguments.length, 1);
