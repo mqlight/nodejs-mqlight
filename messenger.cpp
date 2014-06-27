@@ -309,10 +309,34 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
 
   String::Utf8Value param(args[0]->ToString());
   std::string address = std::string(*param);
+  std::string sslTrustCertificate;
+  if (!(args.Length() < 2 || args[1].IsEmpty() || args[1]->IsNull() || args[1]->IsUndefined())) {
+    String::Utf8Value param1(args[1]->ToString());
+    sslTrustCertificate = std::string(*param1);
+  } else {
+    sslTrustCertificate = "";
+  }
+
+  pn_ssl_verify_mode_t sslMode = PN_SSL_VERIFY_NULL;
+  if (!(args.Length() < 3 || args[2].IsEmpty() || args[2]->IsNull() || args[2]->IsUndefined())) {
+    Local<Value> param2 = args[2];
+    bool sslVerifyName = param2->BooleanValue();
+    if (sslVerifyName) {
+      sslMode = PN_SSL_VERIFY_PEER_NAME;
+    } else {
+      sslMode = PN_SSL_VERIFY_PEER;
+    }
+  }
 
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("data", name, "username:", username.c_str());
   Proton::Log("data", name, "password:", password.length() ? "********" : NULL);
+  if (sslTrustCertificate.length() > 0) {
+    Proton::Log("data", name, "sslTrustCertificate:", sslTrustCertificate.c_str());
+  }
+  if (sslMode != PN_SSL_VERIFY_NULL) {
+    Proton::Log("data", name, "sslMode:", sslMode);
+  }
 
   // throw exception if already connected
   if (obj->messenger) {
@@ -330,8 +354,36 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   pn_messenger_set_outgoing_window(obj->messenger, std::numeric_limits<int>::max());
   pn_messenger_set_incoming_window(obj->messenger, std::numeric_limits<int>::max());
 
+  // Set the messenger SSL trust certificate when required
+  if (sslTrustCertificate.length() > 0) {
+    Proton::Entry("pn_messenger_set_trusted_certificates", name);
+    int error = pn_messenger_set_trusted_certificates(obj->messenger, sslTrustCertificate.c_str());
+    Proton::Exit("pn_messenger_set_trusted_certificates", name, error);
+    if (error) {
+      pn_messenger_free(obj->messenger);
+      obj->messenger = NULL;
+      THROW_EXCEPTION("Failed to set trusted certificates", "ProtonMessenger::Connect", name);
+    }
+  }
+  if (sslMode != PN_SSL_VERIFY_NULL) {
+    Proton::Entry("pn_messenger_set_ssl_peer_authentication_mode", name);
+    int error = pn_messenger_set_ssl_peer_authentication_mode(obj->messenger, sslMode);
+    Proton::Exit("pn_messenger_set_ssl_peer_authentication_mode", name, error);
+    if (error) {
+      pn_messenger_free(obj->messenger);
+      obj->messenger = NULL;
+      THROW_EXCEPTION("Failed to set SSL peer authentication mode", "ProtonMessenger::Connect", name);
+    }
+  }
+
   // if we have a username make sure we set a route to force auth
   int index = (int)address.find("//");
+  std::string scheme;
+  if (index >= 0) {
+	  scheme = address.substr(0, index);
+  } else {
+	  scheme = "amqp:";
+  }
   int endIndex = index >= 0 ? (int)address.find("/", index+2) : -1;
   std::string hostandport;
   if (endIndex >= 0) {
@@ -344,10 +396,10 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   std::string traceValidationAddress;
   if ( username.length() > 0){
     if ( password.length() > 0 ){
-      validationAddress      = "amqp://" + username + ":" + password   + "@" + hostandport + "/$1";
-      traceValidationAddress = "amqp://" + username + ":" + "********" + "@" + hostandport + "/$1";
+      validationAddress      = scheme + "//" + username + ":" + password   + "@" + hostandport + "/$1";
+      traceValidationAddress = scheme + "//" + username + ":" + "********" + "@" + hostandport + "/$1";
     } else {
-      validationAddress = "amqp://" + username + "@" + hostandport + "/$1";
+      validationAddress = scheme + "//" + username + "@" + hostandport + "/$1";
       traceValidationAddress = validationAddress;
     }
   } else {
@@ -357,10 +409,10 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
 
   /*
    * Set the route so that when required any address starting with
-   * amqp://<host>:<port> gets the supplied user and password added
+   * amqp://<host>:<port> or amqps://<host>:<port> gets the supplied user and password added
    */
   int error;
-  std::string pattern = "amqp://"+hostandport+"/*";
+  std::string pattern = scheme+"//"+hostandport+"/*";
   Proton::Entry("pn_messenger_route", name);
   Proton::Log("parms", name, "pattern:", pattern.c_str());
   Proton::Log("parms", name, "substitution:", traceValidationAddress.c_str());

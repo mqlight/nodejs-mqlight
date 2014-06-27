@@ -113,6 +113,13 @@ Creates an MQ Light client instance.
      connecting to the messaging service.
   *  **user** (String) (optional) user name for authentication
   *  **password** (String) (optional) password for authentication
+  *  **sslTrustCertificate** (String) (optional) SSL trust certificate to use
+     when authentication is required for the MQ Light server. Only used when
+     service specifies the amqps scheme.
+ *   **sslVerifyName** (Boolean) (optional) whether or not to additionally
+     check the MQ Light server’s common name in the certificate matches the
+     actual server’s DNS name. Only used when the sslTrustCertificate option
+     is specified. Valid values: true or false (default: true).
 
 Returns a `Client` object representing the client instance. The client is an
 event emitter and listeners can be registered for the following events:

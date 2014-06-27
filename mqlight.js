@@ -163,6 +163,19 @@ if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
  * <li>
  * password - Optional; the password to use for authentication.
  * </li>
+ * </li>
+ * <li>
+ * sslTrustCertificate - Optional; the SSL trust certificate to use when
+ *            authentication is required for the MQ Light server. Only
+ *            valid when service specifies the amqps scheme.
+ * </li>
+  * <li>
+ * sslVerifyName - Optional; Whether or not to additionally check the
+ *            MQ Light server's common name in the certificate matches
+ *            the actual server's DNS name. Only valid when the
+ *            sslTrustCertificate option is specified.
+ *            valid values: true or false (default: true).
+ * </li>
  * </ul>
  *
  * @param {Object}
@@ -177,8 +190,22 @@ exports.createClient = function(options) {
     log.throw('createClient', log.NO_CLIENT_ID, err);
     throw err;
   }
-  var client = new Client(options.service, options.id,
-                          options.user, options.password);
+  var securityOptions = { user:options.user,
+                          password:options.password,
+                          sslTrustCertificate:options.sslTrustCertificate,
+                          sslVerifyName:options.sslVerifyName,
+                          toString: function() {
+                            return '[\n'+
+                                   ' user:'+this.user+'\n'+
+                                   ' password:'+(this.password ? '********' :
+                                       this.password)+'\n'+
+                                   ' sslTrustCertificate:'+
+                                       this.sslTrustCertificate+'\n'+
+                                   ' sslVerifyName:'+this.sslVerifyName+'\n'+
+                                   ']';
+                          }
+                        };
+  var client = new Client(options.service, options.id, securityOptions);
 
   process.setMaxListeners(0);
   process.once('exit', function() {
@@ -256,7 +283,8 @@ var generateServiceList = function(service) {
   /*
    * Validate the list of URLs for the service, inserting default values as
    * necessary Expected format for each URL is: amqp://host:port or
-   * amqps://host:port (port is optional, defaulting to 5672)
+   * amqps://host:port (port is optional, defaulting to 5672 or 5671 as
+   * appropriate)
   */
   var serviceList = [];
   for (var i = 0; i < inputServiceList.length; i++) {
@@ -511,11 +539,9 @@ var getHttpServiceFunction = function(serviceUrl) {
  *          subscription be unsubscribed from the topic, in favour of the
  *          second instance. If this property is not specified then the client
  *          will generate a probabalistically unique ID.
- * @param {String}
- *          user - Optional; the user name to use for authentication to the MQ
- *          Light service.
- * @param {String}
- *          password - Optional; the password to use for authentication.
+ * @param {Object}
+ *          securityOptions - Any required security options for
+ *          user name/password authentication and SSL.
  * @throws {TypeError}
  *           If one of the specified parameters in of the wrong type.
  * @throws {RangeError}
@@ -525,14 +551,13 @@ var getHttpServiceFunction = function(serviceUrl) {
  *           incorrectly formatted.
  * @constructor
  */
-var Client = function(service, id, user, password) {
+var Client = function(service, id, securityOptions) {
   log.entry('Client.constructor', log.NO_CLIENT_ID);
   log.log('parms', log.NO_CLIENT_ID, 'service:', service);
   log.log('parms', log.NO_CLIENT_ID, 'id:', id);
-  log.log('parms', log.NO_CLIENT_ID, 'user:', user);
-  log.log('parms', log.NO_CLIENT_ID,
-          'password:', password ? '********' : password);
-
+  log.log('parms', log.NO_CLIENT_ID, 'securityOptions:',
+          securityOptions.toString());
+  
   EventEmitter.call(this);
 
   var err, msg;
@@ -585,12 +610,35 @@ var Client = function(service, id, user, password) {
   }
 
   // User/password must either both be present, or both be absent.
-  if ((user && !password) || (!user && password)) {
+  if ((securityOptions.user && !securityOptions.password) ||
+      (!securityOptions.user && securityOptions.password)) {
     err = new TypeError('both user and password properties ' +
                         'must be specified together');
     log.throw('Client.constructor', id, err);
     throw err;
   }
+  
+  // Valdate the ssl security options
+  if (securityOptions.sslVerifyName !== undefined) {
+    if (!(securityOptions.sslVerifyName === true ||
+          securityOptions.sslVerifyName === false)) {
+      err = new TypeError("sslVerifyName value '" +
+                          securityOptions.sslVerifyName +
+                          "' is invalid. Must evaluate to true or false");
+      log.throw('Client.constructor', this.id, err);
+      throw err;
+    }
+  }
+  if (securityOptions.sslTrustCertificate !== undefined) {
+    if (!(typeof securityOptions.sslTrustCertificate === 'string')) {
+      err = new TypeError("sslTrustCertificate value '" +
+                          securityOptions.sslTrustCertificate +
+                          "' is invalid. Must be of type String");
+      log.throw('Client.constructor', this.id, err);
+      throw err;      
+    }
+  }
+  
   // Save the required data as client fields
   this.serviceFunction = serviceFunction;
   this.serviceList = serviceList;
@@ -598,16 +646,21 @@ var Client = function(service, id, user, password) {
 
   log.entry('proton.createMessenger', this.id);
   // Initialize ProtonMessenger with auth details
-  if (user) {
+  if (securityOptions.user) {
     // URI encode username and password before passing them to proton
-    var usr = encodeURIComponent(String(user));
-    var pw = encodeURIComponent(String(password));
+    var usr = encodeURIComponent(String(securityOptions.user));
+    var pw = encodeURIComponent(String(securityOptions.password));
     this.messenger = proton.createMessenger(id, usr, pw);
   } else {
     this.messenger = proton.createMessenger(id);
   }
   log.exit('proton.createMessenger', this.id, null);
 
+  // Save the security options, but exclude the password
+  // as it will be cached in the messenger (and otherwise will be traced!).
+  securityOptions.password = undefined;
+  this.securityOptions = securityOptions;
+  
   // Set the initial state to disconnected
   this.state = 'disconnected';
   this.service = undefined;
@@ -803,7 +856,9 @@ Client.prototype.connectToService = function(callback) {
       try {
         var service = serviceList[i];
         log.log('data', client.id, 'attempting connect to: ' + service);
-        var rc = client.messenger.connect(service);
+        var rc = client.messenger.connect(service,
+            client.securityOptions.sslTrustCertificate,
+            client.securityOptions.sslVerifyName);
         if (rc) {
           error = new Error(client.messenger.getLastErrorText());
           log.log('data', client.id, 'failed to connect to: ' + service +
