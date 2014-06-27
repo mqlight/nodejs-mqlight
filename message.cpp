@@ -74,6 +74,8 @@ void ProtonMessage::Init(Handle<Object> target)
       GetLinkAddress);
   tpl->InstanceTemplate()->SetAccessor(String::New("deliveryAnnotations"),
       GetDeliveryAnnotations);
+  tpl->InstanceTemplate()->SetAccessor(String::New("ttl"),
+      GetTimeToLive, SetTimeToLive);
 
   target->Set(name, constructor->GetFunction());
 }
@@ -493,4 +495,50 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
 
   Proton::Exit("ProtonMessage::GetDeliveryAnnotations", name, 1);
   return scope.Close(result);
+}
+
+Handle<Value> ProtonMessage::GetTimeToLive(Local<String> property,
+                                           const AccessorInfo &info)
+{
+  HandleScope scope;
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char *name = msg ? msg->name : NULL;
+  unsigned int ttl = 0;
+
+  Proton::Entry("ProtonMessage::GetTimeToLive", name);
+
+  if (msg && msg->message)
+  {
+    ttl = pn_message_get_ttl(msg->message);
+  }
+
+  char ttlString[16];
+  sprintf(ttlString, "%d", ttl);
+  Proton::Exit("ProtonMessage::GetTimeToLive", name, ttlString);
+  return scope.Close(Number::New(ttl));
+}
+
+void ProtonMessage::SetTimeToLive(Local<String> property,
+                                  Local<Value> value,
+                                  const AccessorInfo &info)
+{
+  HandleScope scope;
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char *name = msg ? msg->name : NULL;
+  
+  Proton::Entry("ProtonMessage::SetTimeToLive", name);
+
+  if (msg && msg->message)
+  {
+    unsigned int numberValue = 4294967295;
+    if (value->ToNumber()->NumberValue() < 4294967295) {
+        numberValue = value->ToNumber()->NumberValue();
+    }
+    Proton::Log("parms", name, "value:", numberValue);
+
+    pn_message_set_ttl(msg->message, numberValue);
+  }
+
+  Proton::Exit("ProtonMessage::SetTimeToLive", name, 0);
+  scope.Close(Undefined());
 }
