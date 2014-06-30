@@ -213,7 +213,7 @@ exports.createClient = function(options) {
   process.once('exit', function() {
     log.entry('createClient.on.exit', log.NO_CLIENT_ID);
 
-    if (client && client.state == 'connected') {
+    if (client && client.getState() == 'connected') {
       try {
         client.messenger.send();
         client.disconnect();
@@ -367,16 +367,23 @@ var getFileServiceFunction = function(fileUrl) {
     throw err;
   }
 
+  var filePath = fileUrl;
+  // special case for Windows drive letters in file URIs, trim the leading /
+  if (os.platform() === 'win32' && filePath.match('^\/[a-zA-Z]:\/')) {
+    filePath = filePath.substring(1);
+  }
+
   var fileServiceFunction = function(callback) {
     log.entry('fileServiceFunction', log.NO_CLIENT_ID);
+    log.log('parms', log.NO_CLIENT_ID, 'filePath:', filePath);
 
-    fs.readFile(fileUrl, { encoding: 'utf8' }, function(err, data) {
+    fs.readFile(filePath, { encoding: 'utf8' }, function(err, data) {
       log.entry('fileServiceFunction.readFile.callback', log.NO_CLIENT_ID);
       log.log('parms', log.NO_CLIENT_ID, 'err:', err);
       log.log('parms', log.NO_CLIENT_ID, 'data:', data);
 
       if (err) {
-        err.message = 'attempt to read ' + fileUrl + ' failed with the ' +
+        err.message = 'attempt to read ' + filePath + ' failed with the ' +
                       'following error: ' + err.message;
         log.log('error', log.NO_CLIENT_ID, err);
         log.entry('fileServiceFunction.callback', log.NO_CLIENT_ID);
@@ -388,7 +395,7 @@ var getFileServiceFunction = function(fileUrl) {
         try {
           obj = JSON.parse(data);
         } catch (err) {
-          err.message = 'the content read from ' + fileUrl + ' contained ' +
+          err.message = 'the content read from ' + filePath + ' contained ' +
                         'unparseable JSON: ' + err.message;
           log.caught('fileServiceFunction.readFile.callback',
                      log.NO_CLIENT_ID, err);
@@ -563,7 +570,7 @@ var Client = function(service, id, securityOptions) {
   log.log('parms', log.NO_CLIENT_ID, 'id:', id);
   log.log('parms', log.NO_CLIENT_ID, 'securityOptions:',
           securityOptions.toString());
-  
+
   EventEmitter.call(this);
 
   var err, msg;
@@ -744,7 +751,7 @@ Client.prototype.connect = function(callback) {
   var performConnect = function(client, callback) {
     log.entry('Client.connect.performConnect', client.id);
 
-    var currentState = client.state;
+    var currentState = client.getState();
     // if we are not disconnected or disconnecting return with the client object
     if (currentState !== 'disconnected') {
       if (currentState === 'disconnecting') {
@@ -806,7 +813,7 @@ Client.prototype.connect = function(callback) {
   var stillDisconnecting = function(client, callback) {
     log.entry('stillDisconnecting', client.id);
 
-    if (client.state === 'disconnecting') {
+    if (client.getState() === 'disconnecting') {
       setImmediate(function() {
         stillDisconnecting(client, callback);
       });
@@ -840,8 +847,8 @@ Client.prototype.connectToService = function(callback) {
   var client = this;
   log.entry('Client.connectToService', client.id);
 
-  if (client.state === 'disconnecting' ||
-      client.state === 'disconnected') {
+  if (client.getState() === 'disconnecting' ||
+      client.getState() === 'disconnected') {
     if (callback) {
       log.entry('Client.connectToService.callback', client.id);
       callback(new Error('connect aborted due to disconnect'));
@@ -1101,11 +1108,11 @@ Client.prototype.disconnect = function(callback) {
  */
 function reconnect(client){
   log.entry('Client.reconnect', client.id);
-  if (client.state !== 'connected') {
+  if (client.getState() !== 'connected') {
     if (client.isDisconnected()) {
       log.exit('Client.reconnect', client.id, null);
       return undefined;
-    } else if (client.state === 'retrying') {
+    } else if (client.getState() === 'retrying') {
       log.exit('Client.reconnect', client.id, client);
       return client;
     }
@@ -1170,12 +1177,12 @@ var processQueuedActions = function() {
   }
   log.entry('processQueuedActions', client.id);
   while (client.queuedSubscriptions.length > 0 && 
-          client.state === 'connected') {
+          client.getState() === 'connected') {
     var sub = client.queuedSubscriptions.pop();
     client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
   }
   while (client.queuedSends.length > 0 &&
-          client.state === 'connected') {
+          client.getState() === 'connected') {
     var msg = client.queuedSends.pop();
     client.send(msg.topic, msg.data, msg.options, msg.callback);
   }
@@ -1190,11 +1197,10 @@ var processQueuedActions = function() {
  * generated identifier if the id property was not specified when the client
  * was created.
  */
-Object.defineProperty(Client, 'id', {
-  get: function() {
-    return this.id;
-  }
-});
+Client.prototype.getId = function() {
+  var id = this.id;
+  return id;
+};
 
 
 /**
@@ -1202,11 +1208,14 @@ Object.defineProperty(Client, 'id', {
  * connected (when the client is in 'connected') - otherwise (for all other
  * client states) undefined is returned.
  */
-Object.defineProperty(Client, 'service', {
-  get: function() {
-    return this.state === 'connected' ? this.service : undefined;
+Client.prototype.getService = function() {
+  if (this.state === 'connected') {
+    var service = this.service;
+    return service;
+  } else {
+    return undefined;
   }
-});
+};
 
 
 /**
@@ -1214,12 +1223,11 @@ Object.defineProperty(Client, 'service', {
  * following string values: 'connected', 'connecting', 'disconnected',
 * 'disconnecting', or 'retrying'.
  */
-Object.defineProperty(Client, 'state', {
-  get: function() {
-    log.log('data', this.id, 'Client.state', this.state);
-    return this.state;
-  }
-});
+Client.prototype.getState = function() {
+  var state = this.state;
+  log.log('data', this.id, 'Client.getState:', state);
+  return state;
+};
 
 
 /**
@@ -1368,7 +1376,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   // Ensure we are not retrying otherwise queue message and return
-  if (this.state === 'retrying' || this.state === 'connecting') {
+  if (this.getState() === 'retrying' || this.getState() === 'connecting') {
     this.queuedSends.push({topic: topic, data: data, options: options,
       callback: callback});
     log.exit('Client.send', this.id);
@@ -1383,7 +1391,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     log.entry('proton.createMessage', client.id);
     protonMsg = proton.createMessage();
     log.exit('proton.createMessage', client.id, protonMsg);
-    protonMsg.address = this.service;
+    protonMsg.address = this.getService();
     if (topic) {
       // need to encode the topic component but / has meaning that shouldn't be
       // encoded
@@ -1593,7 +1601,8 @@ Client.prototype.checkForMessages = function() {
         var qos = exports.QOS_AT_MOST_ONCE;
         var matchedSubs = client.subscriptions.filter(function(el){
           // 1 added to length to account for the / we add
-          var addressNoService = el.address.slice(client.service.length + 1);
+          var addressNoService = el.address.slice(client.getService().length + 
+                                 1);
           //possible to have 2 matches work out whether this is
           //for a share or private topic
           if (el.share === undefined && 
@@ -1915,11 +1924,11 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   // Subscribe using the specified topic pattern and share options
   var messenger = this.messenger;
-  var address = this.service + '/' + share + topicPattern;
+  var address = this.getService() + '/' + share + topicPattern;
   var client = this;
-  var subscriptionAddress = this.service + '/' + topicPattern;
+  var subscriptionAddress = this.getService() + '/' + topicPattern;
   // If retrying queue this subscribe
-  if ( client.state === 'retrying' || client.state === 'connecting'){
+  if ( client.getState() === 'retrying' || client.getState() === 'connecting'){
     //first check if its already there and if so remove old and add new
     for ( var qs = 0; qs < client.queuedSubscriptions; qs++ ){
       if (client.queuedSubscriptions[qs].address === subscriptionAddress &&

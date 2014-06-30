@@ -26,6 +26,7 @@ process.env.NODE_ENV = 'unittest';
 
 var stubproton = require('./stubs/stubproton');
 var mqlight = require('../mqlight');
+var os = require('os');
 var fs = require('fs');
 var http = require('http');
 var EventEmitter = require('events').EventEmitter;
@@ -42,11 +43,11 @@ var testCase = require('nodeunit').testCase;
 module.exports.test_successful_connect_disconnect = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
   var count = 0;
-  test.equals('disconnected', client.state);
+  test.equals('disconnected', client.getState());
   client.on('connected', function(x, y) {
     test.ok(this === client);
     test.equals(arguments.length, 0);
-    test.equals(client.state, 'connected');
+    test.equals(client.getState(), 'connected');
     if (++count === 2) {
       client.disconnect();
       test.done();
@@ -55,7 +56,7 @@ module.exports.test_successful_connect_disconnect = function(test) {
   client.connect(function(err) {
     test.ok(this === client);
     test.equals(arguments.length, 0);
-    test.equals(client.state, 'connected');
+    test.equals(client.getState(), 'connected');
     if (++count === 2) {
       client.disconnect();
       test.done();
@@ -149,7 +150,7 @@ module.exports.test_connect_too_many_arguments = function(test) {
 
 
 /**
- * Tests that calling connect to an endpoint that is currently down retries
+ * Tests that calling connect to an enpoint that is currently down retries
  * until successful.
  * @param {object} test the unittest interface
  */
@@ -183,7 +184,7 @@ module.exports.test_connect_multiple_endpoints = function(test) {
     service: services
   });
   client.connect(function() {
-    test.equals(client.service, 'amqp://host:5672');
+    test.equals(client.getService(), 'amqp://host:5672');
     client.disconnect();
     test.done();
   });
@@ -214,7 +215,7 @@ module.exports.test_connect_variable_endpoints = function(test) {
     test.ok(err.message.indexOf('amqp://bad') != -1);
   });
   client.connect(function() {
-    test.equals(client.service, 'amqp://host:1234');
+    test.equals(client.getService(), 'amqp://host:1234');
     client.disconnect();
     test.done();
   });
@@ -288,7 +289,7 @@ module.exports.test_connect_http_changing_endpoint = function(test) {
   });
   client.connect(function(err) {
     test.ifError(err);
-    test.equals(client.service, 'amqp://host:1234',
+    test.equals(client.getService(), 'amqp://host:1234',
                 'Connected to wrong service. ');
     client.disconnect();
     test.done();
@@ -341,7 +342,7 @@ module.exports.test_connect_http_multiple_endpoints = function(test) {
   });
   client.connect(function(err) {
     test.ifError(err);
-    test.equals(client.service, 'amqp://host:1234',
+    test.equals(client.getService(), 'amqp://host:1234',
                 'Connected to wrong service. ');
     client.disconnect();
     test.done();
@@ -562,9 +563,9 @@ module.exports.test_connect_file_changing_endpoint = function(test) {
   });
   client.connect(function(err) {
     test.ifError(err);
-    test.ok(client.service);
-    test.equals(client.service, 'amqp://host:1234',
-                'Connected to wrong service. ' + client.service);
+    test.ok(client.getService());
+    test.equals(client.getService(), 'amqp://host:1234',
+                'Connected to wrong service. ' + client.getService());
     client.disconnect();
     test.done();
     fs.readFile = originalReadFileMethod;
@@ -608,7 +609,7 @@ module.exports.test_connect_file_multiple_endpoints = function(test) {
   });
   client.connect(function(err) {
     test.ifError(err);
-    test.equals(client.service, 'amqp://host:1234',
+    test.equals(client.getService(), 'amqp://host:1234',
                 'Connected to wrong service. ');
     client.disconnect();
     test.done();
@@ -652,6 +653,34 @@ module.exports.test_connect_bad_remote_file_uri = function(test) {
       /unsupported file URI/
   );
   test.done();
+};
+
+
+/**
+ * Tests that calling connect with a Windows drive letter works correctly.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_connect_windows_drive_letter_file_uri = function(test) {
+  var originalPlatformMethod = os.platform;
+  os.platform = function() {
+    return 'win32';
+  };
+  var originalReadFileMethod = fs.readFile;
+  fs.readFile = function(filename, options, callback) {
+    test.equals(filename, 'D:/test/path/file.json',
+                'Incorrect filename passed: ' + filename);
+    client.disconnect();
+    test.done();
+    fs.readFile = originalReadFileMethod;
+    os.platform = originalPlatformMethod;
+  };
+  var client = mqlight.createClient({
+    service: 'file:///D:/test/path/file.json'
+  });
+  client.connect(function(err) {
+    test.ifError(err);
+  });
 };
 
 
