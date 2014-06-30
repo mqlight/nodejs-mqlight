@@ -890,6 +890,11 @@ Client.prototype.connectToService = function(callback) {
     if (client.firstConnect) {
       statusClient = 'connected';
       client.firstConnect = false;
+      //could be queued actions so need to process those here. On reconnect
+      //this would be done via the callback we set, first connect its the
+      //users callback so won't process anything.
+      log.log('data', client.id, 'first connect since being disconnected');
+      processQueuedActions.apply(client);
     } else {
       statusClient = 'reconnected';
     }
@@ -1090,7 +1095,6 @@ Client.prototype.disconnect = function(callback) {
  */
 function reconnect(client){
   log.entry('Client.reconnect', client.id);
-
   if (client.getState() !== 'connected') {
     if (client.isDisconnected()) {
       log.exit('Client.reconnect', client.id, null);
@@ -1119,21 +1123,6 @@ function reconnect(client){
     client.outstandingSends.pop();
   }
 
-  var resubscribe = function() {
-    log.entry('Client.reconnect.resubscribe', client.id);
-    while (client.queuedSubscriptions.length > 0 && 
-            client.getState() === 'connected') {
-      var sub = client.queuedSubscriptions.pop();
-      client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
-    }
-    while (client.queuedSends.length > 0 &&
-            client.getState() === 'connected') {
-      var msg = client.queuedSends.pop();
-      client.send(msg.topic, msg.data, msg.options, msg.callback);
-    }
-
-    log.exit('Client.reconnect.resubscribe');
-  };
   // if client is using serviceFunction, re-generate the list of services
   // TODO: merge these copy & paste
   if (client.serviceFunction instanceof Function) {
@@ -1144,19 +1133,48 @@ function reconnect(client){
       } else {
         setImmediate(function() {
           client.serviceList = generateServiceList(service);
-          client.connectToService.apply(client, [resubscribe]);
+          client.connectToService.apply(client, [processQueuedActions]);
         });
       }
     });
   } else {
     setImmediate(function() {
-      client.connectToService.apply(client, [resubscribe]);
+      client.connectToService.apply(client, [processQueuedActions]);
     });
   }
 
   log.exit('Client.reconnect', client.id, client);
   return client;
 }
+
+
+/**
+* Called on reconnect or first connect to process any
+* actions that may have been queued.
+* @this should be set to the client object that has 
+* connected or reconnected
+*/
+var processQueuedActions = function() {
+  //this set to the appropriate client via apply call in connectToService
+  var client = this;
+  if ( client === undefined || !(client.constructor === Client) ){
+    log.entry('processQueuedActions', 'client was not set');
+    log.exit('processQueuedActions', 'client not set returning');
+    return;  
+  }
+  log.entry('processQueuedActions', client.id);
+  while (client.queuedSubscriptions.length > 0 && 
+          client.getState() === 'connected') {
+    var sub = client.queuedSubscriptions.pop();
+    client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
+  }
+  while (client.queuedSends.length > 0 &&
+          client.getState() === 'connected') {
+    var msg = client.queuedSends.pop();
+    client.send(msg.topic, msg.data, msg.options, msg.callback);
+  }
+  log.exit('processQueuedActions', client.id);
+};
 
 
 /**
@@ -1897,7 +1915,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var client = this;
   var subscriptionAddress = this.getService() + '/' + topicPattern;
   // If retrying queue this subscribe
-  if ( client.getState() === 'retrying' ){
+  if ( client.getState() === 'retrying' || client.getState() === 'connecting'){
     //first check if its already there and if so remove old and add new
     for ( var qs = 0; qs < client.queuedSubscriptions; qs++ ){
       if (client.queuedSubscriptions[qs].address === subscriptionAddress &&

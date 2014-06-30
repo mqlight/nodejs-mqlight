@@ -380,3 +380,46 @@ module.exports.test_queued_subs_retrying = function(test){
   });
   client.connect();
 };
+
+
+/**
+* Test that when the initial connection fails a queued subscribe
+* will get processed, when it connects.
+* @param {object} test the unittest interface.
+*/
+module.exports.test_initial_failure_retry_sub = function(test){
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+  var callbackCalled = 0;
+  var first = true;
+  client.on('connected', function() {
+    test.equal(client.queuedSubscriptions.length, 0, 
+        'should be no queued subs');
+    setTimeout(function(){  client.disconnect() },10);
+  });
+
+  client.on('error', function() {
+    if ( first ) {
+      client.subscribe('queuedSub', function(err){
+        if (err){
+          test.ok(false, 'should not be called in err');
+        } else {
+          callbackCalled++;
+        }
+      });
+      first = false;
+    } else {
+      test.equal(client.queuedSubscriptions.length, 1, 
+                 'should be a queued sub');
+      stubproton.setConnectStatus(0);
+    } 
+  });
+
+  client.on('disconnected', function(){
+    test.equal(callbackCalled, 1, 'should have called in success');
+    test.done();
+  });
+
+  stubproton.setConnectStatus(1);
+  client.connect();
+};
