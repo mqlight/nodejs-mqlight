@@ -29,6 +29,7 @@ The following are the currently supported platform architectures:
 
 * 64-bit or 32-bit runtime on Windows (x64 or x86)
 * 64-bit runtime on Linux (x64)
+* 64-bit runtime on Mac OS X (x64)
 
 You will currently receive an error if you attempt to use any other
 combination.
@@ -108,18 +109,18 @@ Creates an MQ Light client instance.
 * `options`, (Object)  options for the client. Properties include:
 
   *  **service**, (String) (required), the URL for the service to connect to.
-  *  **id** (String, default: AUTO_[0-9a-f]{7}), a unique identifier for
-     this client. A client with a duplicate `id` will be prevented from
-     connecting to the messaging service.
-  *  **user** (String) (optional) user name for authentication
-  *  **password** (String) (optional) password for authentication
-  *  **sslTrustCertificate** (String) (optional) SSL trust certificate to use
+  *  **id** (String, default: `AUTO_[0-9a-f]{7}`) (optional), a unique
+     identifier for this client. A client with a duplicate `id` will be
+     prevented from connecting to the messaging service.
+  *  **user** (String) (optional), user name for authentication
+  *  **password** (String) (optional), password for authentication
+  *  **sslTrustCertificate** (String) (optional), SSL trust certificate to use
      when authentication is required for the MQ Light server. Only used when
      service specifies the amqps scheme.
- *   **sslVerifyName** (Boolean) (optional) whether or not to additionally
-     check the MQ Light server’s common name in the certificate matches the
-     actual server’s DNS name. Only used when the sslTrustCertificate option
-     is specified. Valid values: true or false (default: true).
+  *  **sslVerifyName** (Boolean, default: true) (optional), whether or not to
+     additionally check the MQ Light server's common name in the certificate
+     matches the actual server's DNS name. Only used when the
+     sslTrustCertificate option is specified.
 
 Returns a `Client` object representing the client instance. The client is an
 event emitter and listeners can be registered for the following events:
@@ -139,6 +140,7 @@ converted to JSON before sending and automatically parsed back into the same
 Object type when received.
 
 * `topic` - (String) the topic to which the message will be sent.
+  A topic can contain any character in the Unicode character set.
 * `message` - (String | Buffer | Object) the message body to be sent
 * `options` - (Object) (optional) map of additional options for the send.
   Supported options are:
@@ -158,7 +160,10 @@ message will be delivered to a particular `Destination`, and hence
 `subscription`.
 
 * `pattern` - (String) used to match against the `topic` specified when a
-   message is sent to the messaging service.
+  message is sent to the messaging service. A pattern can contain any character
+  in the Unicode character set, with `#` representing a multilevel wildcard and
+  `+` a single level wildcard as described
+  [here](https://developer.ibm.com/messaging/mq-light/wildcard-topicpatterns/).
 * `share` - (String) (optional) name for creating or joining a shared
   subscription for which messages are anycast between connected subscribers. If
   omitted defaults to unshared (e.g. private to the client).
