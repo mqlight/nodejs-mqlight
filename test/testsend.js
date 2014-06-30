@@ -404,7 +404,7 @@ module.exports.test_clear_queuedsends_disconnect = function(test) {
   client.on('connected', function(x,y) {
     stubproton.setConnectStatus(1);
     client.send('test', 'message', opts, function(err){
-      test.deepEqual(client.getState(), 'disconnected',
+      test.deepEqual(client.state, 'disconnected',
           'callback called when disconnected');
       test.notDeepEqual(err, undefined, 'not undefined so err set');
       test.equal(client.queuedSends.length, 0, 'no queued sends left');

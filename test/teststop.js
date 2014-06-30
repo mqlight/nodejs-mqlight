@@ -42,7 +42,7 @@ module.exports.test_disconnect_callback_and_event = function(test) {
     client.on('disconnected', function() {
       test.ok(this === client);
       test.equals(arguments.length, 0);
-      test.equals(client.getState(), 'disconnected');
+      test.equals(client.state, 'disconnected');
       if (++count == 2) {
         test.done();
       }

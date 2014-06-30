@@ -45,20 +45,20 @@ module.exports.test_successful_reconnect = function(test) {
   }, 5000);
 
   client.on('connected', function(x, y) {
-    test.deepEqual(client.getState(), 'connected',
+    test.deepEqual(client.state, 'connected',
         'client status connected after connect');
     stubproton.setConnectStatus(2);
     mqlight.reconnect(client);
   });
 
   client.on('error', function(err) {
-    test.deepEqual(client.getState(), 'retrying',
+    test.deepEqual(client.state, 'retrying',
         'client in retrying state after error');
     stubproton.setConnectStatus(0);
   });
 
   client.on('reconnected', function(x, y) {
-    test.deepEqual(client.getState(), 'connected', 'client has reconnected');
+    test.deepEqual(client.state, 'connected', 'client has reconnected');
     client.disconnect();
     test.done();
     clearTimeout(timeout);
@@ -106,13 +106,13 @@ module.exports.test_multi_reconnect_call = function(test) {
   });
   client.on('error', function(x, y) {
     //second reconnect should return immediately
-    test.deepEqual(mqlight.reconnect(client).getState(), 'retrying');
+    test.deepEqual(mqlight.reconnect(client).state, 'retrying');
     stubproton.setConnectStatus(0);
   });
 
   client.on('reconnected', function(x, y) {
     reconnectedEvents++;
-    test.equals(client.getState(), 'connected',
+    test.equals(client.state, 'connected',
         'client state connected after reconnect');
     setTimeout(function() {
       test.equals(reconnectedEvents, 1, 'reconnected event happened once');
@@ -202,7 +202,7 @@ module.exports.test_disconnect_while_reconnecting = function(test) {
   });
 
   client.on('disconnected', function(x, y) {
-    test.deepEqual(client.getState(), 'disconnected', 'state disconected');
+    test.deepEqual(client.state, 'disconnected', 'state disconected');
     //set connect state to 0 and wait a second incase of reconnect
     stubproton.setConnectStatus(0);
     setTimeout(function() {
@@ -244,7 +244,7 @@ module.exports.test_single_queued_send = function(test) {
     client.send('test', 'message', opts, function() {
       //this callback should only happen after reconnect
       test.equals(reconnected, 1, 'has reconnected');
-      test.deepEqual(client.getState(), 'connected', 'state is connected');
+      test.deepEqual(client.state, 'connected', 'state is connected');
       test.equals(client.queuedSends.length, 0, 'queued sends now 0');
       client.disconnect();
       clearTimeout(timeout);

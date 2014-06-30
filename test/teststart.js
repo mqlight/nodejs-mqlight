@@ -42,11 +42,11 @@ var testCase = require('nodeunit').testCase;
 module.exports.test_successful_connect_disconnect = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
   var count = 0;
-  test.equals('disconnected', client.getState());
+  test.equals('disconnected', client.state);
   client.on('connected', function(x, y) {
     test.ok(this === client);
     test.equals(arguments.length, 0);
-    test.equals(client.getState(), 'connected');
+    test.equals(client.state, 'connected');
     if (++count === 2) {
       client.disconnect();
       test.done();
@@ -55,7 +55,7 @@ module.exports.test_successful_connect_disconnect = function(test) {
   client.connect(function(err) {
     test.ok(this === client);
     test.equals(arguments.length, 0);
-    test.equals(client.getState(), 'connected');
+    test.equals(client.state, 'connected');
     if (++count === 2) {
       client.disconnect();
       test.done();
@@ -149,7 +149,7 @@ module.exports.test_connect_too_many_arguments = function(test) {
 
 
 /**
- * Tests that calling connect to an enpoint that is currently down retries
+ * Tests that calling connect to an endpoint that is currently down retries
  * until successful.
  * @param {object} test the unittest interface
  */
@@ -183,7 +183,7 @@ module.exports.test_connect_multiple_endpoints = function(test) {
     service: services
   });
   client.connect(function() {
-    test.equals(client.getService(), 'amqp://host:5672');
+    test.equals(client.service, 'amqp://host:5672');
     client.disconnect();
     test.done();
   });
@@ -214,7 +214,7 @@ module.exports.test_connect_variable_endpoints = function(test) {
     test.ok(err.message.indexOf('amqp://bad') != -1);
   });
   client.connect(function() {
-    test.equals(client.getService(), 'amqp://host:1234');
+    test.equals(client.service, 'amqp://host:1234');
     client.disconnect();
     test.done();
   });
@@ -288,7 +288,7 @@ module.exports.test_connect_http_changing_endpoint = function(test) {
   });
   client.connect(function(err) {
     test.ifError(err);
-    test.equals(client.getService(), 'amqp://host:1234',
+    test.equals(client.service, 'amqp://host:1234',
                 'Connected to wrong service. ');
     client.disconnect();
     test.done();
@@ -341,7 +341,7 @@ module.exports.test_connect_http_multiple_endpoints = function(test) {
   });
   client.connect(function(err) {
     test.ifError(err);
-    test.equals(client.getService(), 'amqp://host:1234',
+    test.equals(client.service, 'amqp://host:1234',
                 'Connected to wrong service. ');
     client.disconnect();
     test.done();
@@ -562,9 +562,9 @@ module.exports.test_connect_file_changing_endpoint = function(test) {
   });
   client.connect(function(err) {
     test.ifError(err);
-    test.ok(client.getService());
-    test.equals(client.getService(), 'amqp://host:1234',
-                'Connected to wrong service. ' + client.getService());
+    test.ok(client.service);
+    test.equals(client.service, 'amqp://host:1234',
+                'Connected to wrong service. ' + client.service);
     client.disconnect();
     test.done();
     fs.readFile = originalReadFileMethod;
@@ -608,7 +608,7 @@ module.exports.test_connect_file_multiple_endpoints = function(test) {
   });
   client.connect(function(err) {
     test.ifError(err);
-    test.equals(client.getService(), 'amqp://host:1234',
+    test.equals(client.service, 'amqp://host:1234',
                 'Connected to wrong service. ');
     client.disconnect();
     test.done();
