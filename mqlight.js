@@ -134,7 +134,7 @@ if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
  * Options:
  * <ul>
  * <li>
- * service  - Required; when an instance of String this is a URL to connect to.
+ * service  - Required: when an instance of String this is a URL to connect to.
  *            When an instance of Array this is an array of URLs to connect to
  *            - each will be tried in turn until either a connection is
  *            successfully established to one of the URLs, or all of the URLs
@@ -142,9 +142,11 @@ if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
  *            this argument, then function is invoked each time the client
  *            wants to establish a connection (e.g. for any of the state
  *            transitions, on the state diagram shown earlier on this page,
- *            which lead to the 'connected' state). The function must return
- *            either an instance of String or Array, which are treated in the
- *            manner described previously.
+ *            which lead to the 'connected' state) and is supplied a single
+ *            parameter containing a callback in the form function(err,
+ *            service). The function must supply the service URL as either an
+ *            instance of String or Array to the callback function and this
+ *            will be treated in the same manner described previously.
  * </li>
  * <li>
  * id       - Optional; an identifier that is used to identify this client. Two
@@ -520,15 +522,19 @@ var getHttpServiceFunction = function(serviceUrl) {
  * Represents an MQ Light client instance.
  *
  * @param {String|Array|Function}
- *          service - Required; when an instance of String this is a URL to
- *          connect to. When an instance of Array this is an array of URLs to
+ *          service  - Required; when an instance of String this is a URL to
+ *          connect to.  When an instance of Array this is an array of URLs to
  *          connect to - each will be tried in turn until either a connection
  *          is successfully established to one of the URLs, or all of the URLs
  *          have been tried. When an instance of Function is specified for this
  *          argument, then function is invoked each time the client wants to
- *          establish a connection. The function must return either an instance
- *          of String or Array, which are treated in the manner described
- *          previously.
+ *          establish a connection (e.g. for any of the state transitions, on
+ *          the state diagram shown earlier on this page, which lead to the
+ *          'connected' state) and is supplied a single parameter containing a
+ *          callback in the form function(err, service). The function must
+ *          supply the service URL as either an instance of String or Array to
+ *          the callback function and this will be treated in the same manner
+ *          described previously.
  * @param {String}
  *          id - Optional; an identifier that is used to identify this client.
  *          To different instances of Client can have the same id, however only

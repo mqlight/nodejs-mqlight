@@ -108,7 +108,12 @@ Creates an MQ Light client instance.
 
 * `options`, (Object)  options for the client. Properties include:
 
-  *  **service**, (String) (required), the URL for the service to connect to.
+  *  **service**, (String | Array | Function) (required), a String containing
+     the URL for the service to connect to, or alternatively an Array
+     containing a list of URLs to attempt to connect to in turn, or
+     alternatively an async function which will be expected to supply the
+     service URL(s) to a callback function that will be passed to it whenever
+     it is called (in the form ``function(err, service)``).
   *  **id** (String, default: `AUTO_[0-9a-f]{7}`) (optional), a unique
      identifier for this client. A client with a duplicate `id` will be
      prevented from connecting to the messaging service.
