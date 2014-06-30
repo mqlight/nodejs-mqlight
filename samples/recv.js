@@ -75,7 +75,7 @@ var client = mqlight.createClient(opts);
 
 // once connection is acquired, receive messages from the required topic
 client.on('connected', function() {
-  console.log('Connected to %s using client-id %s', service, client.getId());
+  console.log('Connected to %s using client-id %s', service, client.id);
 
   // now subscribe to topic for publications
   client.subscribe(topic, parsed['share-name'], function(err, pattern) {
