@@ -296,3 +296,117 @@ module.exports.test_createClient_too_many_arguments = function(test) {
   mqlight.createClient({service: 'amqp://host'}, 'wallflower');
   test.done();
 };
+
+
+/**
+ * Test that bad ssl options cause createClient to fail
+ * @param {object} test - test case.
+ */
+module.exports.test_bad_ssl_options = function(test) {
+  var testData = [{sslTrustCertificate: 1, sslVerifyName: true},
+                  {sslTrustCertificate: {a:1}, sslVerifyName: true},
+                  {sslTrustCertificate: true, sslVerifyName: true},
+                  {sslTrustCertificate:'ValidCertificate', sslVerifyName:'a'},
+                  {sslTrustCertificate:'ValidCertificate', sslVerifyName: 1},
+                  {sslTrustCertificate:'ValidCertificate',
+                    sslVerifyName:{a:1}}];
+  test.expect(testData.length);
+  for (var i = 0; i < testData.length; i++) {
+    test.throws(function() {
+      var opts = {
+        service: 'amqp://host',
+        sslTrustCertificate : testData[i].sslTrustCertificate,
+        sslVerifyName : testData[i].sslVerifyName,
+        id: 'testid'
+      };
+      mqlight.createClient(opts);
+    }, function(err) {
+      if (err instanceof TypeError) {
+        return true;
+      }
+    }, 'invalid bad ssl options test (' + i + '): ' + testData[i]);
+  }
+  test.done();
+};
+
+
+/**
+ * Test that the ssl options for valid certificates cause connect to be
+ * successful
+ * @param {object} test - test case.
+ */
+module.exports.test_valid_ssl_options = function(test) {
+  var testData = [{sslTrustCertificate:'ValidCertificate', sslVerifyName:true},
+                  {sslTrustCertificate:'ValidCertificate', sslVerifyName:true},
+                  {sslTrustCertificate:'BadVerify', sslVerifyName: false}];
+  var count = 0;
+  var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
+    var opts = {
+      service: 'amqp://host',
+      sslTrustCertificate : testData[count].sslTrustCertificate,
+      sslVerifyName : testData[count].sslVerifyName,
+      id: 'testid'
+    };
+    var client = mqlight.createClient(opts);
+    client.on('error', function(err) {
+      client.disconnect();
+      test.ok(!err,'unexpected error event: '+err);
+      test.done();
+    });
+    client.connect(function(err) {
+      test.ok(!err);
+      client.disconnect();
+      ++count;
+      if (count == testData.length) {
+        test.done();
+      } else {
+        validSSLTest(testData[count].sslTrustCertificate,
+            testData[count].sslVerifyName);
+      }
+    });
+  };
+
+  validSSLTest(testData[count].sslTrustCertificate,
+      testData[count].sslVerifyName);
+};
+
+
+/**
+ * Test that the ssl options for invalid certificates cause connect to fail
+ * @param {object} test - test case.
+ */
+module.exports.test_invalid_ssl_options = function(test) {
+  var testData = [{sslTrustCertificate:'BadCertificate', sslVerifyName:true},
+                  {sslTrustCertificate:'BadCertificate', sslVerifyName:false},
+                  {sslTrustCertificate:'BadVerify', sslVerifyName: true}];  
+  var count = 0;
+  var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
+    var opts = {
+      service: 'amqp://host',
+      sslTrustCertificate : testData[count].sslTrustCertificate,
+      sslVerifyName : testData[count].sslVerifyName,
+      id: 'testid'
+    };
+    var client = mqlight.createClient(opts);
+    client.on('error', function(err) {
+      test.ok(err);
+      client.disconnect();
+      ++count;
+      if (count == testData.length) {
+        test.done();
+      } else {
+        validSSLTest(testData[count].sslTrustCertificate,
+            testData[count].sslVerifyName);
+      }
+    });
+    client.on('connect', function(err) {
+      client.disconnect();
+      test.ok(!err,'unexpected connect event');
+      test.done();
+    });
+    client.connect();
+  };
+
+  validSSLTest(testData[count].sslTrustCertificate,
+      testData[count].sslVerifyName);
+};

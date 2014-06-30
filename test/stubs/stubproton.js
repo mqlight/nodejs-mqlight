@@ -99,9 +99,9 @@ module.exports.createProtonStub = function() {
       settle: function() {
         if (DEBUG) console.log('stub settle function called');
       },
-      connect: function(service) {
+      connect: function(service, sslTrustCertificate, sslVerifyName) {
         if (DEBUG) console.log('stub connect function called for service: ' +
-                               service);
+                               service, sslTrustCertificate, sslVerifyName);
         if (!this.stopped) throw new Error('already connected');
         var result;
         if (service.indexOf('bad') != -1) {
@@ -109,6 +109,16 @@ module.exports.createProtonStub = function() {
           this.lastErrorText = 'bad service ' + service;
           if (DEBUG) console.log('connect will fail, error: ' +
                                  this.lastErrorText);
+        } else if (sslTrustCertificate === 'BadCertificate') {
+          result = -1;
+          this.lastErrorText = 'Bad Certificate';
+          if (DEBUG) console.log('connect will fail, error: ' +
+              this.lastErrorText);
+        } else if (sslTrustCertificate === 'BadVerify' && sslVerifyName) {
+          result = -1;
+          this.lastErrorText = 'Bad verify name';
+          if (DEBUG) console.log('connect will fail, error: ' +
+              this.lastErrorText);
         } else {
           if (connectStatus !== 0) {
             this.lastErrorText = 'connect error: ' + connectStatus;
