@@ -423,3 +423,45 @@ module.exports.test_initial_failure_retry_sub = function(test){
   stubproton.setConnectStatus(1);
   client.connect();
 };
+
+
+/**
+* Test that when the initial connection fails a queued send
+* will get processed, when it connects.
+* @param {object} test the unittest interface.
+*/
+module.exports.test_initial_failure_retry_send = function(test){
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+  var callbackCalled = 0;
+  var first = true;
+  client.on('connected', function() {
+    test.equal(client.queuedSends.length, 0, 
+        'should be no queued sends');
+    setTimeout(function(){  client.disconnect() },10);
+  });
+
+  client.on('error', function() {
+    if ( first ) {
+      client.send('topic', 'message', function(err){
+        if (err){
+          test.ok(false, 'should not be called in err');
+        } else {
+          callbackCalled++;
+        }
+      });
+      first = false;
+    } else {
+      test.equal(client.queuedSends.length, 1, 
+                 'should be a queued send');
+      stubproton.setConnectStatus(0);
+    }
+  }); 
+
+  client.on('disconnected', function(){
+    test.equal(callbackCalled, 1, 'should be one callback called');
+    test.done();
+  });
+  stubproton.setConnectStatus(1);
+  client.connect();
+};

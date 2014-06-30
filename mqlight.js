@@ -1363,7 +1363,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   // Ensure we are not retrying otherwise queue message and return
-  if (this.getState() === 'retrying') {
+  if (this.getState() === 'retrying' || this.getState() === 'connecting') {
     this.queuedSends.push({topic: topic, data: data, options: options,
       callback: callback});
     log.exit('Client.send', this.id);
