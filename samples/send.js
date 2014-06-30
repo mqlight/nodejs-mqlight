@@ -85,10 +85,7 @@ client.on('connected', function() {
     var body = messages[i];
     var options = {};
     if (parsed['message-ttl']) {
-      var ttl = Number(parsed['message-ttl']);
-      if (!Number.isNaN(ttl) && Number.isFinite(ttl) && ttl > 0) {
-        options.ttl = ttl;
-      }
+      options.ttl = Number(parsed['message-ttl']);
     }
     client.send(topic, body, options, function(err, topic, data, options) {
       if (err) {
