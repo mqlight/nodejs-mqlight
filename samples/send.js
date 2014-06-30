@@ -28,7 +28,8 @@ var uuid = require('node-uuid');
 var types = {
   service: String,
   topic: String,
-  delay: Number
+  delay: Number,
+  'message-ttl': Number
 };
 var shorthands = {
   s: ['--service'],
@@ -48,6 +49,8 @@ if (parsed.help) {
   console.log('  -t TOPIC, --topic=TOPIC');
   console.log('                        send messages to topic TOPIC' +
               ' (default: public)');
+  console.lof('  --message-ttl=NUM     set message time-to-live to NUM ' +
+              'seconds');
   console.log('  -d NUM, --delay=NUM   add a NUM seconds time delay between' +
               ' each request');
   console.log('');
@@ -80,7 +83,14 @@ client.on('connected', function() {
   var i = 0;
   var sendNextMessage = function() {
     var body = messages[i];
-    client.send(topic, body, function(err, topic, data, options) {
+    var options = {};
+    if (parsed['message-ttl']) {
+      var ttl = Number(parsed['message-ttl']);
+      if (!Number.isNaN(ttl) && Number.isFinite(ttl) && ttl > 0) {
+        options.ttl = ttl;
+      }
+    }
+    client.send(topic, body, options, function(err, topic, data, options) {
       if (err) {
         console.error('Problem with send request: %s', err.message);
         process.exit(1);
