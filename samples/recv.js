@@ -28,7 +28,8 @@ var uuid = require('node-uuid');
 var types = {
   'share-name': String,
   service: String,
-  'topic-pattern': String
+  'topic-pattern': String,
+  'destination-ttl': Number
 };
 var shorthands = {
   h: ['--help'],
@@ -52,6 +53,8 @@ if (parsed.help || remain.length > 0) {
   console.log('                        subscribe to receive messages matching' +
               ' TOPICPATTERN');
   console.log('                        (default: public)');
+  console.log('  --destination-ttl=NUM set destination time-to-live to NUM ' +
+              'seconds');
   console.log('  -n NAME, --share-name NAME');
   console.log('                        optionally, subscribe to a shared' +
               ' destination using');
@@ -67,6 +70,7 @@ if (parsed.help || remain.length > 0) {
 
 var service = parsed.service ? parsed.service : 'amqp://localhost';
 var topic = parsed['topic-pattern'] ? parsed['topic-pattern'] : 'public';
+var share = parsed['share-name'] ? parsed['share-name'] : undefined;
 
 // connect client to broker
 var opts = {
@@ -78,9 +82,13 @@ var client = mqlight.createClient(opts);
 // once connection is acquired, receive messages from the required topic
 client.on('connected', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
+  var options = {};
+  if (parsed['destination-ttl']) {
+    options.ttl = Number(parsed['destination-ttl']);
+  }
 
   // now subscribe to topic for publications
-  client.subscribe(topic, parsed['share-name'], function(err, pattern) {
+  client.subscribe(topic, share, options, function(err, pattern) {
     if (err) {
       console.error('Problem with subscribe request: %s', err.message);
       process.exit(1);

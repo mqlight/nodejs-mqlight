@@ -1909,6 +1909,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   } else {
     share = 'private:';
   }
+  log.log('parms', this.id, 'share:', share);
 
   // Validate the options parameter, when specified
   if (options !== undefined) {
@@ -1963,9 +1964,6 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       ttl = Math.round(ttl / 1000);
     }
   }
-
-  log.log('parms', this.id, 'share:', share);
-  log.log('parms', this.id, 'options:', options);
 
   if (callback && !(callback instanceof Function)) {
     err = new TypeError('callback must be a function type');
@@ -2039,14 +2037,14 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       //call if success or if disconnected otherwise it will be retried
       if ( err === undefined ){
         log.entry('Client.subscribe.callback', client.id);
-        log.log('parms', client.id, 'err:', err, 'topicPattern:', topicPattern,
-                'originalShareValue:', originalShareValue);
+        log.log('parms', client.id, 'err:', err, ', topicPattern:',
+                topicPattern, ', originalShareValue:', originalShareValue);
         callback.apply(client, [err, topicPattern, originalShareValue]);
         log.exit('Client.subscribe.callback', client.id, null);
       } else if ( client.isDisconnected() ){
         log.entry('Client.subscribe.callback', client.id);
-        log.log('parms', client.id, 'err:', err, 'topicPattern:', topicPattern,
-                'originalShareValue:', originalShareValue);
+        log.log('parms', client.id, 'err:', err, ', topicPattern:',
+                topicPattern, ', originalShareValue:', originalShareValue);
         callback.apply(client, [err, topicPattern, originalShareValue]);
         log.exit('Client.subscribe.callback', client.id, null);
       }
