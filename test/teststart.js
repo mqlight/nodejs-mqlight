@@ -762,3 +762,183 @@ module.exports.test_connect_heartbeat = function(test) {
     setTimeout(waitForHeartbeats, remoteIdleTimeout, 0);
   });
 };
+
+
+/**
+ * Test that passing various combinations of user and password into the
+ * createClient(...) method works (or fails) as expected.
+ *
+ * @param {object} test the unittest interface
+ */
+
+module.exports.test_connect_user_password_options = function(test) {
+  var data = [
+    { desc: '00: no user or password specified anywhere',
+      service: 'amqp://host',
+      user: undefined,
+      password: undefined,
+      valid: true },
+    { desc: '01: user specified as a property - but no password',
+      service: 'amqp://host',
+      user: 'user',
+      password: undefined,
+      valid: false },
+    { desc: '02: no user or password specified anywhere',
+      service: 'amqp://host',
+      user: undefined,
+      password: 'password',
+      valid: false },
+    { desc: '03: user in (String) URL, no properties set',
+      service: 'amqp://user@host',
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '04: user/password in (String) URL, no properties set',
+      service: 'amqp://user:pass@host',
+      user: undefined,
+      password: undefined,
+      valid: true },
+    { desc: '05: user/password in (String) URL, user mismatches properties',
+      service: 'amqp://user1:pass1@host',
+      user: 'user2',
+      password: 'pass1',
+      valid: false },
+    { desc: '06: password in (String) URL does not match password property',
+      service: 'amqp://user1:pass1@host',
+      user: 'user1',
+      password: 'pass2',
+      valid: false },
+    { desc: '07: String URL and properties all specify matching values',
+      service: 'amqp://user1:pass1@host',
+      user: 'user1',
+      password: 'pass1',
+      valid: true },
+    { desc: '08: Array URLs have mixture of embedded auth #1',
+      service: ['amqp://user1:pass1@host', 'amqp://host'],
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '09: Array URLs have mixture of embedded auth #2',
+      service: ['amqp://host', 'amqp://user1:pass1@host'],
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '10: Array URLs have matching users but different passwords',
+      service: ['amqp://user1:pass1@host', 'amqp://user1:pass2@host'],
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '11: Array URLs have matching passwords but different users',
+      service: ['amqp://user1:pass1@host', 'amqp://user2:pass1@host'],
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '12: Array URLs have matching user/passwords - no properties',
+      service: ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'],
+      user: undefined,
+      password: undefined,
+      valid: true },
+    { desc: '13: Array URLs and properties all match',
+      service: ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'],
+      user: 'user1',
+      password: 'pass1',
+      valid: true },
+    { desc: '14: Array URLs have same values but user property different',
+      service: ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'],
+      user: 'user2',
+      password: 'pass1',
+      valid: false },
+    { desc: '15: Array URLs have same values but password property different',
+      service: ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'],
+      user: 'user1',
+      password: 'pass2',
+      valid: false },
+    { desc: '16: Func returns String value with user/password',
+      service: function(cb) {cb(undefined, 'amqp://user1:pass1@host')},
+      user: undefined,
+      password: undefined,
+      valid: true },
+    { desc: '17: Func returns String without auth, user/pass props',
+      service: function(cb) {cb(undefined, 'amqp://host')},
+      user: 'user1',
+      password: 'pass1',
+      valid: true },
+    { desc: '18: Func returns String with user/pass matches properties',
+      service: function(cb) {cb(undefined, 'amqp://user1:pass1@host')},
+      user: 'user1',
+      password: 'pass1',
+      valid: true },
+    { desc: '19: Func returns URI with only user - no other values',
+      service: function(cb) {cb(undefined, 'amqp://user1@host')},
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '20: Func returns Array with different credentials in URLs #1',
+      service: function(cb)
+      {cb(undefined, ['amqp://host', 'amqp://user1:pass1@host'])},
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '21: Func returns Array with different credentials in URLs #2',
+      service: function(cb)
+      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://host'])},
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '22: Func returns Array with users mismatching in URLs',
+      service: function(cb)
+      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://user2:pass1@host'])},
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '23: Func returns URLs that mismatch on password',
+      service: function(cb)
+      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://user1:pass2@host'])},
+      user: undefined,
+      password: undefined,
+      valid: false },
+    { desc: '24: Func returns URLs that match each other but mismatch props',
+      service: function(cb)
+      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'])},
+      user: 'user2',
+      password: 'pass1',
+      valid: false },
+    { desc: '25: Func returns URLs with user/pass that match properties',
+      service: function(cb)  // 25: Everything specified, everything matches
+      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'])},
+      user: 'user1',
+      password: 'pass1',
+      valid: true }
+  ];
+
+  var runtest = function(i) {
+    if (i == data.length) {
+      test.done();
+    } else {
+      try {
+        var client = mqlight.createClient(data[i]);
+        client.connect(function(err) {
+          if (err) {
+            test.ok(!data[i].valid, 
+                    'index #' + i + ' should have been accepted\n' +
+                    data[i].desc + '\n' + err + '\n' + JSON.stringify(data[i]));
+          } else {
+            test.ok(data[i].valid, 
+                    'index #' + i + ' should have been rejected\n' +
+                    data[i].desc + '\n' + JSON.stringify(data[i]));
+          }
+          this.disconnect();
+          runtest(++i);
+        });
+      } catch(e) {
+        test.ok(!data[i].valid, 
+                'index #' + i + ' should have been accepted\n' + 
+                data[i].desc + '\n' + e + '\n' + JSON.stringify(data[i]));
+        runtest(++i);
+      }
+    }
+  };
+
+  runtest(0);
+};
+

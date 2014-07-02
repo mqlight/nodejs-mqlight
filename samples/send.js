@@ -44,12 +44,15 @@ if (parsed.help) {
   console.log('');
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
-  console.log('  -s URL, --service=URL service to connect to' +
-              ' (default: amqp://localhost)');
+  console.log('  -s URL, --service=URL service to connect to, for example:\n' +
+              '                        amqp://user@password@localhost:5672 ' +
+              'or\n' +
+              '                        amqps://host:5671 to use SSL/TLS\n' +
+              '                        (default: amqp://localhost)');
   console.log('  -t TOPIC, --topic=TOPIC');
   console.log('                        send messages to topic TOPIC' +
               ' (default: public)');
-  console.lof('  --message-ttl=NUM     set message time-to-live to NUM ' +
+  console.log('  --message-ttl=NUM     set message time-to-live to NUM ' +
               'seconds');
   console.log('  -d NUM, --delay=NUM   add a NUM seconds time delay between' +
               ' each request');
@@ -76,7 +79,7 @@ var delay = parsed.delay * 1000 || 0;
 
 // once connection is acquired, send messages
 client.on('connected', function() {
-  console.log('Connected to %s using client-id %s', service, client.id);
+  console.log('Connected to %s using client-id %s', client.service, client.id);
   console.log('Publishing to: %s', topic);
 
   // queue all messages for sending

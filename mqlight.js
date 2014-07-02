@@ -192,21 +192,26 @@ exports.createClient = function(options) {
     log.throw('createClient', log.NO_CLIENT_ID, err);
     throw err;
   }
-  var securityOptions = { user:options.user,
-                          password:options.password,
-                          sslTrustCertificate:options.sslTrustCertificate,
-                          sslVerifyName:options.sslVerifyName,
-                          toString: function() {
-                            return '[\n'+
-                                   ' user:'+this.user+'\n'+
-                                   ' password:'+(this.password ? '********' :
-                                       this.password)+'\n'+
-                                   ' sslTrustCertificate:'+
-                                       this.sslTrustCertificate+'\n'+
-                                   ' sslVerifyName:'+this.sslVerifyName+'\n'+
-                                   ']';
-                          }
-                        };
+
+  var securityOptions = {
+    propertyUser: options.user,
+    propertyPassword: options.password,
+    urlUser: undefined,
+    urlPassword: undefined,
+    sslTrustCertificate: options.sslTrustCertificate,
+    sslVerifyName:options.sslVerifyName,
+    toString: function() {
+      return '[\n' +
+          ' propertyUser: ' + this.user + '\n' +
+          ' propertyPassword: ' + 
+          (this.propertyPassword ? '********' : undefined) + '\n' +
+          ' propertyUser: ' + this.propertyUser + '\n' +
+          ' urlPassword: ' + (this.urlPassword ? '********' : undefined) + 
+          '\n' +
+          ' sslTrustCertificate: ' + this.sslTrustCertificate + '\n' +
+          ' sslVerifyName: ' + this.sslVerifyName + '\n' + ']';
+    }
+  };
   var client = new Client(options.service, options.id, securityOptions);
 
   process.setMaxListeners(0);
@@ -238,24 +243,21 @@ exports.createClient = function(options) {
  *          service - Required; when an instance of String this is a URL to
  *          connect to. When an instance of Array this is an array of URLs to
  *          connect to
+ * @param {Object} securityOptions - Required; an object encapsulating the
+ *          security sensitive options used to establish a connection.
  * @return {Array} Valid service URLs, with port number added as appropriate.
  * @throws TypeError
  *           If service is not a string or array type.
  * @throws Error
  *           if an unsupported or invalid URL specified.
  */
-var generateServiceList = function(service) {
+var generateServiceList = function(service, securityOptions) {
   log.entry('generateServiceList', log.NO_CLIENT_ID);
-  log.log('parms', log.NO_CLIENT_ID, 'service:', service);
+  log.log('parms', log.NO_CLIENT_ID, 'service:', 
+      String(service).replace(/:[^:]+@/, ':******@'));
+  log.log('parms', log.NO_CLIENT_ID, 'securityOptions:', securityOptions);
 
   var err;
-
-  // Validate the parameter list length
-  if (arguments.length > 1) {
-    err = new Error('Too many arguments');
-    log.throw('generateServiceList', log.NO_CLIENT_ID, err);
-    throw err;
-  }
 
   // Ensure the service is an Array
   var inputServiceList = [];
@@ -297,15 +299,65 @@ var generateServiceList = function(service) {
     var path = serviceUrl.path;
     var auth = serviceUrl.auth;
     var msg;
-
+    var authUser = undefined;
+    var authPassword = undefined;
+    
     // check for auth details
     if (auth) {
-      msg = 'Unsupported URL, auth details e.g user:pass@localhost should ' +
-            'be supplied as options for createClient';
-      err = new Error(msg);
-      log.throw('generateServiceList', log.NO_CLIENT_ID, err);
-      throw err;
+
+      if (auth.indexOf(':') >= 0) {
+        authUser = String(auth).slice(0, auth.indexOf(':'));
+        authPassword = String(auth).slice(auth.indexOf(':')+1);
+      } else {
+        msg = "URLs supplied via the 'service' property must specify both a" +
+              'user name and a password value, or omit both values';
+        err = new Error(msg);
+        log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+        throw err;
+      }
+      if (securityOptions.propertyUser && authUser &&
+          (securityOptions.propertyUser !== authUser)) {
+        msg = "User name supplied as 'user' property (" + 
+              securityOptions.propertyUser + ') does not match user name ' +
+              "supplied via a URL passed via the 'service' property (" +
+              authUser + ')';
+        err = new Error(msg);
+        log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+        throw err;
+      }
+      if (securityOptions.propertyPassword && authPassword &&
+          (securityOptions.propertyPassword !== authPassword)) {
+        msg = "Password supplied as 'password' property does not match a " +
+              "password supplied via a URL passed via the 'service' property";
+        err = new Error(msg);
+        log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+        throw err;
+      }
+      if (i === 0) {
+        securityOptions.urlUser = authUser;
+        securityOptions.urlPassword = authPassword;
+      } 
     }
+
+    // Check whatever URL user names / passwords are present this time
+    // through the loop - match the ones set on securityOptions by the first
+    // pass through the loop.
+    if (i > 0) {
+      if (securityOptions.urlUser !== authUser) {
+        msg = "URLs supplied via the 'service' property contain " +
+              'inconsistent user names';
+        err = new Error(msg);
+        log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+        throw err;
+      } else if (securityOptions.urlPassword !== authPassword) {
+        msg = "URLs supplied via the 'service' property contain " +
+              'inconsistent password values';
+        err = new Error(msg);
+        log.throw('generateServiceList', log.NO_CLIENT_ID, err);
+        throw err;
+      }
+    }
+
     // Check we are trying to use the amqp protocol
     if (!protocol || protocol !== 'amqp:' && protocol !== 'amqps:') {
       msg = "Unsupported URL '" + inputServiceList[i] +
@@ -566,7 +618,8 @@ var getHttpServiceFunction = function(serviceUrl) {
  */
 var Client = function(service, id, securityOptions) {
   log.entry('Client.constructor', log.NO_CLIENT_ID);
-  log.log('parms', log.NO_CLIENT_ID, 'service:', service);
+  log.log('parms', log.NO_CLIENT_ID, 'service:', 
+          String(service).replace(/:[^:]+@/, ':******@'));
   log.log('parms', log.NO_CLIENT_ID, 'id:', id);
   log.log('parms', log.NO_CLIENT_ID, 'securityOptions:',
           securityOptions.toString());
@@ -595,7 +648,7 @@ var Client = function(service, id, securityOptions) {
     }
   }
   if (!serviceFunction) {
-    serviceList = generateServiceList(service);
+    serviceList = generateServiceList(service, securityOptions);
   }
 
   // If client id has not been specified then generate an id
@@ -623,8 +676,8 @@ var Client = function(service, id, securityOptions) {
   }
 
   // User/password must either both be present, or both be absent.
-  if ((securityOptions.user && !securityOptions.password) ||
-      (!securityOptions.user && securityOptions.password)) {
+  if ((securityOptions.propertyUser && !securityOptions.propertyPassword) ||
+      (!securityOptions.propertyUser && securityOptions.propertyPassword)) {
     err = new TypeError('both user and password properties ' +
                         'must be specified together');
     log.throw('Client.constructor', id, err);
@@ -659,10 +712,14 @@ var Client = function(service, id, securityOptions) {
 
   log.entry('proton.createMessenger', this.id);
   // Initialize ProtonMessenger with auth details
-  if (securityOptions.user) {
+  if (securityOptions.urlUser) {
     // URI encode username and password before passing them to proton
-    var usr = encodeURIComponent(String(securityOptions.user));
-    var pw = encodeURIComponent(String(securityOptions.password));
+    var usr = encodeURIComponent(String(securityOptions.urlUser));
+    var pw = encodeURIComponent(String(securityOptions.urlPassword));
+    this.messenger = proton.createMessenger(id, usr, pw);
+  } else if (securityOptions.properyUser) {
+    var usr = encodeURIComponent(String(securityOptions.propertyUser));
+    var pw = encodeURIComponent(String(securityOptions.propertyPassword));
     this.messenger = proton.createMessenger(id, usr, pw);
   } else {
     this.messenger = proton.createMessenger(id);
@@ -671,7 +728,8 @@ var Client = function(service, id, securityOptions) {
 
   // Save the security options, but exclude the password
   // as it will be cached in the messenger (and otherwise will be traced!).
-  securityOptions.password = undefined;
+  securityOptions.propertyPassword = undefined;
+  securityOptions.urlPassword = undefined;
   this.securityOptions = securityOptions;
   
   // Set the initial state to disconnected
@@ -784,17 +842,18 @@ Client.prototype.connect = function(callback) {
         if (err) {
           log.entry('Client.connect.performConnect.serviceFunction.callback',
                     client.id);
-          callback(err);
+          callback.apply(client, [err]);
           log.exit('Client.connect.performConnect.serviceFunction.callback',
               client.id, null);
         } else {
           try {
-            client.serviceList = generateServiceList(service);
+            client.serviceList = 
+                generateServiceList(service, client.securityOptions);
             client.connectToService(callback);
           } catch (err) {
             log.entry('Client.connect.performConnect.serviceFunction.callback',
                       client.id);
-            callback(err);
+            callback.apply(client, [err]);
             log.exit('Client.connect.performConnect.serviceFunction.callback',
                 client.id, null);
           }
@@ -965,7 +1024,8 @@ Client.prototype.connectToService = function(callback) {
           log.log('emit', client.id, 'error', err);
           client.emit('error', err);
         } else {
-          client.serviceList = generateServiceList(service);
+          client.serviceList = 
+              generateServiceList(service, client.securityOptions);
           setTimeout(retry, CONNECT_RETRY_INTERVAL);
         }
       });

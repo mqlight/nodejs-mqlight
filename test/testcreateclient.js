@@ -233,7 +233,7 @@ module.exports.test_invalid_URIs = function(test) {
                      'amqp://localhost:34:34',
                      'amqp://test:-34',
                      'amqp://here:34/path',
-                     'amqp://rupert:password@NotThere',
+                     'amqp://rupert@NotThere',
                      'amqp://:34',
                      "ce n'est pas une uri"];
   test.expect(invalidUris.length);
@@ -267,7 +267,9 @@ module.exports.test_valid_URIs = function(test) {
                   {uri: 'amqp://host:1234', expected: 'amqp://host:1234'},
                   {uri: 'amqps://host:4321', expected: 'amqps://host:4321'},
                   {uri: 'aMqP://HoSt:1234', expected: 'amqp://host:1234'},
-                  {uri: 'AmQpS://hOsT:4321', expected: 'amqps://host:4321'}];
+                  {uri: 'AmQpS://hOsT:4321', expected: 'amqps://host:4321'},
+                  {uri: 'amqp://user:pass@host:1234', 
+                    expected: 'amqp://host:1234'}];
   var count = 0;
   var clientTest = function(uri, expected) {
     var client = mqlight.createClient({service: uri});

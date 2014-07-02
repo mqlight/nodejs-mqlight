@@ -44,8 +44,11 @@ if (parsed.help || remain.length > 0) {
   console.log('');
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
-  console.log('  -s URL, --service=URL service to connect to' +
-              ' (default: amqp://localhost)');
+  console.log('  -s URL, --service=URL service to connect to, for example:\n' +
+              '                        amqp://user@password@localhost:5672 ' +
+              'or\n' +
+              '                        amqps://host:5671 to use SSL/TLS\n' +
+              '                        (default: amqp://localhost)');
   console.log('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN');
   console.log('                        subscribe to receive messages matching' +
               ' TOPICPATTERN');
@@ -75,7 +78,7 @@ var client = mqlight.createClient(opts);
 
 // once connection is acquired, receive messages from the required topic
 client.on('connected', function() {
-  console.log('Connected to %s using client-id %s', service, client.id);
+  console.log('Connected to %s using client-id %s', client.service, client.id);
 
   // now subscribe to topic for publications
   client.subscribe(topic, parsed['share-name'], function(err, pattern) {
