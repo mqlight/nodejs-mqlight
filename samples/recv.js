@@ -26,16 +26,18 @@ var uuid = require('node-uuid');
 
 // parse the commandline arguments
 var types = {
-  'share-name': String,
   service: String,
   'topic-pattern': String,
-  'destination-ttl': Number
+  id: String,
+  'destination-ttl': Number,
+  'share-name': String
 };
 var shorthands = {
   h: ['--help'],
-  n: ['--share-name'],
   s: ['--service'],
-  t: ['--topic-pattern']
+  t: ['--topic-pattern'],
+  i: ['--id'],
+  n: ['--share-name']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
@@ -49,10 +51,13 @@ if (parsed.help || remain.length > 0) {
               '                        amqp://user:password@host:5672 or\n' +
               '                        amqps://host:5671 to use SSL/TLS\n' +
               '                        (default: amqp://localhost)');
-  console.log('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN');
-  console.log('                        subscribe to receive messages matching' +
+  console.log('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN\n' +
+              '                        subscribe to receive messages matching' +
               ' TOPICPATTERN');
   console.log('                        (default: public)');
+  console.log('  -i ID, --id=ID        the ID to use when connecting to ' +
+              'MQ Light\n' +
+              '                        (default: recv_[0-9a-f]{7})');
   console.log('  --destination-ttl=NUM set destination time-to-live to NUM ' +
               'seconds');
   console.log('  -n NAME, --share-name NAME');
@@ -69,17 +74,18 @@ if (parsed.help || remain.length > 0) {
 }
 
 var service = parsed.service ? parsed.service : 'amqp://localhost';
-var topic = parsed['topic-pattern'] ? parsed['topic-pattern'] : 'public';
+var pattern = parsed['topic-pattern'] ? parsed['topic-pattern'] : 'public';
+var id = parsed.id ? parsed.id : 'recv_' + uuid.v4().substring(0, 7);
 var share = parsed['share-name'] ? parsed['share-name'] : undefined;
 
 // connect client to broker
 var opts = {
   service: service,
-  id: 'recv_' + uuid.v4().substring(0, 7)
+  id: id
 };
 var client = mqlight.createClient(opts);
 
-// once connection is acquired, receive messages from the required topic
+// once connection is acquired, receive messages for the supplied pattern
 client.on('connected', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
   var options = {};
@@ -87,14 +93,18 @@ client.on('connected', function() {
     options.ttl = Number(parsed['destination-ttl']);
   }
 
-  // now subscribe to topic for publications
-  client.subscribe(topic, share, options, function(err, pattern) {
+  // now subscribe to pattern for messages
+  client.subscribe(pattern, share, options, function(err, pattern) {
     if (err) {
       console.error('Problem with subscribe request: %s', err.message);
       process.exit(1);
     }
     if (pattern) {
-      console.log('Subscribed to: %s', pattern);
+      if (share) {
+        console.log('Subscribed to share: %s, pattern: %s', share, pattern);
+      } else {
+        console.log('Subscribed to pattern: %s', pattern);
+      }
     }
   });
 

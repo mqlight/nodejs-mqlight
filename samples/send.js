@@ -28,14 +28,15 @@ var uuid = require('node-uuid');
 var types = {
   service: String,
   topic: String,
-  delay: Number,
-  'message-ttl': Number
+  'message-ttl': Number,
+  delay: Number
 };
 var shorthands = {
+  h: ['--help'],
   s: ['--service'],
   t: ['--topic'],
-  d: ['--delay'],
-  h: ['--help']
+  i: ['--id'],
+  d: ['--delay']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 
@@ -51,6 +52,9 @@ if (parsed.help) {
   console.log('  -t TOPIC, --topic=TOPIC');
   console.log('                        send messages to topic TOPIC' +
               ' (default: public)');
+  console.log('  -i ID, --id=ID        the ID to use when connecting to ' +
+              'MQ Light\n' +
+              '                        (default: send_[0-9a-f]{7})');
   console.log('  --message-ttl=NUM     set message time-to-live to NUM ' +
               'seconds');
   console.log('  -d NUM, --delay=NUM   add a NUM seconds time delay between' +
@@ -59,13 +63,14 @@ if (parsed.help) {
   process.exit(0);
 }
 
-var topic = parsed.topic ? parsed.topic : 'public';
 var service = parsed.service ? parsed.service : 'amqp://localhost';
+var topic = parsed.topic ? parsed.topic : 'public';
+var id = parsed.id ? parsed.id : 'send_' + uuid.v4().substring(0, 7);
 
 // create client to connect to broker with
 var opts = {
   service: service,
-  id: 'send_' + uuid.v4().substring(0, 7)
+  id: id
 };
 var client = mqlight.createClient(opts);
 
