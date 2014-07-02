@@ -113,12 +113,16 @@ Creates an MQ Light client instance.
      containing a list of URLs to attempt to connect to in turn, or
      alternatively an async function which will be expected to supply the
      service URL(s) to a callback function that will be passed to it whenever
-     it is called (in the form ``function(err, service)``).
+     it is called (in the form ``function(err, service)``). User names and
+     passwords may be embedded into the URL (e.g. ``amqp://user:pass@host``).
   *  **id** (String, default: `AUTO_[0-9a-f]{7}`) (optional), a unique
      identifier for this client. A client with a duplicate `id` will be
      prevented from connecting to the messaging service.
-  *  **user** (String) (optional), user name for authentication
-  *  **password** (String) (optional), password for authentication
+  *  **user** (String) (optional), user name for authentication. Alternatively,
+     user name may be embedded in the URL passed via the service property.
+  *  **password** (String) (optional), password for authentication.
+     Alternatively, user name may be embedded in the URL passed via the service
+     property.
   *  **sslTrustCertificate** (String) (optional), SSL trust certificate to use
      when authentication is required for the MQ Light server. Only used when
      service specifies the amqps scheme.
