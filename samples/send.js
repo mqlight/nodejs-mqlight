@@ -45,8 +45,7 @@ if (parsed.help) {
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
   console.log('  -s URL, --service=URL service to connect to, for example:\n' +
-              '                        amqp://user@password@localhost:5672 ' +
-              'or\n' +
+              '                        amqp://user:password@host:5672 or\n' +
               '                        amqps://host:5671 to use SSL/TLS\n' +
               '                        (default: amqp://localhost)');
   console.log('  -t TOPIC, --topic=TOPIC');
