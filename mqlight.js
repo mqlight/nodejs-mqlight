@@ -254,7 +254,7 @@ exports.createClient = function(options) {
 var generateServiceList = function(service, securityOptions) {
   logger.entry('generateServiceList', logger.NO_CLIENT_ID);
   logger.log('parms', logger.NO_CLIENT_ID, 'service:',
-      String(service).replace(/:[^:]+@/, ':********@'));
+      String(service).replace(/:[^:]+@/g, ':********@'));
   logger.log('parms', logger.NO_CLIENT_ID, 'securityOptions:', securityOptions);
 
   var err;
@@ -291,20 +291,17 @@ var generateServiceList = function(service, securityOptions) {
    * appropriate)
   */
   var serviceList = [];
+  var authUser, authPassword;
   for (var i = 0; i < inputServiceList.length; i++) {
     var serviceUrl = url.parse(inputServiceList[i]);
     var protocol = serviceUrl.protocol;
-    var host = serviceUrl.hostname;
-    var port = serviceUrl.port;
-    var path = serviceUrl.path;
-    var auth = serviceUrl.auth;
     var msg;
-    var authUser = undefined;
-    var authPassword = undefined;
 
     // check for auth details
+    var auth = serviceUrl.auth;
+    authUser = undefined;
+    authPassword = undefined;
     if (auth) {
-
       if (auth.indexOf(':') >= 0) {
         authUser = String(auth).slice(0, auth.indexOf(':'));
         authPassword = String(auth).slice(auth.indexOf(':')+1);
@@ -368,6 +365,7 @@ var generateServiceList = function(service, securityOptions) {
       throw err;
     }
     // Check we have a hostname
+    var host = serviceUrl.hostname;
     if (!host) {
       msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
             'service. Must supply a hostname.';
@@ -376,10 +374,12 @@ var generateServiceList = function(service, securityOptions) {
       throw err;
     }
     // Set default port if not supplied
+    var port = serviceUrl.port;
     if (!port) {
       port = (protocol === 'amqp:') ? '5672' : '5671';
     }
     // Check for no path
+    var path = serviceUrl.path;
     if (path) {
       msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
             " ) can't be part of a service URL.";
@@ -390,7 +390,11 @@ var generateServiceList = function(service, securityOptions) {
     serviceList[i] = protocol + '//' + host + ':' + port;
   }
 
-  logger.exit('generateServiceList', logger.NO_CLIENT_ID, serviceList);
+  logger.exit('generateServiceList', logger.NO_CLIENT_ID,
+              [
+                'serviceList:', serviceList,
+                'securityOptions:', securityOptions
+              ]);
   return serviceList;
 };
 
@@ -630,7 +634,7 @@ var getHttpServiceFunction = function(serviceUrl) {
 var Client = function(service, id, securityOptions) {
   logger.entry('Client.constructor', logger.NO_CLIENT_ID);
   logger.log('parms', logger.NO_CLIENT_ID, 'service:',
-             String(service).replace(/:[^:]+@/, ':********@'));
+             String(service).replace(/:[^:]+@/g, ':********@'));
   logger.log('parms', logger.NO_CLIENT_ID, 'id:', id);
   logger.log('parms', logger.NO_CLIENT_ID, 'securityOptions:',
              securityOptions.toString());
@@ -723,14 +727,15 @@ var Client = function(service, id, securityOptions) {
 
   logger.entry('proton.createMessenger', this.id);
   // Initialize ProtonMessenger with auth details
+  var usr, pw;
   if (securityOptions.urlUser) {
     // URI encode username and password before passing them to proton
-    var usr = encodeURIComponent(String(securityOptions.urlUser));
-    var pw = encodeURIComponent(String(securityOptions.urlPassword));
+    usr = encodeURIComponent(String(securityOptions.urlUser));
+    pw = encodeURIComponent(String(securityOptions.urlPassword));
     this.messenger = proton.createMessenger(id, usr, pw);
-  } else if (securityOptions.properyUser) {
-    var usr = encodeURIComponent(String(securityOptions.propertyUser));
-    var pw = encodeURIComponent(String(securityOptions.propertyPassword));
+  } else if (securityOptions.propertyUser) {
+    usr = encodeURIComponent(String(securityOptions.propertyUser));
+    pw = encodeURIComponent(String(securityOptions.propertyPassword));
     this.messenger = proton.createMessenger(id, usr, pw);
   } else {
     this.messenger = proton.createMessenger(id);
