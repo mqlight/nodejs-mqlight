@@ -19,12 +19,12 @@
 /* jslint node: true */
 /* jshint -W083,-W097 */
 'use strict';
-var log = exports;
+var logger = exports;
 
 var pkg = require('./package.json');
 var os = require('os');
 var moment = require('moment');
-var logger = require('npmlog');
+var npmlog = require('npmlog');
 var fs = require('fs');
 var util = require('util');
 
@@ -36,7 +36,7 @@ var ffdcSequence = 0;
 var fd = 0;
 var dataSize;
 var exceptionThrown = null;
-var processedExceptions = 0;
+var potentialUnwinds = 0;
 
 var ENTRY_IND = '>-----------------------------------------------------------';
 var EXIT_IND = '<-----------------------------------------------------------';
@@ -56,9 +56,9 @@ var styles = {
  * heading.
  */
 var write = function(lvl, prefix, args) {
-  logger.heading = moment(new Date()).format('HH:mm:ss.SSS') +
+  npmlog.heading = moment(new Date()).format('HH:mm:ss.SSS') +
                    ' [' + process.pid + ']';
-  logger.log.apply(this, arguments);
+  npmlog.log.apply(this, arguments);
 };
 
 
@@ -67,7 +67,7 @@ var write = function(lvl, prefix, args) {
  * and host.
  */
 var header = function(lvl, clientId, options) {
-  if (logger.levels[logger.level] <= logger.levels[lvl]) {
+  if (npmlog.levels[npmlog.level] <= npmlog.levels[lvl]) {
     write(lvl, clientId, HEADER_BANNER);
     write(lvl, clientId, '| IBM MQ Light Node.js Client Module -',
           options.title);
@@ -80,7 +80,6 @@ var header = function(lvl, clientId, options) {
     write(lvl, clientId, '| Node Version      :-', process.version);
     write(lvl, clientId, '| Node Path         :-', process.execPath);
     write(lvl, clientId, '| Node Arguments    :-', process.execArgs);
-    write(lvl, clientId, '| Program Arguments :- ', process.argv);
     if (!isWin) {
       write(lvl, clientId, '| User Id           :-', process.getuid());
       write(lvl, clientId, '| Group Id          :-', process.getgid());
@@ -90,7 +89,7 @@ var header = function(lvl, clientId, options) {
     write(lvl, clientId, '| Description       :-', pkg.description);
     write(lvl, clientId, '| Installation Path :-', __dirname);
     write(lvl, clientId, '| Uptime            :-', process.uptime());
-    write(lvl, clientId, '| Log Level         :-', logger.level);
+    write(lvl, clientId, '| Log Level         :-', npmlog.level);
     write(lvl, clientId, '| Data Size         :-', dataSize);
     if ('fnc' in options) {
       write(lvl, clientId, '| Function          :-', options.fnc);
@@ -101,7 +100,9 @@ var header = function(lvl, clientId, options) {
     if ('ffdcSequence' in options) {
       write(lvl, clientId, '| FDCSequenceNumber :-', options.ffdcSequence++);
     }
-    write(lvl, clientId, '| Exceptions        :-', processedExceptions);
+    if (potentialUnwinds != 0) {
+      write(lvl, clientId, '| potentialUnwinds :-', potentialUnwinds);
+    }
     write(lvl, clientId, HEADER_BANNER);
     write(lvl, clientId, '');
   }
@@ -113,32 +114,32 @@ var header = function(lvl, clientId, options) {
  *
  * @param {String} lvl The logging level to write at.
  */
-log.setLevel = function(lvl) {
-  if (logger.levels[lvl.toLowerCase()]) {
-    logger.level = lvl.toLowerCase();
+logger.setLevel = function(lvl) {
+  if (npmlog.levels[lvl.toLowerCase()]) {
+    npmlog.level = lvl.toLowerCase();
 
-    header('header', log.NO_CLIENT_ID, {title: 'Log'});
+    header('header', logger.NO_CLIENT_ID, {title: 'Log'});
 
-    if (logger.levels[logger.level] <= logger.levels.detail) {
+    if (npmlog.levels[npmlog.level] <= npmlog.levels.detail) {
       // Set PN_TRACE_FRM if detailed data level logging is enabled.
-      log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
+      logger.log('debug', logger.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
       process.env.PN_TRACE_FRM = '1';
-      if (logger.levels[logger.level] <= logger.levels.raw) {
+      if (npmlog.levels[npmlog.level] <= npmlog.levels.raw) {
         // Set PN_TRACE_RAW if raw level logging is enabled.
-        log.log('debug', log.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
+        logger.log('debug', logger.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
         process.env.PN_TRACE_RAW = '1';
       } else {
-        log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
+        logger.log('debug', logger.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
         delete process.env.PN_TRACE_RAW;
       }
     }
     else {
       if (process.env.PN_TRACE_RAW) {
-        log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
+        logger.log('debug', logger.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
         delete process.env.PN_TRACE_RAW;
       }
       if (process.env.PN_TRACE_FRM) {
-        log.log('debug', log.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
+        logger.log('debug', logger.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
         delete process.env.PN_TRACE_FRM;
       }
     }
@@ -153,8 +154,8 @@ log.setLevel = function(lvl) {
  *
  * @return {String} The logging level.
  */
-log.getLevel = function() {
-  return logger.level;
+logger.getLevel = function() {
+  return npmlog.level;
 };
 
 
@@ -166,10 +167,10 @@ log.getLevel = function() {
  *        as a file which will be written to as well as
  *        stderr/stdout.
  */
-log.setStream = function(stream) {
+logger.setStream = function(stream) {
   if (stream === 'stderr') {
     // Log to stderr.
-    logger.stream = process.stderr;
+    npmlog.stream = process.stderr;
 
     // Stop writing to a file.
     if (fd) {
@@ -177,7 +178,7 @@ log.setStream = function(stream) {
     }
   } else if (stream === 'stdout') {
     // Log to stdout.
-    logger.stream = process.stdout;
+    npmlog.stream = process.stdout;
 
     // Stop writing to a file.
     if (fd) {
@@ -196,13 +197,13 @@ log.setStream = function(stream) {
     fd = fs.openSync(stream, 'a', '0644');
 
     // Set up a listener for log events.
-    logger.on('log', function(m) {
+    npmlog.on('log', function(m) {
       if (fd) {
-        if (logger.levels[logger.level] <= logger.levels[m.level]) {
+        if (npmlog.levels[npmlog.level] <= npmlog.levels[m.level]) {
           // We'll get called for every log event, so filter to ones we're
           // interested in.
           fs.writeSync(fd, util.format('%s %s %s %s\n',
-                                       logger.heading, logger.disp[m.level],
+                                       npmlog.heading, npmlog.disp[m.level],
                                        m.prefix, m.message));
         }
       }
@@ -216,9 +217,9 @@ log.setStream = function(stream) {
  *
  * @param {Number} size amount of message data that will get logged.
  */
-log.setDataSize = function(size) {
-  log.entry('log.setDataSize', log.NO_CLIENT_ID);
-  log.log('parms', log.NO_CLIENT_ID, 'size:', size);
+logger.setDataSize = function(size) {
+  logger.entry('logger.setDataSize', logger.NO_CLIENT_ID);
+  logger.log('parms', logger.NO_CLIENT_ID, 'size:', size);
 
   if (typeof size === 'string') {
     dataSize = parseInt(size);
@@ -229,7 +230,7 @@ log.setDataSize = function(size) {
     dataSize = size;
   }
 
-  log.exit('log.setDataSize', log.NO_CLIENT_ID);
+  logger.exit('logger.setDataSize', logger.NO_CLIENT_ID);
 };
 
 
@@ -238,7 +239,7 @@ log.setDataSize = function(size) {
  *
  * @return {Number} The data size.
  */
-log.getDataSize = function() {
+logger.getDataSize = function() {
   return dataSize;
 };
 
@@ -252,10 +253,9 @@ log.getDataSize = function() {
  * @param {String} id The id of the client causing the function
  *        to be entered.
  */
-log.entryLevel = function(lvl, name, id) {
+logger.entryLevel = function(lvl, name, id) {
   if (exceptionThrown) {
-    log.log('error', id, '* Uncaught exception');
-    processedExceptions++;
+    logger.log('error', id, '* Uncaught exception');
     exceptionThrown = null;
     while(stack.length > 1) {
       stack.pop();
@@ -273,8 +273,8 @@ log.entryLevel = function(lvl, name, id) {
  * @param {String} id The id of the client causing the function
  *        to be entered.
  */
-log.entry = function(name, id) {
-  log.entryLevel('entry', name, id);
+logger.entry = function(name, id) {
+  logger.entryLevel('entry', name, id);
 };
 
 
@@ -288,20 +288,27 @@ log.entry = function(name, id) {
  *        to be exited.
  * @param {Object} rc The function return code.
  */
-log.exitLevel = function(lvl, name, id, rc) {
+logger.exitLevel = function(lvl, name, id, rc) {
   write(lvl, id, EXIT_IND.substring(0, Math.max(1, stack.length - 1)),
         name, rc ? rc : '');
   var last;
-  do
-  {
+  do {
+    // Check if we've unwound to the bottom of the stack.
     if (stack.length == 1) {
-      if (processedExceptions == 0) {
-        log.ffdc('log.exitLevel', 10, null, name);
+      // We have. Generate an FFDC if we believe the stack to be good. Most
+      // likely we've exited with the wrong function name.
+      if (potentialUnwinds == 0) {
+        logger.ffdc('logger.exitLevel', 10, null, name);
       }
+      potentialUnwinds--;
+      logger.log('debug', id, 'Potential unwinds decreased to',
+                 potentialUnwinds);
       break;
     }
+
+    // Get rid of the last function put on the stack.
     last = stack.pop();
-  } while (last != name);
+  } while(last != name);
 };
 
 
@@ -313,8 +320,8 @@ log.exitLevel = function(lvl, name, id, rc) {
  *        to be exited.
  * @param {Object} rc The function return code.
  */
-log.exit = function(name, id, rc) {
-  log.exitLevel('exit', name, id, rc);
+logger.exit = function(name, id, rc) {
+  logger.exitLevel('exit', name, id, rc);
 };
 
 
@@ -326,8 +333,8 @@ log.exit = function(name, id, rc) {
  * @param {String} id The id of the client logging the data.
  * @param {Object} args The data to be logged.
  */
-log.log = function(lvl, id, args) {
-  if (logger.levels[logger.level] <= logger.levels[lvl]) {
+logger.log = function(lvl, id, args) {
+  if (npmlog.levels[npmlog.level] <= npmlog.levels[lvl]) {
     write.apply(this, arguments);
   }
 };
@@ -342,8 +349,8 @@ log.log = function(lvl, id, args) {
  *        specified data size. Must be either a string or a
  *        Buffer object.
                                                                 */
-log.body = function(id, data) {
-  if (logger.levels[logger.level] <= logger.levels.data) {
+logger.body = function(id, data) {
+  if (npmlog.levels[npmlog.level] <= npmlog.levels.data) {
     write('data', id, '! length:', data.length);
     if (typeof data === 'string') {
       if ((dataSize >= data.length) || (dataSize < 0)) {
@@ -376,10 +383,12 @@ log.body = function(id, data) {
  *        exception.
  * @param {Object} err The exception being thrown.
                                                                 */
-log.throwLevel = function(lvl, name, id, err) {
-  log.log('error', id, '* Thrown exception:', err);
+logger.throwLevel = function(lvl, name, id, err) {
+  logger.log('error', id, '* Thrown exception:', err);
   exceptionThrown = err;
-  log.exitLevel(lvl, name, id, 'Exception thrown');
+  logger.exitLevel(lvl, name, id, 'Exception thrown');
+  potentialUnwinds += stack.length-1;
+  logger.log('debug', id, 'Potential unwinds increased to', potentialUnwinds);
 };
 
 
@@ -393,8 +402,8 @@ log.throwLevel = function(lvl, name, id, err) {
  *        exception.
  * @param {Error} err The exception being thrown.
                                                                 */
-log.throw = function(name, id, err) {
-  log.throwLevel('exit', name, id, err);
+logger.throw = function(name, id, err) {
+  logger.throwLevel('exit', name, id, err);
 };
 
 
@@ -409,19 +418,21 @@ log.throw = function(name, id, err) {
  * @param {String} id The id of the client logging the data.
  * @param {Error} err The exception being caught.
                                                                 */
-log.caughtLevel = function(lvl, name, id, err) {
-  log.log('error', id, '* Caught exception:', err);
+logger.caughtLevel = function(lvl, name, id, err) {
+  logger.log('error', id, '* Caught exception:', err);
   if (exceptionThrown) {
-    processedExceptions++;
     exceptionThrown = null;
     while(stack.length > 1) {
       if (stack[stack.length - 1] === name) {
         break;
       }
       stack.pop();
+      potentialUnwinds--;
+      logger.log('debug', id, 'Potential unwinds decreased to',
+                 potentialUnwinds);
     }
     if (stack.length == 1) {
-      log.entryLevel(lvl, name, id);
+      logger.entryLevel(lvl, name, id);
     }
   }
 };
@@ -436,8 +447,8 @@ log.caughtLevel = function(lvl, name, id, err) {
  * @param {String} id The id of the client logging the data.
  * @param {Error} err The exception being caught.
                                                                 */
-log.caught = function(name, id, err) {
-  log.caughtLevel('entry', name, id, err);
+logger.caught = function(name, id, err) {
+  logger.caughtLevel('entry', name, id, err);
 };
 
 
@@ -452,21 +463,21 @@ log.caught = function(name, id, err) {
  * @param {Object=} opt_data Extra data to aid in problem
  *        diagnosis.
  */
-log.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
+logger.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
   var opts = {
     title: 'First Failure Data Capture',
     fnc: opt_fnc || 'User-requested FFDC by function',
     probeId: opt_probeId || 255,
     ffdcSequence: ffdcSequence++,
-    clientId: opt_client ? opt_client.id : log.NO_CLIENT_ID
+    clientId: opt_client ? opt_client.id : logger.NO_CLIENT_ID
   };
 
-  log.entry('log.ffdc', opts.clientId);
-  log.log('parms', opts.clientId, 'fnc:', opt_fnc);
-  log.log('parms', opts.clientId, 'probeId:', opt_probeId);
-  log.log('parms', opts.clientId, 'data:', opt_data);
+  logger.entry('logger.ffdc', opts.clientId);
+  logger.log('parms', opts.clientId, 'fnc:', opt_fnc);
+  logger.log('parms', opts.clientId, 'probeId:', opt_probeId);
+  logger.log('parms', opts.clientId, 'data:', opt_data);
 
-  if (logger.levels[logger.level] <= logger.levels.ffdc) {
+  if (npmlog.levels[npmlog.level] <= npmlog.levels.ffdc) {
     header('ffdc', opts.clientId, opts);
     write('ffdc', opts.clientId, new Error().stack);
     write('ffdc', opts.clientId, '');
@@ -474,12 +485,12 @@ log.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
     write('ffdc', opts.clientId, stack.slice(1));
     write('ffdc', opts.clientId, '');
     write('ffdc', opts.clientId, 'Function History');
-    for (var idx = 0; idx < logger.record.length; idx++) {
-      var rec = logger.record[idx];
+    for (var idx = 0; idx < npmlog.record.length; idx++) {
+      var rec = npmlog.record[idx];
       if ((rec.level !== 'ffdc') &&
-          (logger.levels[rec.level] >= logger.levels[historyLevel])) {
+          (npmlog.levels[rec.level] >= npmlog.levels[historyLevel])) {
         write('ffdc', opts.clientId, '%d %s %s %s',
-              rec.id, logger.disp[rec.level], rec.prefix, rec.message);
+              rec.id, npmlog.disp[rec.level], rec.prefix, rec.message);
       }
     }
     if (opt_client) {
@@ -503,7 +514,7 @@ log.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
     write('ffdc', opts.clientId, '');
   }
 
-  log.exit('log.ffdc', opts.clientId, null);
+  logger.exit('logger.ffdc', opts.clientId, null);
 };
 
 
@@ -513,24 +524,24 @@ log.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
  *
  * @const {string}
  */
-log.NO_CLIENT_ID = '*';
+logger.NO_CLIENT_ID = '*';
 
-logger.addLevel('all', -Infinity, styles.inverse, 'all   ');
-logger.addLevel('data_often', -Infinity, styles.green, 'data  ');
-logger.addLevel('exit_often', -Infinity, styles.yellow, 'exit  ');
-logger.addLevel('entry_often', -Infinity, styles.yellow, 'entry ');
-logger.addLevel('raw', 200, styles.inverse, 'raw   ');
-logger.addLevel('detail', 300, styles.green, 'detail');
-logger.addLevel('debug', 500, styles.inverse, 'debug ');
-logger.addLevel('emit', 800, styles.green, 'emit  ');
-logger.addLevel('data', 1000, styles.green, 'data  ');
-logger.addLevel('parms', 1200, styles.yellow, 'parms ');
-logger.addLevel('header', 1500, styles.yellow, 'header');
-logger.addLevel('exit', 1500, styles.yellow, 'exit  ');
-logger.addLevel('entry', 1500, styles.yellow, 'entry ');
-logger.addLevel('entry_exit', 1500, styles.yellow, 'func  ');
-logger.addLevel('error', 1800, styles.red, 'error ');
-logger.addLevel('ffdc', 2000, styles.red, 'ffdc  ');
+npmlog.addLevel('all', -Infinity, styles.inverse, 'all   ');
+npmlog.addLevel('data_often', -Infinity, styles.green, 'data  ');
+npmlog.addLevel('exit_often', -Infinity, styles.yellow, 'exit  ');
+npmlog.addLevel('entry_often', -Infinity, styles.yellow, 'entry ');
+npmlog.addLevel('raw', 200, styles.inverse, 'raw   ');
+npmlog.addLevel('detail', 300, styles.green, 'detail');
+npmlog.addLevel('debug', 500, styles.inverse, 'debug ');
+npmlog.addLevel('emit', 800, styles.green, 'emit  ');
+npmlog.addLevel('data', 1000, styles.green, 'data  ');
+npmlog.addLevel('parms', 1200, styles.yellow, 'parms ');
+npmlog.addLevel('header', 1500, styles.yellow, 'header');
+npmlog.addLevel('exit', 1500, styles.yellow, 'exit  ');
+npmlog.addLevel('entry', 1500, styles.yellow, 'entry ');
+npmlog.addLevel('entry_exit', 1500, styles.yellow, 'func  ');
+npmlog.addLevel('error', 1800, styles.red, 'error ');
+npmlog.addLevel('ffdc', 2000, styles.red, 'ffdc  ');
 
 
 /**
@@ -538,7 +549,7 @@ logger.addLevel('ffdc', 2000, styles.red, 'ffdc  ');
  * this can be changed to stdout by setting the environment
  * variable MQLIGHT_NODE_LOG_STREAM=stdout.
  */
-log.setStream(process.env.MQLIGHT_NODE_LOG_STREAM || 'stderr');
+logger.setStream(process.env.MQLIGHT_NODE_LOG_STREAM || 'stderr');
 
 
 /**
@@ -547,7 +558,7 @@ log.setStream(process.env.MQLIGHT_NODE_LOG_STREAM || 'stderr');
  * environment variable MQLIGHT_NODE_MESSAGE_DATA_SIZE to a
  * different number.
  */
-log.setDataSize(process.env.MQLIGHT_NODE_MESSAGE_DATA_SIZE || 100);
+logger.setDataSize(process.env.MQLIGHT_NODE_MESSAGE_DATA_SIZE || 100);
 
 
 /**
@@ -556,7 +567,7 @@ log.setDataSize(process.env.MQLIGHT_NODE_MESSAGE_DATA_SIZE || 100);
  * variable MQLIGHT_NODE_LOG to one of the defined levels.
  */
 startLevel = process.env.MQLIGHT_NODE_LOG || 'ffdc';
-log.setLevel(startLevel);
+logger.setLevel(startLevel);
 
 
 /**
@@ -565,9 +576,9 @@ log.setLevel(startLevel);
  * by setting the environment variable
  * MQLIGHT_NODE_LOG_HISTORY_SIZE to a different number.
  */
-logger.maxRecordSize = process.env.MQLIGHT_NODE_LOG_HISTORY_SIZE || 10000;
-log.log('debug', log.NO_CLIENT_ID,
-        'logger.maxRecordSize:', logger.maxRecordSize);
+npmlog.maxRecordSize = process.env.MQLIGHT_NODE_LOG_HISTORY_SIZE || 10000;
+logger.log('debug', logger.NO_CLIENT_ID,
+           'npmlog.maxRecordSize:', npmlog.maxRecordSize);
 
 /*
  * Set the level of entries that will dumped in the ffdc function history.
@@ -576,7 +587,7 @@ log.log('debug', log.NO_CLIENT_ID,
  * one of the defined levels.
  */
 historyLevel = process.env.MQLIGHT_NODE_LOG_HISTORY || 'debug';
-log.log('debug', log.NO_CLIENT_ID, 'historyLevel:', historyLevel);
+logger.log('debug', logger.NO_CLIENT_ID, 'historyLevel:', historyLevel);
 
 
 /*
@@ -586,19 +597,21 @@ log.log('debug', log.NO_CLIENT_ID, 'historyLevel:', historyLevel);
  */
 if (!process.env.MQLIGHT_NODE_NO_HANDLER) {
   var signal = isWin ? 'SIGBREAK' : 'SIGUSR2';
-  log.log('debug', log.NO_CLIENT_ID, 'Registering signal handler for', signal);
+  logger.log('debug', logger.NO_CLIENT_ID, 'Registering signal handler for',
+             signal);
   process.on(signal, function() {
-    log.ffdc(signal, 255, null, 'User-requested FFDC on signal');
+    logger.ffdc(signal, 255, null, 'User-requested FFDC on signal');
 
     // Start logging at the 'debug' level if we're not doing so, or turn off
     // logging if we already are.
-    if (logger.levels[startLevel] > logger.levels.debug) {
-      if (logger.level === startLevel) {
-        log.log('ffdc', log.NO_CLIENT_ID, 'Setting logger.level: debug');
-        log.setLevel('debug');
+    if (npmlog.levels[startLevel] > npmlog.levels.debug) {
+      if (npmlog.level === startLevel) {
+        logger.log('ffdc', logger.NO_CLIENT_ID, 'Setting npmlog.level: debug');
+        logger.setLevel('debug');
       } else {
-        log.log('ffdc', log.NO_CLIENT_ID, 'Setting logger.level:', startLevel);
-        log.setLevel(startLevel);
+        logger.log('ffdc', logger.NO_CLIENT_ID, 'Setting npmlog.level:',
+                   startLevel);
+        logger.setLevel(startLevel);
       }
     }
   });
@@ -617,9 +630,10 @@ if (process.env.MQLIGHT_NODE_DEBUG_PORT) {
  * an ffdc will be produced on an uncaught exception.
  */
 if (process.env.MQLIGHT_NODE_FFDC_ON_UNCAUGHT) {
-  log.log('debug', log.NO_CLIENT_ID, 'Registering uncaught exception handler');
+  logger.log('debug', logger.NO_CLIENT_ID,
+             'Registering uncaught exception handler');
   process.on('uncaughtException', function(err) {
-    log.ffdc('uncaughtException', 100, null, err);
+    logger.ffdc('uncaughtException', 100, null, err);
     throw err;
   });
 }
