@@ -36,6 +36,8 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 #include <string.h>
 #include <limits>
 #include <vector>
+#include <iostream>
+#include <fstream>
 
 #ifdef _WIN32
 typedef __int32 int32_t;
@@ -50,17 +52,15 @@ typedef unsigned __int32 uint32_t;
 
 using namespace v8;
 
-#define THROW_EXCEPTION(error, fnc, id)                           \
-  Proton::Throw((fnc), (id), error);                              \
-  ThrowException(Exception::TypeError(                            \
-      String::New((error) == NULL ? "unknown error" : (error)))); \
-  return scope.Close(Undefined());
+#define THROW_EXCEPTION(error, fnc, id) \
+    Proton::Throw((fnc), (id), error); \
+    ThrowException(Exception::TypeError(String::New((error) == NULL ? "unknown error" : (error)))); \
+    return scope.Close(Undefined());
 
-#define THROW_EXCEPTION_LEVEL(error, lvl, fnc, id)                \
-  Proton::Throw((lvl), (fnc), (id), error);                       \
-  ThrowException(Exception::TypeError(                            \
-      String::New((error) == NULL ? "unknown error" : (error)))); \
-  return scope.Close(Undefined());
+#define THROW_EXCEPTION_LEVEL(error, lvl, fnc, id) \
+    Proton::Throw((lvl), (fnc), (id), error); \
+    ThrowException(Exception::TypeError(String::New((error) == NULL ? "unknown error" : (error)))); \
+    return scope.Close(Undefined());
 
 Persistent<FunctionTemplate> ProtonMessenger::constructor;
 
@@ -84,41 +84,38 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
   NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
   NODE_SET_PROTOTYPE_METHOD(constructor, "getLastErrorText", GetLastErrorText);
-  NODE_SET_PROTOTYPE_METHOD(
-      constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
   NODE_SET_PROTOTYPE_METHOD(constructor, "work", Work);
 
+
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
-  tpl->InstanceTemplate()->SetAccessor(String::New("hasOutgoing"), HasOutgoing);
+  tpl->InstanceTemplate()->SetAccessor(String::New("hasOutgoing"),
+      HasOutgoing);
 
   target->Set(name, constructor->GetFunction());
 }
 
-void ProtonMessenger::Tracer(pn_transport_t* transport, const char* message)
+void ProtonMessenger::Tracer(pn_transport_t *transport, const char *message)
 {
-  pn_connection_t* connection = pn_transport_connection(transport);
-  if (connection) {
-    const char* id = pn_connection_get_container(connection);
+  pn_connection_t *connection = pn_transport_connection(transport);
+  if(connection)
+  {
+    const char *id = pn_connection_get_container(connection);
     Proton::Log("detail", id, "|", message);
-  } else {
+  }
+  else
+  {
     Proton::Log("detail", NULL, "|", message);
   }
 }
 
-ProtonMessenger::ProtonMessenger(std::string name,
-                                 std::string username,
-                                 std::string password)
-    : ObjectWrap(),
-      name(name),
-      username(username),
-      password(password),
-      messenger(NULL)
+ProtonMessenger::ProtonMessenger(std::string name, std::string username, std::string password) :
+  ObjectWrap(), name(name), username(username), password(password), messenger(NULL)
 {
   Proton::Entry("ProtonMessenger::constructor", NULL);
   Proton::Log("parms", NULL, "name:", name.c_str());
   Proton::Log("parms", NULL, "username:", username.c_str());
-  Proton::Log(
-      "parms", NULL, "password:", (password.length() > 0) ? "********" : "");
+  Proton::Log("parms", NULL, "password:", (password.length() > 0) ? "********" : "");
 
   Proton::Exit("ProtonMessenger::constructor", NULL, 0);
 }
@@ -127,8 +124,9 @@ ProtonMessenger::~ProtonMessenger()
 {
   Proton::Entry("ProtonMessenger::destructor", NULL);
 
-  if (messenger) {
-    const char* name = pn_messenger_name(messenger);
+  if (messenger)
+  {
+    const char *name = pn_messenger_name(messenger);
     Proton::Entry("pn_messenger_free", name);
     pn_messenger_free(messenger);
     Proton::Exit("pn_messenger_free", name, 0);
@@ -144,7 +142,7 @@ Handle<Value> ProtonMessenger::NewInstance(const Arguments& args)
   Proton::Entry("ProtonMessenger::NewInstance", NULL);
 
   const unsigned argc = args.Length();
-  Handle<Value>* argv = new Handle<Value>[argc];
+  Handle<Value> *argv = new Handle<Value>[argc];
   for (uint32_t i = 0; i < argc; i++) {
     argv[i] = args[i];
   }
@@ -154,16 +152,16 @@ Handle<Value> ProtonMessenger::NewInstance(const Arguments& args)
   return scope.Close(instance);
 }
 
+
 Handle<Value> ProtonMessenger::New(const Arguments& args)
 {
   HandleScope scope;
 
   Proton::Entry("ProtonMessenger::New", NULL);
 
-  if (!args.IsConstructCall()) {
-    THROW_EXCEPTION("Use the new operator to create instances of this object.",
-                    "ProtonMessenger::New",
-                    NULL)
+  if (!args.IsConstructCall())
+  {
+    THROW_EXCEPTION("Use the new operator to create instances of this object.", "ProtonMessenger::New", NULL)
   }
 
   std::string name;
@@ -177,11 +175,13 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
     name = std::string(*param);
 
     // look for the username and password parameters
-    if (!args[1]->IsUndefined()) {
+    if (!args[1]->IsUndefined())
+    {
       String::Utf8Value userparam(args[1]->ToString());
       username = std::string(*userparam);
 
-      if (!args[2]->IsUndefined()) {
+      if (!args[2]->IsUndefined())
+      {
         String::Utf8Value passwordparam(args[2]->ToString());
         password = std::string(*passwordparam);
       }
@@ -190,11 +190,10 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
 
   Proton::Log("parms", NULL, "name:", name.c_str());
   Proton::Log("parms", NULL, "username:", username.c_str());
-  Proton::Log(
-      "parms", NULL, "password:", (password.length() > 0) ? "********" : "");
+  Proton::Log("parms", NULL, "password:", (password.length() > 0) ? "********" : "");
 
   // create a new instance of this type and wrap it in 'this' v8 Object
-  ProtonMessenger* obj = new ProtonMessenger(name, username, password);
+  ProtonMessenger *obj = new ProtonMessenger(name, username, password);
 
   obj->Wrap(args.This());
 
@@ -202,21 +201,17 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
   return args.This();
 }
 
-Handle<Value> ProtonMessenger::Put(const Arguments& args)
-{
+Handle<Value> ProtonMessenger::Put(const Arguments& args) {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  ;
-  ProtonMessage* msg;
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());;
+  ProtonMessage *msg;
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Put", name);
 
   // throw exception if not enough args
-  if (args.Length() < 2 || args[0].IsEmpty() || args[1].IsEmpty()) {
-    THROW_EXCEPTION("Missing required message or qos argument.",
-                    "ProtonMessenger::Put",
-                    name);
+  if (args.Length() < 2 || args[0].IsEmpty() || args[1].IsEmpty() ) {
+    THROW_EXCEPTION("Missing required message or qos argument.", "ProtonMessenger::Put", name);
   }
 
   msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
@@ -229,10 +224,8 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
     THROW_EXCEPTION("Not connected", "ProtonMessenger::Put", name);
   }
 
-  /* Set the required QoS, by setting the sender settler mode to settled (QoS =
-   * AMO) or unsettled (QoS = ALO).
-   * Note that the receiver settler mode is always set to first, as the MQ Light
-   * listener will negotiate down any receiver settler mode to first.
+  /* Set the required QoS, by setting the sender settler mode to settled (QoS = AMO) or unsettled (QoS = ALO).
+   * Note that the receiver settler mode is always set to first, as the MQ Light listener will negotiate down any receiver settler mode to first.
    */
   if (qos == 0) {
     pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
@@ -252,8 +245,9 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
   pn_messenger_put(obj->messenger, msg->message);
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_put", name, error);
-  if (error) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+  if (error)
+  {
+    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
     THROW_EXCEPTION(text, "ProtonMessenger::Put", name)
   }
 
@@ -264,11 +258,10 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
   return scope.Close(Boolean::New(true));
 }
 
-Handle<Value> ProtonMessenger::Send(const Arguments& args)
-{
+Handle<Value> ProtonMessenger::Send(const Arguments& args) {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Send", name);
 
@@ -281,8 +274,9 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   pn_messenger_send(obj->messenger, -1);
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_send", name, error);
-  if (error) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+  if (error)
+  {
+    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
     THROW_EXCEPTION(text, "ProtonMessenger::Send", name)
   }
 
@@ -290,8 +284,9 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   pn_messenger_work(obj->messenger, 50);
   error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_work", name, error);
-  if (error) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+  if (error)
+  {
+    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
     THROW_EXCEPTION(text, "ProtonMessenger::Send", name)
   }
 
@@ -299,12 +294,11 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   return scope.Close(Boolean::New(true));
 }
 
-Handle<Value> ProtonMessenger::Connect(const Arguments& args)
-{
+Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
 
-  const char* name = obj->name.c_str();
+  const char *name = obj->name.c_str();
   std::string username = obj->username;
   std::string password = obj->password;
 
@@ -312,24 +306,28 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
 
   // throw exception if not enough args
   if (args.Length() < 1) {
-    THROW_EXCEPTION(
-        "Missing required address argument.", "ProtonMessenger::Connect", name);
+    THROW_EXCEPTION("Missing required address argument.", "ProtonMessenger::Connect", name);
   }
 
   String::Utf8Value param(args[0]->ToString());
   std::string address = std::string(*param);
   std::string sslTrustCertificate;
-  if (!(args.Length() < 2 || args[1].IsEmpty() || args[1]->IsNull() ||
-        args[1]->IsUndefined())) {
+  if (!(args.Length() < 2 || args[1].IsEmpty() || args[1]->IsNull() || args[1]->IsUndefined())) {
     String::Utf8Value param1(args[1]->ToString());
     sslTrustCertificate = std::string(*param1);
+    // Check that the trust certificate exists
+    std::ifstream sslTrustCertificateFile(sslTrustCertificate.c_str());
+    if (!sslTrustCertificateFile.good()) {
+      std::string msg = "The file specified for sslTrustCertificate '" + sslTrustCertificate +
+                        "' does not exist or is not accessible";
+      THROW_EXCEPTION(msg.c_str(), "ProtonMessenger::Connect", name);
+    }
   } else {
     sslTrustCertificate = "";
   }
 
   pn_ssl_verify_mode_t sslMode = PN_SSL_VERIFY_NULL;
-  if (!(args.Length() < 3 || args[2].IsEmpty() || args[2]->IsNull() ||
-        args[2]->IsUndefined())) {
+  if (!(args.Length() < 3 || args[2].IsEmpty() || args[2]->IsNull() || args[2]->IsUndefined())) {
     Local<Value> param2 = args[2];
     bool sslVerifyName = param2->BooleanValue();
     if (sslVerifyName) {
@@ -343,8 +341,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   Proton::Log("data", name, "username:", username.c_str());
   Proton::Log("data", name, "password:", password.length() ? "********" : NULL);
   if (sslTrustCertificate.length() > 0) {
-    Proton::Log(
-        "data", name, "sslTrustCertificate:", sslTrustCertificate.c_str());
+    Proton::Log("data", name, "sslTrustCertificate:", sslTrustCertificate.c_str());
   }
   if (sslMode != PN_SSL_VERIFY_NULL) {
     Proton::Log("data", name, "sslMode:", sslMode);
@@ -355,8 +352,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
     THROW_EXCEPTION("Already connected", "ProtonMessenger::Connect", name);
   }
 
-  // Create the messenger object and update the name in case messenger has
-  // changed it
+  // Create the messenger object and update the name in case messenger has changed it
   Proton::Entry("pn_messenger", name);
   obj->messenger = pn_messenger(name);
   obj->name = pn_messenger_name(obj->messenger);
@@ -364,36 +360,28 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
 
   pn_messenger_set_tracer(obj->messenger, ProtonMessenger::Tracer);
   pn_messenger_set_blocking(obj->messenger, false);
-  pn_messenger_set_outgoing_window(obj->messenger,
-                                   std::numeric_limits<int>::max());
-  pn_messenger_set_incoming_window(obj->messenger,
-                                   std::numeric_limits<int>::max());
+  pn_messenger_set_outgoing_window(obj->messenger, std::numeric_limits<int>::max());
+  pn_messenger_set_incoming_window(obj->messenger, std::numeric_limits<int>::max());
 
   // Set the messenger SSL trust certificate when required
   if (sslTrustCertificate.length() > 0) {
     Proton::Entry("pn_messenger_set_trusted_certificates", name);
-    int error = pn_messenger_set_trusted_certificates(
-        obj->messenger, sslTrustCertificate.c_str());
+    int error = pn_messenger_set_trusted_certificates(obj->messenger, sslTrustCertificate.c_str());
     Proton::Exit("pn_messenger_set_trusted_certificates", name, error);
     if (error) {
       pn_messenger_free(obj->messenger);
       obj->messenger = NULL;
-      THROW_EXCEPTION("Failed to set trusted certificates",
-                      "ProtonMessenger::Connect",
-                      name);
+      THROW_EXCEPTION("Failed to set trusted certificates", "ProtonMessenger::Connect", name);
     }
   }
   if (sslMode != PN_SSL_VERIFY_NULL) {
     Proton::Entry("pn_messenger_set_ssl_peer_authentication_mode", name);
-    int error =
-        pn_messenger_set_ssl_peer_authentication_mode(obj->messenger, sslMode);
+    int error = pn_messenger_set_ssl_peer_authentication_mode(obj->messenger, sslMode);
     Proton::Exit("pn_messenger_set_ssl_peer_authentication_mode", name, error);
     if (error) {
       pn_messenger_free(obj->messenger);
       obj->messenger = NULL;
-      THROW_EXCEPTION("Failed to set SSL peer authentication mode",
-                      "ProtonMessenger::Connect",
-                      name);
+      THROW_EXCEPTION("Failed to set SSL peer authentication mode", "ProtonMessenger::Connect", name);
     }
   }
 
@@ -401,27 +389,24 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   int index = (int)address.find("//");
   std::string scheme;
   if (index >= 0) {
-    scheme = address.substr(0, index);
+	  scheme = address.substr(0, index);
   } else {
-    scheme = "amqp:";
+	  scheme = "amqp:";
   }
-  int endIndex = index >= 0 ? (int)address.find("/", index + 2) : -1;
+  int endIndex = index >= 0 ? (int)address.find("/", index+2) : -1;
   std::string hostandport;
   if (endIndex >= 0) {
-    size_t len = endIndex - (index + 2);
-    hostandport =
-        index >= 0 ? address.substr(index + 2, len) : address.substr(0, len);
+  	size_t len = endIndex - (index+2);
+  	hostandport = index >= 0 ? address.substr(index+2, len) : address.substr(0, len);
   } else {
-    hostandport = index >= 0 ? address.substr(index + 2) : address;
+  	hostandport = index >= 0 ? address.substr(index+2) : address;
   }
   std::string validationAddress;
   std::string traceValidationAddress;
-  if (username.length() > 0) {
-    if (password.length() > 0) {
-      validationAddress =
-          scheme + "//" + username + ":" + password + "@" + hostandport + "/$1";
-      traceValidationAddress = scheme + "//" + username + ":" + "********" +
-                               "@" + hostandport + "/$1";
+  if ( username.length() > 0){
+    if ( password.length() > 0 ){
+      validationAddress      = scheme + "//" + username + ":" + password   + "@" + hostandport + "/$1";
+      traceValidationAddress = scheme + "//" + username + ":" + "********" + "@" + hostandport + "/$1";
     } else {
       validationAddress = scheme + "//" + username + "@" + hostandport + "/$1";
       traceValidationAddress = validationAddress;
@@ -433,28 +418,25 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
 
   /*
    * Set the route so that when required any address starting with
-   * amqp://<host>:<port> or amqps://<host>:<port> gets the supplied user and
-   * password added
+   * amqp://<host>:<port> or amqps://<host>:<port> gets the supplied user and password added
    */
   int error;
-  std::string pattern = scheme + "//" + hostandport + "/*";
+  std::string pattern = scheme+"//"+hostandport+"/*";
   Proton::Entry("pn_messenger_route", name);
   Proton::Log("parms", name, "pattern:", pattern.c_str());
   Proton::Log("parms", name, "substitution:", traceValidationAddress.c_str());
-  error = pn_messenger_route(
-      obj->messenger, pattern.c_str(), validationAddress.c_str());
+  error = pn_messenger_route(obj->messenger, pattern.c_str(), validationAddress.c_str());
   Proton::Exit("pn_messenger_route", name, error);
   if (error) {
-    pn_messenger_free(obj->messenger);
-    obj->messenger = NULL;
-    THROW_EXCEPTION(
-        "Failed to set messenger route", "ProtonMessenger::Connect", name);
+	pn_messenger_free(obj->messenger);
+	obj->messenger = NULL;
+    THROW_EXCEPTION("Failed to set messenger route", "ProtonMessenger::Connect", name);
   }
 
   // Indicate that the route should be validated
   if (pn_messenger_set_flags(obj->messenger, PN_FLAGS_CHECK_ROUTES)) {
-    pn_messenger_free(obj->messenger);
-    obj->messenger = NULL;
+	pn_messenger_free(obj->messenger);
+	obj->messenger = NULL;
     THROW_EXCEPTION("Invalid set flags call", "ProtonMessenger::Connect", name);
   }
 
@@ -463,23 +445,21 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   error = pn_messenger_start(obj->messenger);
   Proton::Exit("pn_messenger_start", name, error);
   if (error) {
-    obj->lastConnectErrorText =
-        pn_error_text(pn_messenger_error(obj->messenger));
-    pn_messenger_free(obj->messenger);
-    obj->messenger = NULL;
+	obj->lastConnectErrorText = pn_error_text(pn_messenger_error(obj->messenger));
+	pn_messenger_free(obj->messenger);
+	obj->messenger = NULL;
   } else {
-    obj->lastConnectErrorText = "";
+	obj->lastConnectErrorText = "";
   }
 
   Proton::Exit("ProtonMessenger::Connect", name, error);
   return scope.Close(Integer::New(error));
 }
 
-Handle<Value> ProtonMessenger::Stop(const Arguments& args)
-{
+Handle<Value> ProtonMessenger::Stop(const Arguments& args) {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Stop", name);
 
@@ -502,11 +482,11 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args)
 }
 
 Handle<Value> ProtonMessenger::Stopped(Local<String> property,
-                                       const AccessorInfo& info)
+                                       const AccessorInfo &info)
 {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.Holder());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(info.Holder());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Stopped", name);
 
@@ -523,26 +503,24 @@ Handle<Value> ProtonMessenger::Stopped(Local<String> property,
   return scope.Close(Boolean::New(stopped));
 }
 
-Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
-{
+Handle<Value> ProtonMessenger::Subscribe(const Arguments& args) {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Subscribe", name);
 
   // throw exception if not enough args
-  if (args.Length() < 3 || args[0].IsEmpty() || args[1].IsEmpty() ||
-      args[2].IsEmpty()) {
-    THROW_EXCEPTION("Missing required pattern or qos argument.",
-                    "ProtonMessenger::Subscribe",
-                    name);
+  if (args.Length() < 3 || args[0].IsEmpty() || args[1].IsEmpty()
+          || args[2].IsEmpty()) {
+  	THROW_EXCEPTION("Missing required pattern or qos argument.",
+  	                "ProtonMessenger::Subscribe", name);
   }
 
   String::Utf8Value param(args[0]->ToString());
   std::string address = std::string(*param);
   int qos = (int)args[1]->ToInteger()->Value();
-  int ttl = (int)args[2]->ToInteger()->Value();
+  int ttl = (int) args[2]->ToInteger()->Value();
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("parms", name, "qos:", qos);
   Proton::Log("parms", name, "ttl:", ttl);
@@ -552,11 +530,8 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
     THROW_EXCEPTION("Not connected", "ProtonMessenger::Subscribe", name);
   }
 
-  /* Set the required QoS, by setting the sender settler mode to settled (QoS =
-   * AMO) or unsettled (QoS = ALO).
-   * Note that our API client implementation will always specify a value of
-   * first - meaning "The Receiver will spontaneously settle all incoming
-   * transfers" - this equates to a maximum QoS of "at least once delivery".
+  /* Set the required QoS, by setting the sender settler mode to settled (QoS = AMO) or unsettled (QoS = ALO).
+   * Note that our API client implementation will always specify a value of first - meaning "The Receiver will spontaneously settle all incoming transfers" - this equates to a maximum QoS of "at least once delivery".
    */
   if (qos == 0) {
     pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
@@ -565,9 +540,9 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
     pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
     pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
   } else {
-    THROW_EXCEPTION(
-        "Invalid qos argument.", "ProtonMessenger::Subscribe", name);
+    THROW_EXCEPTION("Invalid qos argument.", "ProtonMessenger::Subscribe", name);
   }
+
 
   Proton::Entry("pn_messenger_subscribe_ttl", name);
   pn_messenger_subscribe_ttl(obj->messenger, address.c_str(), ttl);
@@ -577,18 +552,18 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   pn_messenger_recv(obj->messenger, -1);
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_recv", name, error);
-  if (error) {
-    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)),
-                    "ProtonMessenger::Subscribe",
-                    name)
+  if (error)
+  {
+    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)), "ProtonMessenger::Subscribe", name)
   }
 
   Proton::Entry("pn_messenger_work", name);
   pn_messenger_work(obj->messenger, 50);
   error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_work", name, error);
-  if (error) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+  if (error)
+  {
+    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
     THROW_EXCEPTION(text, "ProtonMessenger::Subscribe", name)
   }
   Proton::Exit("ProtonMessenger::Subscribe", name, 0);
@@ -596,20 +571,16 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
 }
 
 /* XXX: this may need to be wrapped in a uv_async queued operation? */
-Handle<Value> ProtonMessenger::Receive(const Arguments& args)
-{
+Handle<Value> ProtonMessenger::Receive(const Arguments& args) {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("entry_often", "ProtonMessenger::Receive", name);
 
   // throw exception if not enough args
   if (args.Length() < 1) {
-    THROW_EXCEPTION_LEVEL("Missing required expiry time argument.",
-                          "exit_often",
-                          "ProtonMessenger::Receive",
-                          name);
+    THROW_EXCEPTION_LEVEL("Missing required expiry time argument.", "exit_often", "ProtonMessenger::Receive", name);
   }
 
   Local<Integer> integer = args[0]->ToInteger();
@@ -619,62 +590,61 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION_LEVEL(
-        "Not connected", "exit_often", "ProtonMessenger::Receive", name);
+    THROW_EXCEPTION_LEVEL("Not connected", "exit_often", "ProtonMessenger::Receive", name);
   }
 
   Proton::Entry("entry_often", "pn_messenger_recv", name);
   pn_messenger_recv(obj->messenger, -1);
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("exit_often", "pn_messenger_recv", name, error);
-  if (error) {
-    THROW_EXCEPTION_LEVEL(pn_error_text(pn_messenger_error(obj->messenger)),
-                          "exit_often",
-                          "ProtonMessenger::Receive",
-                          name)
+  if (error)
+  {
+    THROW_EXCEPTION_LEVEL(pn_error_text(pn_messenger_error(obj->messenger)), "exit_often", "ProtonMessenger::Receive", name)
   }
 
   Proton::Entry("entry_often", "pn_messenger_work", name);
   pn_messenger_work(obj->messenger, timeout);
   error = pn_messenger_errno(obj->messenger);
   Proton::Exit("exit_often", "pn_messenger_work", name, error);
-  if (error) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+  if (error)
+  {
+    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
     THROW_EXCEPTION_LEVEL(text, "exit_often", "ProtonMessenger::Receive", name)
   }
 
-  std::vector<Local<Object> > vector;
-  while (pn_messenger_incoming(obj->messenger)) {
-    Local<Value> argv[1] = {args[0]};
-    Local<Object> msgObj =
-        ProtonMessage::constructor->GetFunction()->NewInstance(0, argv);
-    ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(msgObj);
+  std::vector< Local<Object> > vector;
+  while (pn_messenger_incoming(obj->messenger))
+  {
+    Local<Value> argv[1] = { args[0] };
+    Local<Object> msgObj = ProtonMessage::constructor->GetFunction()
+                             ->NewInstance(0, argv);
+    ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(msgObj);
 
     Proton::Entry("pn_messenger_get", name);
     pn_messenger_get(obj->messenger, msg->message);
     error = pn_messenger_errno(obj->messenger);
     Proton::Exit("pn_messenger_get", name, error);
-    if (msg->message == NULL)
-      continue;
-    if (error) {
-      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-      THROW_EXCEPTION_LEVEL(
-          text, "exit_often", "ProtonMessenger::Receive", name)
+    if (msg->message == NULL) continue;
+    if (error)
+    {
+      const char *text = pn_error_text(pn_messenger_error(obj->messenger));
+      THROW_EXCEPTION_LEVEL(text, "exit_often", "ProtonMessenger::Receive", name)
     }
 
     vector.push_back(msgObj);
     pn_tracker_t tracker = pn_messenger_incoming_tracker(obj->messenger);
     msg->tracker = tracker;
-    pn_link_t* link = pn_messenger_tracker_link(obj->messenger, tracker);
+    pn_link_t *link = pn_messenger_tracker_link(obj->messenger, tracker);
     if (link) {
       msg->linkAddr = pn_terminus_get_address(pn_link_remote_target(link));
     }
   }
 
   Local<Array> messages = Array::New((int)vector.size());
-  for (unsigned int i = 0; i < vector.size(); i++) {
+  for (unsigned int i = 0; i < vector.size(); i++)
+  {
     messages->Set(Number::New(i), vector[i]);
-    // messages->Set(Number::New(i), vector[i].handle_);
+    //messages->Set(Number::New(i), vector[i].handle_);
   }
 
   Proton::Exit("exit_often", "ProtonMessenger::Receive", name, 0);
@@ -682,11 +652,11 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
 }
 
 Handle<Value> ProtonMessenger::HasOutgoing(Local<String> property,
-                                           const AccessorInfo& info)
+                                           const AccessorInfo &info)
 {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.Holder());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(info.Holder());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::HasOutgoing", name);
 
@@ -704,19 +674,19 @@ Handle<Value> ProtonMessenger::HasOutgoing(Local<String> property,
 Handle<Value> ProtonMessenger::Status(const Arguments& args)
 {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Status", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
-    THROW_EXCEPTION(
-        "Missing required message argument.", "ProtonMessenger::Status", name);
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
+      || args[0]->IsUndefined())
+  {
+    THROW_EXCEPTION("Missing required message argument.", "ProtonMessenger::Status", name);
   }
 
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -732,19 +702,19 @@ Handle<Value> ProtonMessenger::Status(const Arguments& args)
 Handle<Value> ProtonMessenger::Accept(const Arguments& args)
 {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Accept", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
-    THROW_EXCEPTION(
-        "Missing required message argument.", "ProtonMessenger::Accept", name);
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
+      || args[0]->IsUndefined())
+  {
+    THROW_EXCEPTION("Missing required message argument.", "ProtonMessenger::Accept", name);
   }
 
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -753,7 +723,7 @@ Handle<Value> ProtonMessenger::Accept(const Arguments& args)
 
   int status = pn_messenger_accept(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
     THROW_EXCEPTION(text, "ProtonMessenger::Accept", name);
   } else if (status != 0) {
     THROW_EXCEPTION("Failed to accept.", "ProtonMessenger::Accept", name);
@@ -766,19 +736,19 @@ Handle<Value> ProtonMessenger::Accept(const Arguments& args)
 Handle<Value> ProtonMessenger::Settle(const Arguments& args)
 {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Settle", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
-    THROW_EXCEPTION(
-        "Missing required message argument.", "ProtonMessenger::Settle", name);
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
+      || args[0]->IsUndefined())
+  {
+    THROW_EXCEPTION("Missing required message argument.", "ProtonMessenger::Settle", name);
   }
 
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  ProtonMessage *msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -787,7 +757,7 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
 
   int status = pn_messenger_settle(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+    const char *text = pn_error_text(pn_messenger_error(obj->messenger));
     THROW_EXCEPTION(text, "ProtonMessenger::Settle", name);
   } else if (status != 0) {
     THROW_EXCEPTION("Failed to settle.", "ProtonMessenger::Settle", name);
@@ -797,39 +767,36 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
   return scope.Close(Boolean::New(true));
 }
 
-Handle<Value> ProtonMessenger::GetLastErrorText(const Arguments& args)
-{
+Handle<Value> ProtonMessenger::GetLastErrorText(const Arguments& args) {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::GetLastErrorText", name);
 
-  const char* errorText;
+  const char *errorText;
   if (obj->messenger) {
-    errorText = pn_error_text(pn_messenger_error(obj->messenger));
+	  errorText = pn_error_text(pn_messenger_error(obj->messenger));
   } else {
-    errorText = obj->lastConnectErrorText.c_str();
+	  errorText = obj->lastConnectErrorText.c_str();
   }
 
   Proton::Exit("ProtonMessenger::GetLastErrorText", name, errorText);
   return scope.Close(String::New(errorText));
 }
 
-Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args)
-{
+Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args) {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::GetRemoteIdleTimeout", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
-    THROW_EXCEPTION("Missing required address argument.",
-                    "ProtonMessenger::GetRemoteIdleTimeout",
-                    name);
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
+      || args[0]->IsUndefined())
+  {
+    THROW_EXCEPTION("Missing required address argument.", "ProtonMessenger::GetRemoteIdleTimeout", name);
   }
 
   String::Utf8Value param(args[0]->ToString());
@@ -838,31 +805,28 @@ Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION(
-        "Not connected", "ProtonMessenger::GetRemoteIdleTimeout", name);
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::GetRemoteIdleTimeout", name);
   }
 
-  const int remoteIdleTimeout =
-      pn_messenger_get_remote_idle_timeout(obj->messenger, address.c_str());
+  const int remoteIdleTimeout = pn_messenger_get_remote_idle_timeout(obj->messenger, address.c_str());
 
-  Proton::Exit(
-      "ProtonMessenger::GetRemoteIdleTimeout", name, remoteIdleTimeout);
+  Proton::Exit("ProtonMessenger::GetRemoteIdleTimeout", name, remoteIdleTimeout);
   return scope.Close(Number::New(remoteIdleTimeout));
 }
 
 Handle<Value> ProtonMessenger::Work(const Arguments& args)
 {
   HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
+  ProtonMessenger *obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char *name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Work", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
-    THROW_EXCEPTION(
-        "Missing required timeout argument.", "ProtonMessenger::Work", name);
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull()
+      || args[0]->IsUndefined())
+  {
+    THROW_EXCEPTION("Missing required timeout argument.", "ProtonMessenger::Work", name);
   }
 
   Local<Integer> integer = args[0]->ToInteger();

@@ -718,6 +718,20 @@ var Client = function(service, id, securityOptions) {
       logger.throw('Client.constructor', this.id, err);
       throw err;
     }
+    if (!fs.existsSync(securityOptions.sslTrustCertificate)) {
+      err = new TypeError("The file specified for sslTrustCertificate '" +
+                          securityOptions.sslTrustCertificate +
+                          "' does not exist");
+      logger.throw('Client.constructor', this.id, err);
+      throw err;
+    }
+    if (!fs.statSync(securityOptions.sslTrustCertificate).isFile()) {
+      err = new TypeError("The file specified for sslTrustCertificate '" +
+                          securityOptions.sslTrustCertificate +
+                          "' is not a regular file");
+      logger.throw('Client.constructor', this.id, err);
+      throw err;
+    }
   }
 
   // Save the required data as client fields

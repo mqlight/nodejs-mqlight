@@ -25,6 +25,7 @@
 process.env.NODE_ENV = 'unittest';
 var testCase = require('nodeunit').testCase;
 var mqlight = require('../mqlight');
+var fs = require('fs');
 
 
 /**
@@ -312,7 +313,12 @@ module.exports.test_bad_ssl_options = function(test) {
                   {sslTrustCertificate:'ValidCertificate', sslVerifyName:'a'},
                   {sslTrustCertificate:'ValidCertificate', sslVerifyName: 1},
                   {sslTrustCertificate:'ValidCertificate',
-                    sslVerifyName:{a:1}}];
+                    sslVerifyName:{a:1}},
+                  {sslTrustCertificate:'MissingCertificate',
+                    sslVerifyName:true},
+                  {sslTrustCertificate:'dirCertificate',
+                    sslVerifyName:true}];
+  fs.mkdirSync('dirCertificate');
   test.expect(testData.length);
   for (var i = 0; i < testData.length; i++) {
     test.throws(function() {
@@ -330,6 +336,7 @@ module.exports.test_bad_ssl_options = function(test) {
     }, 'invalid bad ssl options test (' + i + '): ' + testData[i]);
   }
   test.done();
+  fs.rmdirSync('dirCertificate');
 };
 
 
@@ -342,6 +349,8 @@ module.exports.test_valid_ssl_options = function(test) {
   var testData = [{sslTrustCertificate:'ValidCertificate', sslVerifyName:true},
                   {sslTrustCertificate:'ValidCertificate', sslVerifyName:true},
                   {sslTrustCertificate:'BadVerify', sslVerifyName: false}];
+  var validCertificateFd = fs.openSync('ValidCertificate', 'w');
+  var badVerifyFd = fs.openSync('BadVerify', 'w');
   var count = 0;
   var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
     var opts = {
@@ -355,6 +364,8 @@ module.exports.test_valid_ssl_options = function(test) {
       client.disconnect();
       test.ok(!err,'unexpected error event: '+err);
       test.done();
+      fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
+      fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
     });
     client.connect(function(err) {
       test.ok(!err);
@@ -362,6 +373,8 @@ module.exports.test_valid_ssl_options = function(test) {
       ++count;
       if (count == testData.length) {
         test.done();
+        fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
+        fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
       } else {
         validSSLTest(testData[count].sslTrustCertificate,
             testData[count].sslVerifyName);
@@ -381,7 +394,9 @@ module.exports.test_valid_ssl_options = function(test) {
 module.exports.test_invalid_ssl_options = function(test) {
   var testData = [{sslTrustCertificate:'BadCertificate', sslVerifyName:true},
                   {sslTrustCertificate:'BadCertificate', sslVerifyName:false},
-                  {sslTrustCertificate:'BadVerify', sslVerifyName: true}];  
+                  {sslTrustCertificate:'BadVerify', sslVerifyName: true}];
+  var badCertificateFd = fs.openSync('BadCertificate', 'w');
+  var badVerifyFd = fs.openSync('BadVerify', 'w');
   var count = 0;
   var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
     var opts = {
@@ -397,6 +412,8 @@ module.exports.test_invalid_ssl_options = function(test) {
       ++count;
       if (count == testData.length) {
         test.done();
+        fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
+        fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
       } else {
         validSSLTest(testData[count].sslTrustCertificate,
             testData[count].sslVerifyName);
@@ -406,6 +423,8 @@ module.exports.test_invalid_ssl_options = function(test) {
       client.disconnect();
       test.ok(!err,'unexpected connect event');
       test.done();
+      fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
+      fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
     });
     client.connect();
   };
