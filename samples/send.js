@@ -23,43 +23,50 @@
 var mqlight = require('mqlight');
 var nopt = require('nopt');
 var uuid = require('node-uuid');
+var fs = require('fs');
 
 // parse the commandline arguments
 var types = {
   service: String,
   topic: String,
   'message-ttl': Number,
-  delay: Number
+  delay: Number,
+  file: String
 };
 var shorthands = {
   h: ['--help'],
   s: ['--service'],
   t: ['--topic'],
   i: ['--id'],
-  d: ['--delay']
+  d: ['--delay'],
+  f: ['--file']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 
+var showUsage = function() {
+  var puts = console.log;
+  puts('Usage: send.js [options] <msg_1> ... <msg_n>');
+  puts('');
+  puts('Options:');
+  puts('  -h, --help            show this help message and exit');
+  puts('  -s URL, --service=URL service to connect to, for example:\n' +
+       '                        amqp://user:password@host:5672 or\n' +
+       '                        amqps://host:5671 to use SSL/TLS\n' +
+       '                        (default: amqp://localhost)');
+  puts('  -t TOPIC, --topic=TOPIC');
+  puts('                        send messages to topic TOPIC\n' +
+       '                        (default: public)');
+  puts('  -i ID, --id=ID        the ID to use when connecting to MQ Light\n' +
+       '                        (default: send_[0-9a-f]{7})');
+  puts('  --message-ttl=NUM     set message time-to-live to NUM seconds');
+  puts('  -d NUM, --delay=NUM   add NUM seconds delay between each request');
+  puts('  -f FILE, --file=FILE  send FILE as binary data. Cannot be\n' +
+       '                        specified at the same time as <msg1>.');
+  puts('');
+};
+
 if (parsed.help) {
-  console.log('Usage: send.js [options] <msg_1> ... <msg_n>');
-  console.log('');
-  console.log('Options:');
-  console.log('  -h, --help            show this help message and exit');
-  console.log('  -s URL, --service=URL service to connect to, for example:\n' +
-              '                        amqp://user:password@host:5672 or\n' +
-              '                        amqps://host:5671 to use SSL/TLS\n' +
-              '                        (default: amqp://localhost)');
-  console.log('  -t TOPIC, --topic=TOPIC');
-  console.log('                        send messages to topic TOPIC' +
-              ' (default: public)');
-  console.log('  -i ID, --id=ID        the ID to use when connecting to ' +
-              'MQ Light\n' +
-              '                        (default: send_[0-9a-f]{7})');
-  console.log('  --message-ttl=NUM     set message time-to-live to NUM ' +
-              'seconds');
-  console.log('  -d NUM, --delay=NUM   add a NUM seconds time delay between' +
-              ' each request');
-  console.log('');
+  showUsage();
   process.exit(0);
 }
 
@@ -76,7 +83,20 @@ var client = mqlight.createClient(opts);
 
 // get message body data to send
 var remain = parsed.argv.remain;
-var messages = (remain.length > 0) ? remain : ['Hello World!'];
+var messages = [];
+
+if (parsed.file) {
+  if (remain.length > 0) {
+    console.error('*** warning: ignoring additionally supplied arguments %s',
+                  remain);
+    console.error();
+  }
+  messages.push(fs.readFileSync(parsed.file));
+} else if (remain.length > 0) {
+  messages = remain;
+} else {
+  messages.push('Hello World!');
+}
 
 // insert a delay between sends if requested
 var delay = parsed.delay * 1000 || 0;
@@ -90,7 +110,7 @@ client.on('connected', function() {
   var i = 0;
   var sendNextMessage = function() {
     var body = messages[i];
-    var options = {};
+    var options = { qos: mqlight.QOS_AT_LEAST_ONCE };
     if (parsed['message-ttl']) {
       options.ttl = Number(parsed['message-ttl']) * 1000;
     }
@@ -125,7 +145,7 @@ client.on('error', function(error) {
     if (error.message) console.error('message: %s', error.message);
     else if (error.stack) console.error(error.stack);
   }
-  console.error('exiting.');
+  console.error('Exiting.');
   process.exit(1);
 });
 
