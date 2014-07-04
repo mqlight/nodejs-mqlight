@@ -309,23 +309,27 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
     THROW_EXCEPTION("Missing required address argument.", "ProtonMessenger::Connect", name);
   }
 
+  // Check for a SSL trust certificate parameter being specified
   String::Utf8Value param(args[0]->ToString());
   std::string address = std::string(*param);
   std::string sslTrustCertificate;
   if (!(args.Length() < 2 || args[1].IsEmpty() || args[1]->IsNull() || args[1]->IsUndefined())) {
     String::Utf8Value param1(args[1]->ToString());
     sslTrustCertificate = std::string(*param1);
-    // Check that the trust certificate exists
+    // Check that the trust certificate exists, if not then set the last error text and return
+    // (note that we don't throw an exception as this an expected/user error)
     std::ifstream sslTrustCertificateFile(sslTrustCertificate.c_str());
     if (!sslTrustCertificateFile.good()) {
-      std::string msg = "The file specified for sslTrustCertificate '" + sslTrustCertificate +
-                        "' does not exist or is not accessible";
-      THROW_EXCEPTION(msg.c_str(), "ProtonMessenger::Connect", name);
+      obj->lastConnectErrorText = "The file specified for sslTrustCertificate '" + sslTrustCertificate +
+			                            "' does not exist or is not accessible";
+      Proton::Exit("ProtonMessenger::Connect", name, -1);
+      return scope.Close(Integer::New(-1));
     }
   } else {
     sslTrustCertificate = "";
   }
 
+  // Check for a SSL verify name parameter being specified
   pn_ssl_verify_mode_t sslMode = PN_SSL_VERIFY_NULL;
   if (!(args.Length() < 3 || args[2].IsEmpty() || args[2]->IsNull() || args[2]->IsUndefined())) {
     Local<Value> param2 = args[2];
@@ -345,6 +349,22 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args) {
   }
   if (sslMode != PN_SSL_VERIFY_NULL) {
     Proton::Log("data", name, "sslMode:", sslMode);
+  }
+
+  // If the proton messenger already exists and has been stopped then free it
+  // so that we can recreate a new instance.  This situation can arise if the
+  // messenger link is closed by the remote end instead of a call to
+  // ProtonMessenger::Stop
+  if (obj->messenger) {
+    Proton::Entry("pn_messenger_stopped", name);
+    bool stopped = pn_messenger_stopped(obj->messenger);
+    Proton::Exit("pn_messenger_stopped", name, stopped);
+    if (stopped) {
+      Proton::Entry("pn_messenger_free", name);
+      pn_messenger_free(obj->messenger);
+      Proton::Exit("pn_messenger_free", name, 0);
+      obj->messenger = NULL;
+    }
   }
 
   // throw exception if already connected
@@ -474,8 +494,8 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args) {
 
   Proton::Entry("pn_messenger_free", name);
   pn_messenger_free(obj->messenger);
-  obj->messenger = NULL;
   Proton::Exit("pn_messenger_free", name, 0);
+  obj->messenger = NULL;
 
   Proton::Exit("ProtonMessenger::Stop", name, 0);
   return scope.Close(Boolean::New(true));
