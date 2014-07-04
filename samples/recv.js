@@ -23,7 +23,6 @@
 var mqlight = require('mqlight');
 var nopt = require('nopt');
 var uuid = require('node-uuid');
-var fs = require('fs');
 
 // parse the commandline arguments
 var types = {
@@ -31,55 +30,47 @@ var types = {
   'topic-pattern': String,
   id: String,
   'destination-ttl': Number,
-  'share-name': String,
-  file: String
+  'share-name': String
 };
 var shorthands = {
   h: ['--help'],
   s: ['--service'],
   t: ['--topic-pattern'],
   i: ['--id'],
-  n: ['--share-name'],
-  f: ['--file']
+  n: ['--share-name']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
 
-var showUsage = function() {
-  var puts = console.log;
-  puts('Usage: recv.js [options]');
-  puts('');
-  puts('Options:');
-  puts('  -h, --help            show this help message and exit');
-  puts('  -s URL, --service=URL service to connect to, for example:\n' +
-       '                        amqp://user:password@host:5672 or\n' +
-       '                        amqps://host:5671 to use SSL/TLS\n' +
-       '                        (default: amqp://localhost)');
-  puts('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN\n' +
-       '                        subscribe to receive messages matching' +
-       ' TOPICPATTERN');
-  puts('                        (default: public)');
-  puts('  -i ID, --id=ID        the ID to use when connecting to MQ Light\n' +
-       '                        (default: recv_[0-9a-f]{7})');
-  puts('  --destination-ttl=NUM set destination time-to-live to NUM seconds');
-  puts('  -n NAME, --share-name NAME');
-  puts('                        optionally, subscribe to a shared' +
-       ' destination using\n' +
-       '                        NAME as the share name.');
-  puts('  -f FILE, --file=FILE  write the payload of the next message' +
-       ' received to\n' +
-       '                        FILE (overwriting previous file contents)' +
-       ' then end.\n' +
-       '                        (default is to print messages to stdout)');
-  puts('');
-};
+if (parsed.help || remain.length > 0) {
+  console.log('Usage: recv.js [options]');
+  console.log('');
+  console.log('Options:');
+  console.log('  -h, --help            show this help message and exit');
+  console.log('  -s URL, --service=URL service to connect to, for example:\n' +
+              '                        amqp://user:password@host:5672 or\n' +
+              '                        amqps://host:5671 to use SSL/TLS\n' +
+              '                        (default: amqp://localhost)');
+  console.log('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN\n' +
+              '                        subscribe to receive messages matching' +
+              ' TOPICPATTERN');
+  console.log('                        (default: public)');
+  console.log('  -i ID, --id=ID        the ID to use when connecting to ' +
+              'MQ Light\n' +
+              '                        (default: recv_[0-9a-f]{7})');
+  console.log('  --destination-ttl=NUM set destination time-to-live to NUM ' +
+              'seconds');
+  console.log('  -n NAME, --share-name NAME');
+  console.log('                        optionally, subscribe to a shared' +
+              ' destination using');
+  console.log('                        NAME as the share name.');
+  console.log('');
 
-if (parsed.help) {
-  showUsage();
-  process.exit(0);
-} else if (remain.length > 0) {
-  showUsage();
-  process.exit(1);
+  if (parsed.help) {
+    process.exit(0);
+  } else {
+    process.exit(1);
+  }
 }
 
 var service = parsed.service ? parsed.service : 'amqp://localhost';
@@ -97,9 +88,9 @@ var client = mqlight.createClient(opts);
 // once connection is acquired, receive messages for the supplied pattern
 client.on('connected', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
-  var options = { qos: mqlight.QOS_AT_LEAST_ONCE, autoConfirm: false };
+  var options = {};
   if (parsed['destination-ttl']) {
-    options.ttl = Number(parsed['destination-ttl']);
+    options.ttl = Number(parsed['destination-ttl']) * 1000;
   }
 
   // now subscribe to pattern for messages
@@ -121,19 +112,8 @@ client.on('connected', function() {
   var i = 0;
   client.on('message', function(data, delivery) {
     console.log('# received message (%d)', (++i));
-    if (parsed.file) {
-      console.log('Writing message data to %s', parsed.file);
-      fs.writeFileSync(parsed.file, data);
-      delivery.message.confirmDelivery();
-      client.disconnect(function() {
-        console.error('Exiting.');
-        process.exit(0);
-      });
-    } else {
-      console.log(data);
-      console.log(delivery);
-      delivery.message.confirmDelivery();
-    }
+    console.log(data);
+    console.log(delivery);
   });
   client.on('malformed', function(data, delivery) {
     console.error('*** received malformed message (%d)', (++i));
@@ -148,7 +128,7 @@ client.on('error', function(error) {
     if (error.message) console.error('message: %s', error.message);
     else if (error.stack) console.error(error.stack);
   }
-  console.error('Exiting.');
+  console.error('exiting.');
   process.exit(1);
 });
 
