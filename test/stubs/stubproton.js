@@ -104,9 +104,10 @@ module.exports.createProtonStub = function() {
                                service, sslTrustCertificate, sslVerifyName);
         if (!this.stopped) throw new Error('already connected');
         var result;
-        if (service.indexOf('bad') != -1) {
+        var href = service.href;
+        if (href.indexOf('bad') != -1) {
           result = -2;
-          this.lastErrorText = 'bad service ' + service;
+          this.lastErrorText = 'bad service ' + href;
           if (DEBUG) console.log('connect will fail, error: ' +
                                  this.lastErrorText);
         } else if (sslTrustCertificate === 'BadCertificate') {
