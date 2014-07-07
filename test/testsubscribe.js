@@ -34,7 +34,8 @@ var testCase = require('nodeunit').testCase;
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_too_few_arguments = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_too_few_arguments',
+    service: 'amqp://host'});
   client.connect(function() {
     test.throws(function() {
       client.subscribe();
@@ -51,7 +52,8 @@ module.exports.test_subscribe_too_few_arguments = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_too_many_arguments = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_too_many_arguments',
+    service: 'amqp://host'});
   client.connect(function() {
     test.doesNotThrow(function() {
       client.subscribe('/foo', 'share1', {}, function() {}, 'stowaway');
@@ -67,7 +69,9 @@ module.exports.test_subscribe_too_many_arguments = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_callback_must_be_function = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id:
+        'test_subscribe_callback_must_be_function',
+    service: 'amqp://host'});
   client.connect(function() {
     test.throws(function() {
       client.subscribe('/foo', 'share', {}, 7);
@@ -138,7 +142,8 @@ module.exports.test_subscribe_parameters = function(test) {
     lastSubscribedAddress = address;
   };
 
-  var client = mqlight.createClient({service: service});
+  var client = mqlight.createClient({id: 'test_subscribe_parameters', service:
+        service});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       var clientSubscribeMethod = client.subscribe;
@@ -181,7 +186,8 @@ module.exports.test_subscribe_parameters = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_ok_callback = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_ok_callback', service:
+        'amqp://host'});
   client.connect(function() {
     client.subscribe('/foo', function() {
       test.equals(arguments.length, 3);
@@ -204,7 +210,8 @@ module.exports.test_subscribe_ok_callback = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_fail_callback = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_fail_callback',
+    service: 'amqp://host'});
   var count = 0;
 
   // Replace the messeneger subscribe method with our own implementation.
@@ -227,7 +234,7 @@ module.exports.test_subscribe_fail_callback = function(test) {
 
     client.disconnect();
   });
-  
+
   client.on('error', function(err) {
     test.ok(err instanceof Error);
     test.equals(arguments.length, 1);
@@ -243,7 +250,8 @@ module.exports.test_subscribe_fail_callback = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_when_disconnected = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_when_disconnected',
+    service: 'amqp://host'});
   test.throws(function() {
     client.subscribe('/foo');
   }, Error);
@@ -257,7 +265,8 @@ module.exports.test_subscribe_when_disconnected = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_returns_client = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_returns_client',
+    service: 'amqp://host'});
   client.connect(function() {
     test.deepEqual(client.subscribe('/foo'), client);
     client.disconnect();
@@ -284,7 +293,8 @@ module.exports.test_subscribe_topics = function(test) {
               {valid: true, pattern: '/#'},
               {valid: true, pattern: '/+'}];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_topics', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
@@ -315,7 +325,8 @@ module.exports.test_subscribe_share_names = function(test) {
               {vaild: false, share: 'a:'},
               {valid: false, share: ':a'}];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_share_names', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
@@ -355,7 +366,8 @@ module.exports.test_subscribe_options = function(test) {
               {valid: true, options: data},
               {valid: true, options: { a: 1 } }];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_options', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
@@ -402,7 +414,8 @@ module.exports.test_subscribe_qos = function(test) {
               {valid: true, qos: mqlight.QOS_AT_MOST_ONCE},
               {valid: true, qos: mqlight.QOS_AT_LEAST_ONCE}];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_qos', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { qos: data[i].qos };
@@ -448,7 +461,8 @@ module.exports.test_subscribe_autoConfirm = function(test) {
               {valid: true, opts: { autoConfirm: 'abc' == 'abc' } },
               {valid: true, opts: { autoConfirm: a } }];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_autoConfirm', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
@@ -491,7 +505,8 @@ module.exports.test_subscribe_ttl_validity = function(test) {
     {valid: true, ttl: ''}    // treated as 0
   ];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_ttl_validity',
+    service: 'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { ttl: data[i].ttl };
@@ -534,7 +549,8 @@ module.exports.test_subscribe_ttl_rounding = function(test) {
     subscribedTtl = ttl;
   };
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_subscribe_ttl_rounding',
+    service: 'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { ttl: data[i].ttl };

@@ -706,6 +706,12 @@ var Client = function(service, id, securityOptions) {
       client.state = 'connecting';
     }
 
+    // stop the messenger to free the object if its still around
+    if (client.messenger && !client.messenger.stopped) {
+      client.messenger.stop();
+      if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
+    }
+
     // Obtain the list of services for connect and connect to one of the
     // services, retrying until a connection can be established
     var serviceList;
@@ -784,8 +790,7 @@ var Client = function(service, id, securityOptions) {
       for (var i = 0; i < serviceList.length; i++) {
         try {
           var service = serviceList[i];
-          // reparse the service url to prepend authentication information
-          // back on if required
+          // check if we will be providing authentication information
           var auth;
           if (securityOptions.urlUser) {
             auth = encodeURIComponent(String(securityOptions.urlUser));
@@ -802,6 +807,8 @@ var Client = function(service, id, securityOptions) {
             auth = undefined;
           }
           var logUrl;
+          // reparse the service url to prepend authentication information
+          // back on as required
           if (auth) {
             var serviceUrl = url.parse(service);
             service = serviceUrl.protocol + '//' + auth + serviceUrl.host;
@@ -813,7 +820,7 @@ var Client = function(service, id, securityOptions) {
           }
           logger.log('data', client.id, 'attempting to connect to: ' + logUrl);
 
-          var rc = client.messenger.connect(service,
+          var rc = client.messenger.connect(url.parse(service),
                                             securityOptions.sslTrustCertificate,
                                             securityOptions.sslVerifyName);
           if (rc) {
@@ -897,22 +904,22 @@ var Client = function(service, id, securityOptions) {
     } else {
       // We've tried all services without success. Pause for a while before
       // trying again
-      if (client.messenger && !client.messenger.stopped) {
-        client.messenger.stop();
-        if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
-      }
       client.state = 'retrying';
       var retry = function() {
         logger.entryLevel('entry_often', 'retry', client.id);
-        client.performConnect.apply(client, [callback]);
+        if (!client.isDisconnected()) {
+          client.performConnect.apply(client, [callback]);
+        }
         logger.entryLevel('exit_often', 'retry', client.id);
       };
-  
+
       // TODO 10 seconds is an arbitrary value, need to review if this is
       // appropriate. Timeout should be adjusted based on reconnect algo.
       logger.log('data', client.id, 'trying to connect again ' +
                  ((CONNECT_RETRY_INTERVAL >0) ? ('after ' +
-                  CONNECT_RETRY_INTERVAL / 1000 + ' seconds') : 'immediately'));
+                                                 CONNECT_RETRY_INTERVAL /
+                                                 1000 + ' seconds') :
+          'immediately'));
       setTimeout(retry, CONNECT_RETRY_INTERVAL);
       // XXX: should we even emit an error in this case? we're going to retry
       logger.log('emit', client.id, 'error', error);
@@ -1215,6 +1222,11 @@ Client.prototype.disconnect = function(callback) {
  *          for chaining of other method calls on the client object.
  */
 function reconnect(client) {
+  if (client === undefined || client.constructor !== Client) {
+    logger.entry('reconnect', 'client was not set');
+    logger.exit('reconnect', 'client not set returning');
+    return;
+  }
   logger.entry('Client.reconnect', client.id);
   if (client.state !== 'connected') {
     if (client.isDisconnected()) {
@@ -2065,11 +2077,12 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   } catch (e) {
     logger.caught('Client.subscribe', client.id, e);
     err = e;
-    //error during subscribe so add to list of queued to resub
+    // error during subscribe so add to list of queued to resub
     client.queuedSubscriptions.push({address: subscriptionAddress,
       qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
       share: originalShareValue, options: options, callback: callback });
-    reconnect(client);
+    // FIXME: should we really reconnect in this case?
+    // reconnect(client);
   }
 
   setImmediate(function() {

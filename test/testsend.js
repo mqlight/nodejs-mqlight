@@ -35,7 +35,8 @@ var mqlight = require('../mqlight');
  * @param {object} test the unittest interface
  */
 module.exports.test_send_too_few_arguments = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_too_few_arguments',
+    service: 'amqp://host'});
   client.connect(function() {
     test.throws(
         function() {
@@ -59,7 +60,8 @@ module.exports.test_send_too_few_arguments = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_send_too_many_arguments = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_too_many_arguments',
+    service: 'amqp://host'});
   client.connect(function() {
     test.doesNotThrow(
         function() {
@@ -86,7 +88,8 @@ module.exports.test_send_topics = function(test) {
               {valid: true, topic: 'kittens'},
               {valid: true, topic: '/kittens'}];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_topics', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
@@ -148,7 +151,8 @@ module.exports.test_send_payloads = function(test) {
     lastMsg = message;
   };
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_payloads', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].result === 'error') {
@@ -206,7 +210,8 @@ module.exports.test_send_callback = function(test) {
   var testData = [{topic: 'topic1', data: 'data1', options: {}},
                   {topic: 'topic2', data: 'data2', options: undefined}];
   test.expect(testData.length * 7);
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_callback', service:
+        'amqp://host'});
   var count = 0;
   var callbackMaker = function(data) {
     return function() {
@@ -240,8 +245,9 @@ module.exports.test_send_callback = function(test) {
  * client is in disconnected state.
  * @param {object} test the unittest interface
  */
-module.exports.test_send_fails_if_disconneced = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+module.exports.test_send_fails_if_disconnected = function(test) {
+  var client = mqlight.createClient({id: 'test_send_fails_if_disconnected',
+    service: 'amqp://host'});
   test.throws(
       function() {
         client.send('topic', 'message');
@@ -273,7 +279,8 @@ module.exports.test_send_options = function(test) {
               {valid: true, options: data},
               {valid: true, options: { a: 1 } }];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_options', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
@@ -318,7 +325,8 @@ module.exports.test_send_qos = function(test) {
               {valid: true, qos: mqlight.QOS_AT_MOST_ONCE},
               {valid: true, qos: mqlight.QOS_AT_LEAST_ONCE}];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_qos', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { qos: data[i].qos };
@@ -354,7 +362,8 @@ module.exports.test_send_qos_function = function(test) {
               {valid: true, qos: 0, callback: undefined},
               {valid: true, qos: 0, callback: function() {}}];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_qos_function', service:
+        'amqp://host'});
   client.connect(function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { qos: data[i].qos };
@@ -387,23 +396,26 @@ module.exports.test_send_qos_function = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_clear_queuedsends_disconnect = function(test) {
-  test.expect(3);
-  var client = mqlight.createClient({service: 'amqp://host'});
+  //test.expect(3);
+  var client = mqlight.createClient({id: 'test_clear_queuedsends_disconnect',
+    service: 'amqp://host'});
   var savedSendFunction = mqlight.proton.messenger.send;
   mqlight.proton.messenger.send = function() {
     throw new Error('stub error during send');
   };
 
-  var timeout = setTimeout(function(){
+  var timeout = setTimeout(function() {
     test.ok(false, 'test timed out before callback');
     mqlight.proton.messenger.send = savedSendFunction;
     client.disconnect();
-  }, 5000)
+    test.done();
+  },
+  5000);
   var opts = {qos: mqlight.QOS_AT_LEAST_ONCE};
-           
-  client.on('connected', function(x,y) {
+
+  client.on('connected', function(err) {
     stubproton.setConnectStatus(1);
-    client.send('test', 'message', opts, function(err){
+    client.send('test', 'message', opts, function(err) {
       test.deepEqual(client.state, 'disconnected',
           'callback called when disconnected');
       test.notDeepEqual(err, undefined, 'not undefined so err set');
@@ -413,14 +425,17 @@ module.exports.test_clear_queuedsends_disconnect = function(test) {
       test.done();
     });
   });
-  
-  client.on('error', function(x,y){
+
+  client.on('error', function(err) {
     client.disconnect();
   });
 
-  client.connect();
   process.on('uncaughtException', function(err) {
     console.log(err);
+  });
+
+  client.connect(function(err) {
+    test.ifError(err);
   });
 };
 
@@ -450,7 +465,8 @@ module.exports.test_send_ttl = function(test) {
               {expected: 4294967295, valid: true, ttl: 9007199254740992}
   ];
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({id: 'test_send_ttl', service:
+        'amqp://host'});
   var savedPutFunction = mqlight.proton.messenger.put;
   mqlight.proton.messenger.put = function(msg, qos) {
     mqlight.proton.messenger.putMessage = msg;
