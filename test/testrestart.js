@@ -249,10 +249,10 @@ module.exports.test_single_queued_send = function(test) {
   }, 5000);
 
   var opts = {qos: mqlight.QOS_AT_LEAST_ONCE};
-  client.on('connected', function(x,y) {
+  client.once('connected', function(err) {
     stubproton.setConnectStatus(1);
-    client.send('test', 'message', opts, function() {
-      //this callback should only happen after reconnect
+    client.send('test', 'message', opts, function(err) {
+      // this callback should only happen after reconnect
       test.equals(reconnected, 1, 'has reconnected');
       test.deepEqual(client.state, 'connected', 'state is connected');
       test.equals(client.queuedSends.length, 0, 'queued sends now 0');
@@ -262,7 +262,7 @@ module.exports.test_single_queued_send = function(test) {
     });
   });
 
-  client.on('error', function(x, y) {
+  client.once('error', function(err) {
     stubproton.setConnectStatus(0);
     test.equals(client.queuedSends.length, 1, 'check for queued send'); 
   });
@@ -284,7 +284,7 @@ module.exports.test_single_queued_send = function(test) {
 */
 module.exports.test_queue_sends_retrying = function(test) {
   test.expect();
-  var client = mqlight.createClient({id: 'test_queued_subs_retrying', service:
+  var client = mqlight.createClient({id: 'test_queued_sends_retrying', service:
         'amqp://host'});
   var callbacksCalled = 0;
   var callbacksCalledInError = 0;
@@ -330,19 +330,19 @@ module.exports.test_queue_sends_retrying = function(test) {
 /**
 * Test that when in a retrying state that any attempted
 * subscribes are queued and then go through following a reconnect.
+*
 * @param {object} test the unittest interface.
 */
-module.exports.test_queued_subs_retrying = function(test){
-
-  var first = true; 
-  var successCallbacks = 0; 
+module.exports.test_queued_subs_retrying = function(test) {
   var client = mqlight.createClient({id: 'test_queued_subs_retrying', service:
         'amqp://host'}); 
+
   var savedSubFunction = mqlight.proton.messenger.subscribe;
   mqlight.proton.messenger.subscribe = function() {
     throw new Error('error on subscribe');
   };
 
+  var successCallbacks = 0; 
   client.on('connected', function() {
     stubproton.setConnectStatus(1);
     client.subscribe('/test', function(err){
@@ -354,12 +354,13 @@ module.exports.test_queued_subs_retrying = function(test){
     });
   });
 
-  client.on('error', function(err){
-    if ( first ){
+  var first = true; 
+  client.on('error', function(err) {
+    if (first) {
       first = false;
-      //queue up 3 subscribes
-      for (var i = 0; i < 3; i++){
-        client.subscribe('queue'+i, function(err){
+      // queue up 3 subscribes
+      for (var i = 0; i < 3; i++) {
+        client.subscribe('queue'+i, function(err) {
           if (err){
             test.ok(false, 'should not be called in err');
           } else {
@@ -372,13 +373,14 @@ module.exports.test_queued_subs_retrying = function(test){
           'all 4 attempted subs queued');
       mqlight.proton.messenger.subscribe = savedSubFunction;
       stubproton.setConnectStatus(0);
-      setTimeout(function(){client.disconnect()},500);
+      setTimeout(function(){client.disconnect();},500);
     }
 
   });
   
   client.on('disconnected', function() {
-    test.equal(successCallbacks, 4, 'expecting 4 success callbacks');
+    test.equal(successCallbacks, 4, 'expecting 4 success callbacks, saw ' +
+        successCallbacks);
     test.done();
   });
   client.connect();

@@ -52,17 +52,25 @@ typedef unsigned __int32 uint32_t;
 
 using namespace v8;
 
-#define THROW_EXCEPTION(error, fnc, id)                           \
-  Proton::Throw((fnc), (id), error);                              \
-  ThrowException(Exception::TypeError(                            \
-      String::New((error) == NULL ? "unknown error" : (error)))); \
+/* throw an exception of a particular type at the default log lvl */
+#define THROW_EXCEPTION_TYPE(type, msg, fnc, id)                              \
+  Proton::Throw((fnc), (id), msg);                                            \
+  ThrowException(type(String::New((msg) == NULL ? "unknown error" : (msg)))); \
   return scope.Close(Undefined());
 
-#define THROW_EXCEPTION_LEVEL(error, lvl, fnc, id)                \
-  Proton::Throw((lvl), (fnc), (id), error);                       \
-  ThrowException(Exception::TypeError(                            \
-      String::New((error) == NULL ? "unknown error" : (error)))); \
+/* throw an exception of the default type (TypeError) at the default log lvl */
+#define THROW_EXCEPTION(msg, fnc, id) \
+  THROW_EXCEPTION_TYPE(Exception::TypeError, msg, fnc, id)
+
+/* throw an exception of a particular type at a specific log lvl */
+#define THROW_EXCEPTION_LEVEL_TYPE(type, msg, lvl, fnc, id)                   \
+  Proton::Throw((lvl), (fnc), (id), msg);                                     \
+  ThrowException(type(String::New((msg) == NULL ? "unknown error" : (msg)))); \
   return scope.Close(Undefined());
+
+/* throw an exception of the default type (TypeError) at a specific log lvl */
+#define THROW_EXCEPTION_LEVEL(msg, lvl, fnc, id) \
+  THROW_EXCEPTION_LEVEL_TYPE(Exception::TypeError, msg, lvl, fnc, id)
 
 Persistent<FunctionTemplate> ProtonMessenger::constructor;
 
@@ -274,9 +282,10 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
 
   Proton::Entry("ProtonMessenger::Send", name);
 
-  // throw exception if not connected
+  // throw Error if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Send", name);
+    THROW_EXCEPTION_TYPE(
+        Exception::Error, "Not connected", "ProtonMessenger::Send", name);
   }
 
   Proton::Entry("pn_messenger_send", name);
@@ -285,7 +294,8 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   Proton::Exit("pn_messenger_send", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Send", name)
+    // throw Error if error from messenger
+    THROW_EXCEPTION_TYPE(Exception::Error, text, "ProtonMessenger::Send", name)
   }
 
   Proton::Entry("pn_messenger_work", name);
@@ -294,7 +304,8 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   Proton::Exit("pn_messenger_work", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Send", name)
+    // throw Error if error from messenger
+    THROW_EXCEPTION_TYPE(Exception::Error, text, "ProtonMessenger::Send", name)
   }
 
   Proton::Exit("ProtonMessenger::Send", name, 0);
@@ -308,7 +319,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Connect", name);
 
-  // throw exception if not enough args
+  // throw TypeError if not enough args
   if (args.Length() < 1) {
     THROW_EXCEPTION(
         "Missing required address argument.", "ProtonMessenger::Connect", name);
@@ -382,9 +393,12 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
     }
   }
 
-  // throw exception if already connected
+  // throw Error if already connected
   if (obj->messenger) {
-    THROW_EXCEPTION("Already connected", "ProtonMessenger::Connect", name);
+    THROW_EXCEPTION_TYPE(Exception::Error,
+                         "Already connected",
+                         "ProtonMessenger::Connect",
+                         name);
   }
 
   // Create the messenger object and update the name in case messenger has
@@ -410,6 +424,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
     if (error) {
       pn_messenger_free(obj->messenger);
       obj->messenger = NULL;
+      // throw TypeError if unable to set certificates
       THROW_EXCEPTION("Failed to set trusted certificates",
                       "ProtonMessenger::Connect",
                       name);
@@ -423,6 +438,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
     if (error) {
       pn_messenger_free(obj->messenger);
       obj->messenger = NULL;
+      // throw TypeError if unable to set certificates
       THROW_EXCEPTION("Failed to set SSL peer authentication mode",
                       "ProtonMessenger::Connect",
                       name);
@@ -450,6 +466,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   if (error) {
     pn_messenger_free(obj->messenger);
     obj->messenger = NULL;
+    // throw TypeError if unable to set route
     THROW_EXCEPTION(
         "Failed to set messenger route", "ProtonMessenger::Connect", name);
   }
@@ -458,6 +475,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   if (pn_messenger_set_flags(obj->messenger, PN_FLAGS_CHECK_ROUTES)) {
     pn_messenger_free(obj->messenger);
     obj->messenger = NULL;
+    // throw TypeError if unable to set flags
     THROW_EXCEPTION("Invalid set flags call", "ProtonMessenger::Connect", name);
   }
 
@@ -534,7 +552,7 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
 
   Proton::Entry("ProtonMessenger::Subscribe", name);
 
-  // throw exception if not enough args
+  // throw TypeError if not enough args
   if (args.Length() < 3 || args[0].IsEmpty() || args[1].IsEmpty() ||
       args[2].IsEmpty()) {
     THROW_EXCEPTION("Missing required pattern or qos argument.",
@@ -550,9 +568,10 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   Proton::Log("parms", name, "qos:", qos);
   Proton::Log("parms", name, "ttl:", ttl);
 
-  // throw exception if not connected
+  // throw Error if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Subscribe", name);
+    THROW_EXCEPTION_TYPE(
+        Exception::Error, "Not connected", "ProtonMessenger::Subscribe", name);
   }
 
   /* Set the required QoS, by setting the sender settler mode to settled (QoS =
@@ -568,6 +587,7 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
     pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
     pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
   } else {
+    // throw TypeError if bad qos arg
     THROW_EXCEPTION(
         "Invalid qos argument.", "ProtonMessenger::Subscribe", name);
   }
@@ -581,9 +601,11 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_recv", name, error);
   if (error) {
-    THROW_EXCEPTION(pn_error_text(pn_messenger_error(obj->messenger)),
-                    "ProtonMessenger::Subscribe",
-                    name)
+    // throw Error if error from messenger
+    THROW_EXCEPTION_TYPE(Exception::Error,
+                         pn_error_text(pn_messenger_error(obj->messenger)),
+                         "ProtonMessenger::Subscribe",
+                         name)
   }
 
   Proton::Entry("pn_messenger_work", name);
@@ -592,7 +614,9 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   Proton::Exit("pn_messenger_work", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Subscribe", name)
+    // throw Error if error from messenger
+    THROW_EXCEPTION_TYPE(
+        Exception::Error, text, "ProtonMessenger::Subscribe", name)
   }
   Proton::Exit("ProtonMessenger::Subscribe", name, 0);
   return scope.Close(Boolean::New(true));

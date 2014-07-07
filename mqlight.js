@@ -835,10 +835,8 @@ var Client = function(service, id, securityOptions) {
             break;
           }
         } catch (err) {
-          console.error(err);
-          process.exit(1);
-          // Should not get here.
-          // Means that messenger.connect has been called in an invalid way
+          // should never get here, as it means that messenger.connect has been
+          // called in an invalid way, so FFDC
           error = err;
           logger.caught('Client.connectToService', client.id, err);
           logger.ffdc('Client.connectToService', 'ffdc001', client.id, err);
@@ -1281,13 +1279,18 @@ var processQueuedActions = function(err) {
   }
   logger.entry('processQueuedActions', client.id);
   logger.log('parms', client.id, 'err:', err);
+  logger.log('data', client.id, 'client.state:', client.state);
 
   if (!err) {
+    logger.log('data', client.id, 'client.queuedSubscriptions',
+               client.queuedSubscriptions);
     while (client.queuedSubscriptions.length > 0 &&
             client.state === 'connected') {
       var sub = client.queuedSubscriptions.pop();
       client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
     }
+    logger.log('data', client.id, 'client.queuedSends',
+               client.queuedSends);
     while (client.queuedSends.length > 0 &&
             client.state === 'connected') {
       var msg = client.queuedSends.pop();
@@ -1631,9 +1634,11 @@ Client.prototype.send = function(topic, data, options, callback) {
           if (e) {
             logger.log('emit', client.id, 'error', e);
             client.emit('error', e);
+            if (!(e instanceof TypeError)) {
+              reconnect(client);
+            }
           }
         });
-        reconnect(client);
       }
       logger.exit('Client.send.utilSendComplete', client.id, null);
     };
@@ -1658,8 +1663,10 @@ Client.prototype.send = function(topic, data, options, callback) {
       }
       logger.log('emit', client.id, 'error', err);
       client.emit('error', err);
+      if (!(err instanceof TypeError)) {
+        reconnect(client);
+      }
     });
-    reconnect(client);
   }
 
   logger.exit('Client.send', this.id, null);
@@ -1845,7 +1852,9 @@ Client.prototype.checkForMessages = function() {
     process.nextTick(function() {
       logger.log('emit', client.id, 'error', err);
       client.emit('error', err);
-      reconnect(client);
+      if (!(err instanceof TypeError)) {
+        reconnect(client);
+      }
     });
   }
 
@@ -2077,12 +2086,17 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   } catch (e) {
     logger.caught('Client.subscribe', client.id, e);
     err = e;
-    // error during subscribe so add to list of queued to resub
-    client.queuedSubscriptions.push({address: subscriptionAddress,
-      qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
-      share: originalShareValue, options: options, callback: callback });
-    // FIXME: should we really reconnect in this case?
-    // reconnect(client);
+    if (!(err instanceof TypeError)) {
+      setImmediate(function() {
+        logger.log('data', client.id, 'queued subscription and calling ' +
+                   'reconnect');
+        // error during subscribe so add to list of queued to resub
+        client.queuedSubscriptions.push({address: subscriptionAddress,
+          qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
+          share: originalShareValue, options: options, callback: callback });
+        reconnect(client);
+      });
+    }
   }
 
   setImmediate(function() {
