@@ -980,8 +980,7 @@ module.exports.test_connect_user_password_options = function(test) {
             test.ok(data[i].valid,
                     'index #' + i + ' should have been rejected\n' +
                     data[i].desc + '\n' + JSON.stringify(data[i]));
-            // FIXME: should be supporting authentication details from function
-            if (typeof data[i].service !== 'function' && data[i].valid) {
+            if (data[i].valid) {
               test.equal(lastUsr, data[i].expect_user, 'index #' + i +
                          ' passed wrong username ' + lastUsr + ' to the ' +
                          'underlying proton messenger');
