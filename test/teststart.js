@@ -28,6 +28,7 @@ var stubproton = require('./stubs/stubproton');
 var mqlight = require('../mqlight');
 var os = require('os');
 var fs = require('fs');
+var url = require('url');
 var http = require('http');
 var EventEmitter = require('events').EventEmitter;
 var testCase = require('nodeunit').testCase;
@@ -164,7 +165,8 @@ module.exports.test_connect_retry = function(test) {
   });
 
   stubproton.setConnectStatus(requiredConnectStatus);
-  client.connect(function() {
+  client.connect(function(err) {
+    test.ifError(err);
     test.equals(requiredConnectStatus, 0);
     client.disconnect();
     test.done();
@@ -938,19 +940,34 @@ module.exports.test_connect_user_password_options = function(test) {
     }
   ];
 
-  var originalCreateMessenger = mqlight.proton.createMessenger;
+  var originalConnect = mqlight.proton.messenger.connect;
   var lastUsr, lastPw;
-  mqlight.proton.createMessenger = function(id, usr, pw) {
-    var obj = stubproton.createProtonStub();
-    lastUsr = usr;
-    lastPw = pw;
-    return obj.messenger;
+  mqlight.proton.messenger.connect = function(service, sslTrustCertificate,
+                                              sslVerifyName) {
+    var auth;
+    try {
+      auth = url.parse(service).auth;
+    } catch (_) {
+      auth = undefined;
+    }
+    if (auth) {
+      lastUsr = String(auth).slice(0, auth.indexOf(':'));
+      lastPw = String(auth).slice(auth.indexOf(':') + 1);
+    } else {
+      lastUsr = undefined;
+      lastPw = undefined;
+    }
+
+    var messenger = stubproton.createProtonStub().createMessenger();
+    var result = messenger.connect.apply(messenger, [service,
+                                         sslTrustCertificate, sslVerifyName]);
+    return result;
   };
 
   var runtest = function(i) {
     if (i == data.length) {
       test.done();
-      mqlight.proton.createMessenger = originalCreateMessenger;
+      mqlight.proton.messenger.connect = originalConnect;
     } else {
       try {
         var client = mqlight.createClient(data[i]);

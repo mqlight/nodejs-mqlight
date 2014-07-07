@@ -269,7 +269,7 @@ module.exports.test_valid_URIs = function(test) {
                   {uri: 'amqps://host:4321', expected: 'amqps://host:4321'},
                   {uri: 'aMqP://HoSt:1234', expected: 'amqp://host:1234'},
                   {uri: 'AmQpS://hOsT:4321', expected: 'amqps://host:4321'},
-                  {uri: 'amqp://user:pass@host:1234', 
+                  {uri: 'amqp://user:pass@host:1234',
                     expected: 'amqp://host:1234'}];
   var count = 0;
   var clientTest = function(uri, expected) {

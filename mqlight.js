@@ -202,10 +202,10 @@ exports.createClient = function(options) {
     sslVerifyName:options.sslVerifyName,
     toString: function() {
       return '[\n' +
-          ' propertyUser: ' + this.user + '\n' +
+          ' propertyUser: ' + this.propertyUser + '\n' +
           ' propertyPassword: ' +
           (this.propertyPassword ? '********' : undefined) + '\n' +
-          ' propertyUser: ' + this.propertyUser + '\n' +
+          ' propertyUser: ' + this.urlUser + '\n' +
           ' urlPassword: ' + (this.urlPassword ? '********' : undefined) +
           '\n' +
           ' sslTrustCertificate: ' + this.sslTrustCertificate + '\n' +
@@ -232,170 +232,6 @@ exports.createClient = function(options) {
 
   logger.exit('createClient', client.id, client);
   return client;
-};
-
-
-/**
- * Function to take a single service URL, or array of service URLs, validate
- * them, returning an array of service URLs.
- *
- * @param {String|Array}
- *          service - Required; when an instance of String this is a URL to
- *          connect to. When an instance of Array this is an array of URLs to
- *          connect to
- * @param {Object} securityOptions - Required; an object encapsulating the
- *          security sensitive options used to establish a connection.
- * @return {Array} Valid service URLs, with port number added as appropriate.
- * @throws TypeError
- *           If service is not a string or array type.
- * @throws Error
- *           if an unsupported or invalid URL specified.
- */
-var generateServiceList = function(service, securityOptions) {
-  logger.entry('generateServiceList', logger.NO_CLIENT_ID);
-  logger.log('parms', logger.NO_CLIENT_ID, 'service:',
-      String(service).replace(/:[^:]+@/g, ':********@'));
-  logger.log('parms', logger.NO_CLIENT_ID, 'securityOptions:', securityOptions);
-
-  var err;
-
-  // Ensure the service is an Array
-  var inputServiceList = [];
-  if (!service) {
-    err = new Error('service is undefined');
-    logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-    throw err;
-  } else if (service instanceof Function) {
-    err = new TypeError('service cannot be a function');
-    logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-    throw err;
-  } else if (service instanceof Array) {
-    if (service.length === 0) {
-      err = new Error('service array is empty');
-      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-      throw err;
-    }
-    inputServiceList = service;
-  } else if (typeof service === 'string') {
-    inputServiceList[0] = service;
-  } else {
-    err = new TypeError('service must be a string or array type');
-    logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-    throw err;
-  }
-
-  /*
-   * Validate the list of URLs for the service, inserting default values as
-   * necessary Expected format for each URL is: amqp://host:port or
-   * amqps://host:port (port is optional, defaulting to 5672 or 5671 as
-   * appropriate)
-  */
-  var serviceList = [];
-  var authUser, authPassword;
-  for (var i = 0; i < inputServiceList.length; i++) {
-    var serviceUrl = url.parse(inputServiceList[i]);
-    var protocol = serviceUrl.protocol;
-    var msg;
-
-    // check for auth details
-    var auth = serviceUrl.auth;
-    authUser = undefined;
-    authPassword = undefined;
-    if (auth) {
-      if (auth.indexOf(':') >= 0) {
-        authUser = String(auth).slice(0, auth.indexOf(':'));
-        authPassword = String(auth).slice(auth.indexOf(':')+1);
-      } else {
-        msg = "URLs supplied via the 'service' property must specify both a" +
-              'user name and a password value, or omit both values';
-        err = new Error(msg);
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-        throw err;
-      }
-      if (securityOptions.propertyUser && authUser &&
-          (securityOptions.propertyUser !== authUser)) {
-        msg = "User name supplied as 'user' property (" +
-              securityOptions.propertyUser + ') does not match user name ' +
-              "supplied via a URL passed via the 'service' property (" +
-              authUser + ')';
-        err = new Error(msg);
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-        throw err;
-      }
-      if (securityOptions.propertyPassword && authPassword &&
-          (securityOptions.propertyPassword !== authPassword)) {
-        msg = "Password supplied as 'password' property does not match a " +
-              "password supplied via a URL passed via the 'service' property";
-        err = new Error(msg);
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-        throw err;
-      }
-      if (i === 0) {
-        securityOptions.urlUser = authUser;
-        securityOptions.urlPassword = authPassword;
-      }
-    }
-
-    // Check whatever URL user names / passwords are present this time
-    // through the loop - match the ones set on securityOptions by the first
-    // pass through the loop.
-    if (i > 0) {
-      if (securityOptions.urlUser !== authUser) {
-        msg = "URLs supplied via the 'service' property contain " +
-              'inconsistent user names';
-        err = new Error(msg);
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-        throw err;
-      } else if (securityOptions.urlPassword !== authPassword) {
-        msg = "URLs supplied via the 'service' property contain " +
-              'inconsistent password values';
-        err = new Error(msg);
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-        throw err;
-      }
-    }
-
-    // Check we are trying to use the amqp protocol
-    if (!protocol || protocol !== 'amqp:' && protocol !== 'amqps:') {
-      msg = "Unsupported URL '" + inputServiceList[i] +
-            "' specified for service. Only the amqp or amqps protocol are " +
-            'supported.';
-      err = new Error(msg);
-      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-      throw err;
-    }
-    // Check we have a hostname
-    var host = serviceUrl.hostname;
-    if (!host) {
-      msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
-            'service. Must supply a hostname.';
-      err = new Error(msg);
-      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-      throw err;
-    }
-    // Set default port if not supplied
-    var port = serviceUrl.port;
-    if (!port) {
-      port = (protocol === 'amqp:') ? '5672' : '5671';
-    }
-    // Check for no path
-    var path = serviceUrl.path;
-    if (path) {
-      msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
-            " ) can't be part of a service URL.";
-      err = new Error(msg);
-      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
-      throw err;
-    }
-    serviceList[i] = protocol + '//' + host + ':' + port;
-  }
-
-  logger.exit('generateServiceList', logger.NO_CLIENT_ID,
-              [
-                'serviceList:', serviceList,
-                'securityOptions:', securityOptions
-              ]);
-  return serviceList;
 };
 
 
@@ -634,7 +470,7 @@ var getHttpServiceFunction = function(serviceUrl) {
 var Client = function(service, id, securityOptions) {
   logger.entry('Client.constructor', logger.NO_CLIENT_ID);
   logger.log('parms', logger.NO_CLIENT_ID, 'service:',
-             String(service).replace(/:[^:]+@/g, ':********@'));
+             String(service).replace(/:[^\/:]+@/g, ':********@'));
   logger.log('parms', logger.NO_CLIENT_ID, 'id:', id);
   logger.log('parms', logger.NO_CLIENT_ID, 'securityOptions:',
              securityOptions.toString());
@@ -662,9 +498,430 @@ var Client = function(service, id, securityOptions) {
       serviceFunction = getFileServiceFunction(serviceUrl.path);
     }
   }
+
+  // Add generateServiceList function to client with embedded securityOptions
+  // FIXME: change NO_CLIENT_ID to client.id
+  this.generateServiceList = function(service) {
+    //var client = this;
+    logger.entry('generateServiceList', logger.NO_CLIENT_ID);
+    logger.log('parms', logger.NO_CLIENT_ID, 'service:',
+        String(service).replace(/:[^\/:]+@/g, ':********@'));
+    logger.log('parms', logger.NO_CLIENT_ID, 'securityOptions:',
+               securityOptions.toString());
+  
+    var err;
+  
+    // Ensure the service is an Array
+    var inputServiceList = [];
+    if (!service) {
+      err = new Error('service is undefined');
+      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+      throw err;
+    } else if (service instanceof Function) {
+      err = new TypeError('service cannot be a function');
+      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+      throw err;
+    } else if (service instanceof Array) {
+      if (service.length === 0) {
+        err = new Error('service array is empty');
+        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+        throw err;
+      }
+      inputServiceList = service;
+    } else if (typeof service === 'string') {
+      inputServiceList[0] = service;
+    } else {
+      err = new TypeError('service must be a string or array type');
+      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+      throw err;
+    }
+  
+    /*
+     * Validate the list of URLs for the service, inserting default values as
+     * necessary Expected format for each URL is: amqp://host:port or
+     * amqps://host:port (port is optional, defaulting to 5672 or 5671 as
+     * appropriate)
+    */
+    var serviceList = [];
+    var authUser, authPassword;
+  
+    for (var i = 0; i < inputServiceList.length; i++) {
+      var serviceUrl = url.parse(inputServiceList[i]);
+      var protocol = serviceUrl.protocol;
+      var msg;
+  
+      // check for auth details
+      var auth = serviceUrl.auth;
+      authUser = undefined;
+      authPassword = undefined;
+      if (auth) {
+        if (auth.indexOf(':') >= 0) {
+          authUser = String(auth).slice(0, auth.indexOf(':'));
+          authPassword = String(auth).slice(auth.indexOf(':')+1);
+        } else {
+          msg = "URLs supplied via the 'service' property must specify both a" +
+                ' user name and a password value, or omit both values';
+          err = new Error(msg);
+          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          throw err;
+        }
+        if (securityOptions.propertyUser && authUser &&
+            (securityOptions.propertyUser !== authUser)) {
+          msg = "User name supplied as 'user' property (" +
+                securityOptions.propertyUser + ') does not match user name ' +
+                "supplied via a URL passed via the 'service' property (" +
+                authUser + ')';
+          err = new Error(msg);
+          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          throw err;
+        }
+        if (securityOptions.propertyPassword && authPassword &&
+            (securityOptions.propertyPassword !== authPassword)) {
+          msg = "Password supplied as 'password' property does not match a " +
+                "password supplied via a URL passed via the 'service' property";
+          err = new Error(msg);
+          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          throw err;
+        }
+        if (i === 0) {
+          securityOptions.urlUser = authUser;
+          securityOptions.urlPassword = authPassword;
+        }
+      }
+  
+      // Check whatever URL user names / passwords are present this time
+      // through the loop - match the ones set on securityOptions by the first
+      // pass through the loop.
+      if (i > 0) {
+        if (securityOptions.urlUser !== authUser) {
+          msg = "URLs supplied via the 'service' property contain " +
+                'inconsistent user names';
+          err = new Error(msg);
+          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          throw err;
+        } else if (securityOptions.urlPassword !== authPassword) {
+          msg = "URLs supplied via the 'service' property contain " +
+                'inconsistent password values';
+          err = new Error(msg);
+          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          throw err;
+        }
+      }
+  
+      // Check we are trying to use the amqp protocol
+      if (!protocol || protocol !== 'amqp:' && protocol !== 'amqps:') {
+        msg = "Unsupported URL '" + inputServiceList[i] +
+              "' specified for service. Only the amqp or amqps protocol are " +
+              'supported.';
+        err = new Error(msg);
+        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+        throw err;
+      }
+      // Check we have a hostname
+      var host = serviceUrl.hostname;
+      if (!host) {
+        msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
+              'service. Must supply a hostname.';
+        err = new Error(msg);
+        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+        throw err;
+      }
+      // Set default port if not supplied
+      var port = serviceUrl.port;
+      if (!port) {
+        port = (protocol === 'amqp:') ? '5672' : '5671';
+      }
+      // Check for no path
+      var path = serviceUrl.path;
+      if (path) {
+        msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
+              " ) can't be part of a service URL.";
+        err = new Error(msg);
+        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+        throw err;
+      }
+  
+      serviceList[i] = protocol + '//' + host + ':' + port;
+    }
+  
+    logger.exit('generateServiceList', logger.NO_CLIENT_ID,
+                [
+                  'serviceList:',
+                  String(serviceList).replace(/:[^\/:]+@/g, ':********@'),
+                  'securityOptions:', securityOptions.toString()
+                ]);
+    return serviceList;
+  };
+
   if (!serviceFunction) {
-    serviceList = generateServiceList(service, securityOptions);
+    serviceList = this.generateServiceList(service);
   }
+
+  // performs the connect
+  this.performConnect = function(callback) {
+    var client = this;
+    logger.entry('Client.connect.performConnect', client.id);
+
+    var currentState = client.state;
+    // if we are not disconnected or disconnecting return with the client object
+    if (currentState !== 'disconnected' && currentState !== 'retrying') {
+      if (currentState === 'disconnecting') {
+        var stillDisconnecting = function(client, callback) {
+          logger.entry('stillDisconnecting', client.id);
+      
+          if (client.state === 'disconnecting') {
+            setImmediate(function() {
+              stillDisconnecting(client, callback);
+            });
+          } else {
+            process.nextTick(function() {
+              client.performConnect(callback);
+            });
+          }
+      
+          logger.exit('stillDisconnecting', client.id, null);
+        };
+
+        setImmediate(function() {
+          stillDisconnecting(client, callback);
+        });
+        logger.exit('Client.connect.performConnect', client.id, null);
+        return;
+      } else {
+        process.nextTick(function() {
+          if (callback) {
+            logger.entry('Client.connect.performConnect.callback', client.id);
+            callback(undefined);
+            logger.exit('Client.connect.performConnect.callback',
+                        client.id, null);
+          }
+        });
+
+        logger.exit('Client.connect.performConnect', client.id, client);
+        return client;
+      }
+    }
+
+    if (client.state === 'disconnected') {
+      client.state = 'connecting';
+    }
+
+    // Obtain the list of services for connect and connect to one of the
+    // services, retrying until a connection can be established
+    var serviceList;
+    if (client.serviceFunction instanceof Function) {
+      client.serviceFunction(function(err, service) {
+        if (err) {
+          logger.entry('Client.connect.performConnect.serviceFunction.callback',
+                       client.id);
+          callback.apply(client, [err]);
+          logger.exit('Client.connect.performConnect.serviceFunction.callback',
+              client.id, null);
+        } else {
+          try {
+            serviceList =
+                client.generateServiceList(service);
+            client.connectToService(serviceList, callback);
+          } catch (err) {
+            var name = 'Client.connect.performConnect.serviceFunction.callback';
+            logger.entry(name, client.id);
+            callback.apply(client, [err]);
+            logger.exit(name, client.id, null);
+          }
+        }
+      });
+    } else {
+      try {
+        serviceList = client.generateServiceList(service);
+        client.connectToService(serviceList, callback);
+      } catch (err) {
+        if (callback) {
+          process.nextTick(function() {
+            logger.entry('Client.connect.performConnect.callback', client.id);
+            callback.apply(client, [err]);
+            logger.exit('Client.connect.performConnect.callback', client.id,
+                        null);
+          });
+        }
+      }
+    }
+
+    logger.exit('Client.connect.performConnect', client.id, null);
+    return;
+  };
+
+  /**
+  * Function to connect to the service, trys each available service
+  * in turn. If none can connect it emits an error, waits and
+  * attempts to connect again. Callback happens once a successful
+  * connect/reconnect occurs.
+  * @constructor
+  * @param {Array} serviceList list of services to connect to.
+  * @param {connectCallback}
+  *  - callback called when connect/reconnect happens
+  */
+  this.connectToService = function(serviceList, callback) {
+    var client = this;
+    logger.entry('Client.connectToService', client.id);
+  
+    if (client.state === 'disconnecting' ||
+        client.state === 'disconnected') {
+      if (callback) {
+        logger.entry('Client.connectToService.callback', client.id);
+        callback(new Error('connect aborted due to disconnect'));
+        logger.exit('Client.connectToService.callback', client.id, null);
+      }
+      logger.exit('Client.connectToService', client.id, null);
+      return;
+    }
+  
+    var connected = false;
+    var error;
+  
+    // Try each service in turn until we can successfully connect, or exhaust
+    // the list
+    if (!error) {
+      for (var i = 0; i < serviceList.length; i++) {
+        try {
+          var service = serviceList[i];
+          // reparse the service url to prepend authentication information
+          // back on if required
+          var auth;
+          if (securityOptions.urlUser) {
+            auth = encodeURIComponent(String(securityOptions.urlUser));
+            auth += ':';
+            auth += encodeURIComponent(String(securityOptions.urlPassword));
+            auth += '@';
+          } else if (securityOptions.propertyUser) {
+            auth = encodeURIComponent(String(securityOptions.propertyUser));
+            auth += ':';
+            auth +=
+                encodeURIComponent(String(securityOptions.propertyPassword));
+            auth += '@';
+          } else {
+            auth = undefined;
+          }
+          var logUrl;
+          if (auth) {
+            var serviceUrl = url.parse(service);
+            service = serviceUrl.protocol + '//' + auth + serviceUrl.host;
+            logUrl = serviceUrl.protocol + '//' +
+                     auth.replace(/:[^\/:]+@/g, ':********@') +
+                     serviceUrl.host + ':' + serviceUrl.port;
+          } else {
+            logUrl = service;
+          }
+          logger.log('data', client.id, 'attempting to connect to: ' + logUrl);
+
+          var rc = client.messenger.connect(service,
+                                            securityOptions.sslTrustCertificate,
+                                            securityOptions.sslVerifyName);
+          if (rc) {
+            error = new Error(client.messenger.getLastErrorText());
+            logger.log('data', client.id, 'failed to connect to: ' + service +
+                ' due to error: ' + error);
+          } else {
+            logger.log('data', client.id, 'successfully connected to: ' +
+                service);
+            client.service = serviceList[i];
+            connected = true;
+            break;
+          }
+        } catch (err) {
+          console.error(err);
+          process.exit(1);
+          // Should not get here.
+          // Means that messenger.connect has been called in an invalid way
+          error = err;
+          logger.caught('Client.connectToService', client.id, err);
+          logger.ffdc('Client.connectToService', 'ffdc001', client.id, err);
+          logger.throw('Client.connectToService', client.id, err);
+          throw err;
+        }
+      }
+    }
+  
+    // If we've successfully connected then we're done, otherwise we'll retry
+    if (connected) {
+      // Indicate that we're connected
+      client.state = 'connected';
+      var statusClient;
+      if (client.firstConnect) {
+        statusClient = 'connected';
+        client.firstConnect = false;
+        //could be queued actions so need to process those here. On reconnect
+        //this would be done via the callback we set, first connect its the
+        //users callback so won't process anything.
+        logger.log('data', client.id, 'first connect since being disconnected');
+        processQueuedActions.apply(client);
+      } else {
+        statusClient = 'reconnected';
+      }
+  
+      process.nextTick(function() {
+        logger.log('emit', client.id, statusClient);
+        client.emit(statusClient);
+      });
+  
+      if (callback) {
+        process.nextTick(function() {
+          logger.entry('Client.connectToService.callback', client.id);
+          callback.apply(client);
+          logger.exit('Client.connectToService.callback', client.id, null);
+        });
+      }
+  
+      // Setup heartbeat timer to ensure that while connected we send heartbeat
+      // frames to keep the connection alive, when required.
+      var remoteIdleTimeout =
+          client.messenger.getRemoteIdleTimeout(client.service);
+      var heartbeatInterval = remoteIdleTimeout > 0 ?
+          remoteIdleTimeout / 2 : remoteIdleTimeout;
+      logger.log('data', client.id, 'set heartbeatInterval to: ',
+                 heartbeatInterval);
+      if (heartbeatInterval > 0) {
+        var performHeartbeat = function(client, heartbeatInterval) {
+          logger.entry('Client.connectToService.performHeartbeat', client.id);
+          if (client.messenger) {
+            client.messenger.work(0);
+            client.heartbeatTimeout = setTimeout(performHeartbeat,
+                heartbeatInterval, client, heartbeatInterval);
+          }
+          logger.exit('Client.connectToService.performHeartbeat', client.id);
+        };
+        client.heartbeatTimeout = setTimeout(performHeartbeat,
+                                             heartbeatInterval,
+                                             client, heartbeatInterval);
+      }
+  
+    } else {
+      // We've tried all services without success. Pause for a while before
+      // trying again
+      if (client.messenger && !client.messenger.stopped) {
+        client.messenger.stop();
+        if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
+      }
+      client.state = 'retrying';
+      var retry = function() {
+        logger.entryLevel('entry_often', 'retry', client.id);
+        client.performConnect.apply(client, [callback]);
+        logger.entryLevel('exit_often', 'retry', client.id);
+      };
+  
+      // TODO 10 seconds is an arbitrary value, need to review if this is
+      // appropriate. Timeout should be adjusted based on reconnect algo.
+      logger.log('data', client.id, 'trying to connect again ' +
+                 ((CONNECT_RETRY_INTERVAL >0) ? ('after ' +
+                  CONNECT_RETRY_INTERVAL / 1000 + ' seconds') : 'immediately'));
+      setTimeout(retry, CONNECT_RETRY_INTERVAL);
+      // XXX: should we even emit an error in this case? we're going to retry
+      logger.log('emit', client.id, 'error', error);
+      client.emit('error', error);
+    }
+  
+    logger.exit('Client.connectToService', client.id, null);
+    return;
+  };
 
   // If client id has not been specified then generate an id
   if (!id) id = 'AUTO_' + uuid.v4().substring(0, 7);
@@ -711,7 +968,7 @@ var Client = function(service, id, securityOptions) {
     }
   }
   if (securityOptions.sslTrustCertificate !== undefined) {
-    if (!(typeof securityOptions.sslTrustCertificate === 'string')) {
+    if (typeof securityOptions.sslTrustCertificate !== 'string') {
       err = new TypeError("sslTrustCertificate value '" +
                           securityOptions.sslTrustCertificate +
                           "' is invalid. Must be of type String");
@@ -740,27 +997,8 @@ var Client = function(service, id, securityOptions) {
   this.id = id;
 
   logger.entry('proton.createMessenger', this.id);
-  // Initialize ProtonMessenger with auth details
-  var usr, pw;
-  if (securityOptions.urlUser) {
-    // URI encode username and password before passing them to proton
-    usr = encodeURIComponent(String(securityOptions.urlUser));
-    pw = encodeURIComponent(String(securityOptions.urlPassword));
-    this.messenger = proton.createMessenger(id, usr, pw);
-  } else if (securityOptions.propertyUser) {
-    usr = encodeURIComponent(String(securityOptions.propertyUser));
-    pw = encodeURIComponent(String(securityOptions.propertyPassword));
-    this.messenger = proton.createMessenger(id, usr, pw);
-  } else {
-    this.messenger = proton.createMessenger(id);
-  }
+  this.messenger = proton.createMessenger(this.id);
   logger.exit('proton.createMessenger', this.id, null);
-
-  // Save the security options, but exclude the password
-  // as it will be cached in the messenger (and otherwise will be traced!).
-  securityOptions.propertyPassword = undefined;
-  securityOptions.urlPassword = undefined;
-  this.securityOptions = securityOptions;
 
   // Set the initial state to disconnected
   this.state = 'disconnected';
@@ -782,6 +1020,7 @@ var Client = function(service, id, securityOptions) {
   logger.exit('Client.constructor', this.id, this);
 };
 util.inherits(Client, EventEmitter);
+
 
 /**
  * @param {function(object)}
@@ -835,239 +1074,16 @@ Client.prototype.connect = function(callback) {
     throw err;
   }
 
-  // Performs the connect
-  var performConnect = function(client, callback) {
-    logger.entry('Client.connect.performConnect', client.id);
-
-    var currentState = client.state;
-    // if we are not disconnected or disconnecting return with the client object
-    if (currentState !== 'disconnected') {
-      if (currentState === 'disconnecting') {
-        setImmediate(function() {
-          stillDisconnecting(client, callback);
-        });
-
-        logger.exit('Client.connect.performConnect', client.id, null);
-        return;
-      } else {
-        process.nextTick(function() {
-          if (callback) {
-            logger.entry('Client.connect.performConnect.callback', client.id);
-            callback(undefined);
-            logger.exit('Client.connect.performConnect.callback',
-                        client.id, null);
-          }
-        });
-
-        logger.exit('Client.connect.performConnect', client.id, client);
-        return client;
-      }
-    }
-
-    client.state = 'connecting';
-
-    // Obtain the list of services for connect and connect to one of the
-    // services, retrying until a connection can be established
-    if (client.serviceFunction instanceof Function) {
-      client.serviceFunction(function(err, service) {
-        if (err) {
-          logger.entry('Client.connect.performConnect.serviceFunction.callback',
-                       client.id);
-          callback.apply(client, [err]);
-          logger.exit('Client.connect.performConnect.serviceFunction.callback',
-              client.id, null);
-        } else {
-          try {
-            client.serviceList =
-                generateServiceList(service, client.securityOptions);
-            client.connectToService(callback);
-          } catch (err) {
-            var name = 'Client.connect.performConnect.serviceFunction.callback';
-            logger.entry(name, client.id);
-            callback.apply(client, [err]);
-            logger.exit(name, client.id, null);
-          }
-        }
-      });
-    } else {
-      client.connectToService(callback);
-    }
-
-    logger.exit('Client.connect.performConnect', client.id, null);
-    return;
-  };
-
   var client = this;
 
-  var stillDisconnecting = function(client, callback) {
-    logger.entry('stillDisconnecting', client.id);
-
-    if (client.state === 'disconnecting') {
-      setImmediate(function() {
-        stillDisconnecting(client, callback);
-      });
-    } else {
-      process.nextTick(function() {
-        performConnect(client, callback);
-      });
-    }
-
-    logger.exit('stillDisconnecting', client.id, null);
-  };
-
   process.nextTick(function() {
-    performConnect(client, callback);
+    client.performConnect(callback);
   });
 
   logger.exit('Client.connect', client.id, client);
   return client;
 };
 
-
-/**
-* Function to connect to the service, trys each available service
-* in turn. If none can connect it emits an error, waits and
-* attempts to connect again. Callback happens once a successful
-* connect/reconnect occurs.
-* @param {connectCallback}
-*  - callback called when connect/reconnect happens
-*/
-Client.prototype.connectToService = function(callback) {
-  var client = this;
-  logger.entry('Client.connectToService', client.id);
-
-  if (client.state === 'disconnecting' ||
-      client.state === 'disconnected') {
-    if (callback) {
-      logger.entry('Client.connectToService.callback', client.id);
-      callback(new Error('connect aborted due to disconnect'));
-      logger.exit('Client.connectToService.callback', client.id, null);
-    }
-    logger.exit('Client.connectToService', client.id, null);
-    return;
-  }
-
-  var connected = false;
-  var error;
-
-  // Try each service in turn until we can successfully connect, or exhaust
-  // the list
-  var serviceList = client.serviceList;
-  if (!error) {
-    for (var i = 0; i < serviceList.length; i++) {
-      try {
-        var service = serviceList[i];
-        logger.log('data', client.id, 'attempting connect to: ' + service);
-        var rc = client.messenger.connect(service,
-            client.securityOptions.sslTrustCertificate,
-            client.securityOptions.sslVerifyName);
-        if (rc) {
-          error = new Error(client.messenger.getLastErrorText());
-          logger.log('data', client.id, 'failed to connect to: ' + service +
-              ' due to error: ' + error);
-        } else {
-          logger.log('data', client.id, 'successfully connected to: ' +
-              service);
-          client.service = service;
-          connected = true;
-          break;
-        }
-      } catch (err) {
-        // Should not get here.
-        // Means that messenger.connect has been called in an invalid way
-        error = err;
-        logger.caught('Client.connectToService', client.id, err);
-        logger.ffdc('Client.connectToService', 'ffdc001', client.id, err);
-        logger.throw('Client.connectToService', client.id, err);
-        throw err;
-      }
-    }
-  }
-
-  // If we've successfully connected then we're done, otherwise we'll retry
-  if (connected) {
-    // Indicate that we're connected
-    client.state = 'connected';
-    var statusClient;
-    if (client.firstConnect) {
-      statusClient = 'connected';
-      client.firstConnect = false;
-      //could be queued actions so need to process those here. On reconnect
-      //this would be done via the callback we set, first connect its the
-      //users callback so won't process anything.
-      logger.log('data', client.id, 'first connect since being disconnected');
-      processQueuedActions.apply(client);
-    } else {
-      statusClient = 'reconnected';
-    }
-
-    process.nextTick(function() {
-      logger.log('emit', client.id, statusClient);
-      client.emit(statusClient);
-    });
-
-    if (callback) {
-      process.nextTick(function() {
-        logger.entry('Client.connectToService.callback', client.id);
-        callback.apply(client);
-        logger.exit('Client.connectToService.callback', client.id, null);
-      });
-    }
-
-    // Setup heartbeat timer to ensure that while connected we send heartbeat
-    // frames to keep the connection alive, when required.
-    var remoteIdleTimeout =
-        client.messenger.getRemoteIdleTimeout(client.service);
-    var heartbeatInterval = remoteIdleTimeout > 0 ?
-        remoteIdleTimeout / 2 : remoteIdleTimeout;
-    logger.log('data', client.id, 'set heartbeatInterval to: ',
-               heartbeatInterval);
-    if (heartbeatInterval > 0) {
-      var performHeartbeat = function(client, heartbeatInterval) {
-        logger.entry('Client.connectToService.performHeartbeat', client.id);
-        if (client.messenger) {
-          client.messenger.work(0);
-          client.heartbeatTimeout = setTimeout(performHeartbeat,
-              heartbeatInterval, client, heartbeatInterval);
-        }
-        logger.exit('Client.connectToService.performHeartbeat', client.id);
-      };
-      client.heartbeatTimeout = setTimeout(performHeartbeat, heartbeatInterval,
-          client, heartbeatInterval);
-    }
-
-  } else {
-    // We've tried all services without success. Pause for a while before
-    // trying again
-    // TODO 10 seconds is an arbitrary value, need to review if this is
-    // appropriate. Timeout should be adjusted based on reconnect algo.
-    logger.log('emit', client.id, 'error', error);
-    client.emit('error', error);
-    client.state = 'retrying';
-    logger.log('data', client.id, 'trying connect again after 10 seconds');
-    var retry = function() { client.connectToService(callback); };
-
-    // if client is using serviceFunction, re-generate the list of services
-    // TODO: merge these copy & paste
-    if (client.serviceFunction instanceof Function) {
-      client.serviceFunction(function(err, service) {
-        if (err) {
-          logger.log('emit', client.id, 'error', err);
-          client.emit('error', err);
-        } else {
-          client.serviceList =
-              generateServiceList(service, client.securityOptions);
-          setTimeout(retry, CONNECT_RETRY_INTERVAL);
-        }
-      });
-    } else {
-      setTimeout(retry, CONNECT_RETRY_INTERVAL);
-    }
-  }
-
-  logger.exit('Client.connectToService', client.id, null);
-  return;
-};
 
 /**
  * @param {function(object)}
@@ -1198,7 +1214,7 @@ Client.prototype.disconnect = function(callback) {
  * @return {Object} The instance of client that it is invoked on - allowing
  *          for chaining of other method calls on the client object.
  */
-function reconnect(client){
+function reconnect(client) {
   logger.entry('Client.reconnect', client.id);
   if (client.state !== 'connected') {
     if (client.isDisconnected()) {
@@ -1227,26 +1243,7 @@ function reconnect(client){
   while (client.outstandingSends.length > 0) {
     client.outstandingSends.pop();
   }
-
-  // if client is using serviceFunction, re-generate the list of services
-  // TODO: merge these copy & paste
-  if (client.serviceFunction instanceof Function) {
-    client.serviceFunction(function(err, service) {
-      if (err) {
-        logger.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      } else {
-        setImmediate(function() {
-          client.serviceList = generateServiceList(service);
-          client.connectToService.apply(client, [processQueuedActions]);
-        });
-      }
-    });
-  } else {
-    setImmediate(function() {
-      client.connectToService.apply(client, [processQueuedActions]);
-    });
-  }
+  client.performConnect.apply(client, [processQueuedActions]);
 
   logger.exit('Client.reconnect', client.id, client);
   return client;
@@ -1258,25 +1255,32 @@ function reconnect(client){
 * actions that may have been queued.
 * @this should be set to the client object that has
 * connected or reconnected
+*
+* @param {Error} err if an error occurred in the performConnect function that
+* calls this callback.
 */
-var processQueuedActions = function() {
-  //this set to the appropriate client via apply call in connectToService
+var processQueuedActions = function(err) {
+  // this set to the appropriate client via apply call in performConnect
   var client = this;
-  if ( client === undefined || !(client.constructor === Client) ){
+  if (client === undefined || client.constructor !== Client) {
     logger.entry('processQueuedActions', 'client was not set');
     logger.exit('processQueuedActions', 'client not set returning');
     return;
   }
   logger.entry('processQueuedActions', client.id);
-  while (client.queuedSubscriptions.length > 0 &&
-          client.state === 'connected') {
-    var sub = client.queuedSubscriptions.pop();
-    client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
-  }
-  while (client.queuedSends.length > 0 &&
-          client.state === 'connected') {
-    var msg = client.queuedSends.pop();
-    client.send(msg.topic, msg.data, msg.options, msg.callback);
+  logger.log('parms', client.id, 'err:', err);
+
+  if (!err) {
+    while (client.queuedSubscriptions.length > 0 &&
+            client.state === 'connected') {
+      var sub = client.queuedSubscriptions.pop();
+      client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
+    }
+    while (client.queuedSends.length > 0 &&
+            client.state === 'connected') {
+      var msg = client.queuedSends.pop();
+      client.send(msg.topic, msg.data, msg.options, msg.callback);
+    }
   }
   logger.exit('processQueuedActions', client.id);
 };
@@ -1303,7 +1307,8 @@ Object.defineProperty(Client, 'id', {
  */
 Object.defineProperty(Client, 'service', {
   get: function() {
-    return this.state === 'connected' ? this.service : undefined;
+    return this.state === 'connected' ?
+        this.service : undefined;
   }
 });
 
