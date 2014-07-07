@@ -29,6 +29,7 @@ var fs = require('fs');
 var types = {
   service: String,
   topic: String,
+  id: String,
   'message-ttl': Number,
   delay: Number,
   file: String
