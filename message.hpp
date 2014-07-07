@@ -39,46 +39,48 @@
 #include <proton/message.h>
 #include <proton/messenger.h>
 
-class ProtonMessage : public node::ObjectWrap {
-public:
-    static v8::Persistent<v8::FunctionTemplate> constructor;
-    static void Init(v8::Handle<v8::Object> target);
-    static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
-    ProtonMessage();
-    ~ProtonMessage();
+class ProtonMessage : public node::ObjectWrap
+{
+ public:
+  static v8::Persistent<v8::FunctionTemplate> constructor;
+  static void Init(v8::Handle<v8::Object> target);
+  static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
+  ProtonMessage();
+  ~ProtonMessage();
 
-    pn_message_t *message;
-    pn_tracker_t tracker;
-    const char *linkAddr;
-    char name[24];
+  pn_message_t* message;
+  pn_tracker_t tracker;
+  const char* linkAddr;
+  char name[24];
 
-protected:
-    static v8::Handle<v8::Value> New(const v8::Arguments &args);
-    static v8::Handle<v8::Value> Destroy(const v8::Arguments& args);
-    static v8::Handle<v8::Value> GetAddress(v8::Local<v8::String> property,
-                                            const v8::AccessorInfo &args);
-    static void SetAddress(v8::Local<v8::String> property,
-                           v8::Local<v8::Value> value,
-                           const v8::AccessorInfo &args);
-    static v8::Handle<v8::Value> GetBody(v8::Local<v8::String> property,
-                                         const v8::AccessorInfo &args);
-    static void PutBody(v8::Local<v8::String> property,
-                        v8::Local<v8::Value> value,
-                        const v8::AccessorInfo &args);
-    static v8::Handle<v8::Value> GetContentType(v8::Local<v8::String> property,
-                                                const v8::AccessorInfo &args);
-    static void SetContentType(v8::Local<v8::String> property,
-                               v8::Local<v8::Value> value,
-                               const v8::AccessorInfo &args);
-    static v8::Handle<v8::Value> GetLinkAddress(v8::Local<v8::String> property,
-                                                const v8::AccessorInfo &args);
-    static v8::Handle<v8::Value> GetDeliveryAnnotations(v8::Local<v8::String> property,
-                                                        const v8::AccessorInfo &info);
-    static v8::Handle<v8::Value> GetTimeToLive(v8::Local<v8::String> property,
-                                               const v8::AccessorInfo &args);
-    static void SetTimeToLive(v8::Local<v8::String> property,
-                              v8::Local<v8::Value> value,
-                              const v8::AccessorInfo &args);
+ protected:
+  static v8::Handle<v8::Value> New(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Destroy(const v8::Arguments& args);
+  static v8::Handle<v8::Value> GetAddress(v8::Local<v8::String> property,
+                                          const v8::AccessorInfo& args);
+  static void SetAddress(v8::Local<v8::String> property,
+                         v8::Local<v8::Value> value,
+                         const v8::AccessorInfo& args);
+  static v8::Handle<v8::Value> GetBody(v8::Local<v8::String> property,
+                                       const v8::AccessorInfo& args);
+  static void PutBody(v8::Local<v8::String> property,
+                      v8::Local<v8::Value> value,
+                      const v8::AccessorInfo& args);
+  static v8::Handle<v8::Value> GetContentType(v8::Local<v8::String> property,
+                                              const v8::AccessorInfo& args);
+  static void SetContentType(v8::Local<v8::String> property,
+                             v8::Local<v8::Value> value,
+                             const v8::AccessorInfo& args);
+  static v8::Handle<v8::Value> GetLinkAddress(v8::Local<v8::String> property,
+                                              const v8::AccessorInfo& args);
+  static v8::Handle<v8::Value> GetDeliveryAnnotations(
+      v8::Local<v8::String> property,
+      const v8::AccessorInfo& info);
+  static v8::Handle<v8::Value> GetTimeToLive(v8::Local<v8::String> property,
+                                             const v8::AccessorInfo& args);
+  static void SetTimeToLive(v8::Local<v8::String> property,
+                            v8::Local<v8::Value> value,
+                            const v8::AccessorInfo& args);
 };
 
 #endif /* MESSAGE_HPP */
