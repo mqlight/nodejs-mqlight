@@ -706,10 +706,12 @@ var Client = function(service, id, securityOptions) {
       client.state = 'connecting';
     }
 
-    // stop the messenger to free the object if its still around
+    // If the messenger is not already stopped then something has gone wrong
     if (client.messenger && !client.messenger.stopped) {
-      client.messenger.stop();
-      if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
+      var err = new Error('messenger is not stopped');
+      logger.ffdc('Client.connect.performConnect', 'ffdc002', client.id, err);
+      logger.throw('Client.connect.performConnect', client.id, err);
+      throw err;
     }
 
     // Obtain the list of services for connect and connect to one of the
@@ -1092,6 +1094,52 @@ Client.prototype.connect = function(callback) {
 
 /**
  * @param {function(object)}
+ *          stopProcessingCallback - callback to perform post stop processing.
+ * @param {client} client - the client object to stop the messenger for.
+ * @param {callback}
+ *          callback, passed an error object if something goes wrong.
+ */
+
+
+/**
+ * Stops the messenger.  The messenger stop function merely requests it to stop,
+ * so we need to keep checking until it is actually stopped. Then any post
+ * stop processing can be performed.
+ *
+ * @param {client} client - the client object to stop the messenger for.
+ * @param {stopProcessingCallback}
+ *          stopProcessingCallback - Function to perform the required post stop
+ *          processing.
+ * @param {callback}
+ *          callback - (optional) The application callback to be notified of
+ *          errors and completion (passed to the stopProcessingCallback).
+ */
+var stopMessenger = function(client, stopProcessingCallback, callback) {
+  logger.entry('stopMessenger', client.id);
+  
+  var stopped = true;
+  
+  // If messenger available then request it to stop
+  // (otherwise it must have already been stopped)
+  if (client.messenger) {
+    stopped = client.messenger.stop();
+  }
+  
+  // If stopped then perform the required stop processing
+  if (stopped) {
+    stopProcessingCallback(client, callback);
+    
+  // Otherwise check for the messenger being stopped again
+  } else {
+    setImmediate(stopMessenger, client, stopProcessingCallback, callback);
+  }
+  
+  logger.exit('stopMessenger', client.id, null);
+};
+
+
+/**
+ * @param {function(object)}
  *          disconnectCallback - callback, passed an error object if something
  *          goes wrong.
  * @param {String}
@@ -1135,39 +1183,44 @@ Client.prototype.disconnect = function(callback) {
 
     // Only disconnect when all outstanding send operations are complete
     if (client.outstandingSends.length === 0) {
-      var messenger = client.messenger;
-      if (messenger && !messenger.stopped) {
-        messenger.stop();
+      stopMessenger(client, function(client, callback) {
+        logger.entry('Client.disconnect.performDisconnect.stopProcessing',
+            client.id);
+
         if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
-      }
-      //clear queuedSends as we are disconnecting
-      while (client.queuedSends.length > 0) {
-        var msg = client.queuedSends.pop();
-        //call the callback in error as we have disconnected
+    
+        // clear queuedSends as we are disconnecting
+        while (client.queuedSends.length > 0) {
+          var msg = client.queuedSends.pop();
+          // call the callback in error as we have disconnected
+          process.nextTick(function() {
+            logger.entry('Client.disconnect.performDisconnect.'+
+                'stopProcessing.queuedSendCallback', client.id);
+            msg.callback(new Error('send aborted due to disconnect'));
+            logger.exit('Client.disconnect.performDisconnect.'+
+                'stopProcessing.queuedSendCallback', client.id, null);
+          });
+        }
+        // Indicate that we've disconnected
+        client.state = 'disconnected';
         process.nextTick(function() {
-          logger.entry('Client.disconnect.performDisconnect.queuedSendCallback',
-              client.id);
-          msg.callback(new Error('send aborted due to disconnect'));
-          logger.exit('Client.disconnect.performDisconnect.queuedSendCallback',
-              client.id, null);
+          logger.log('emit', client.id, 'disconnected');
+          client.emit('disconnected');
+          client.firstConnect = true;
         });
-      }
-      // Indicate that we've disconnected
-      client.state = 'disconnected';
-      process.nextTick(function() {
-        logger.log('emit', client.id, 'disconnected');
-        client.emit('disconnected');
-        client.firstConnect = true;
-      });
-      if (callback) {
-        process.nextTick(function() {
-          logger.entry('Client.disconnect.performDisconnect.callback',
-                       client.id);
-          callback.apply(client);
-          logger.exit('Client.disconnect.performDisconnect.callback', client.id,
-                      null);
-        });
-      }
+        if (callback) {
+          process.nextTick(function() {
+            logger.entry('Client.disconnect.performDisconnect.stopProcessing.'+
+                'callback', client.id);
+            callback.apply(client);
+            logger.exit('Client.disconnect.performDisconnect.stopProcessing.'+
+                'callback', client.id, null);
+          });
+        }
+        
+        logger.exit('Client.disconnect.performDisconnect.stopProcessing',
+            client.id, null);
+      }, callback);
 
       logger.exit('Client.disconnect.performDisconnect', client.id, null);
       return;
@@ -1238,23 +1291,26 @@ function reconnect(client) {
   client.state = 'retrying';
 
   // stop the messenger to free the object then attempt a reconnect
-  var messenger = client.messenger;
-  if (messenger && !messenger.stopped) {
-    messenger.stop();
+  stopMessenger(client, function(client) {
+    logger.entry('Client.reconnect.stopProcessing', client.id);
+    
     if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
-  }
-
-  // clear the subscriptions list, if the cause of the reconnect happens during
-  // check for messages we need a 0 length so it will check once reconnected.
-  while (client.subscriptions.length > 0) {
-    client.queuedSubscriptions.push(client.subscriptions.pop());
-  }
-  // also clear any left over outstanding sends
-  while (client.outstandingSends.length > 0) {
-    client.outstandingSends.pop();
-  }
-  client.performConnect.apply(client, [processQueuedActions]);
-
+        
+    // clear the subscriptions list, if the cause of the reconnect happens
+    // during check for messages we need a 0 length so it will check once
+    //reconnected.
+    while (client.subscriptions.length > 0) {
+      client.queuedSubscriptions.push(client.subscriptions.pop());
+    }
+    // also clear any left over outstanding sends
+    while (client.outstandingSends.length > 0) {
+      client.outstandingSends.pop();
+    }
+    client.performConnect.apply(client, [processQueuedActions]);
+    
+    logger.exit('Client.reconnect.stopProcessing', client.id, null);
+  });
+  
   logger.exit('Client.reconnect', client.id, client);
   return client;
 }

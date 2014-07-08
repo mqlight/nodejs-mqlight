@@ -140,9 +140,18 @@ module.exports.createProtonStub = function() {
         // if (DEBUG) console.log('stub receive function called');
         return [];
       },
+      stopCount: 2,
       stop: function() {
         if (DEBUG) console.log('stub stop function called');
-        this.stopped = true;
+        if (!this.stopped) {
+          this.stopCount--;
+          if (this.stopCount == 0) {
+            this.stopped = true;
+            this.stopCount = 2;
+          }
+        }
+        if (DEBUG) console.log('stub stop function returning: '+this.stopped);
+        return this.stopped;
       },
       put: function() {
         if (DEBUG) console.log('stub put function called');

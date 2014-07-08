@@ -504,22 +504,29 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args)
 
   Proton::Entry("ProtonMessenger::Stop", name);
 
-  // throw exception if not connected
+  // If already stopped then simply return true
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Stop", name);
+    Proton::Exit("ProtonMessenger::Stop", name, true);
+    return scope.Close(Boolean::New(true));
   }
 
   Proton::Entry("pn_messenger_stop", name);
-  pn_messenger_stop(obj->messenger);
-  Proton::Exit("pn_messenger_stop", name, 0);
+  int err = pn_messenger_stop(obj->messenger);
+  Proton::Exit("pn_messenger_stop", name, err);
 
-  Proton::Entry("pn_messenger_free", name);
-  pn_messenger_free(obj->messenger);
-  Proton::Exit("pn_messenger_free", name, 0);
-  obj->messenger = NULL;
+  Proton::Entry("pn_messenger_stopped", name);
+  bool stopped = pn_messenger_stopped(obj->messenger);
+  Proton::Exit("pn_messenger_stopped", name, stopped);
 
-  Proton::Exit("ProtonMessenger::Stop", name, 0);
-  return scope.Close(Boolean::New(true));
+  if (stopped) {
+    Proton::Entry("pn_messenger_free", name);
+    pn_messenger_free(obj->messenger);
+    Proton::Exit("pn_messenger_free", name, 0);
+    obj->messenger = NULL;
+  }
+
+  Proton::Exit("ProtonMessenger::Stop", name, stopped);
+  return scope.Close(Boolean::New(stopped));
 }
 
 Handle<Value> ProtonMessenger::Stopped(Local<String> property,
