@@ -156,6 +156,12 @@ Object type when received.
   *  **qos**, (Number) The quality of service to use when sending the message.
      0 is used to denote at most once (the default) and 1 is used for at least
      once.
+  *  **ttl**, (Number) A time to live value for the message in milliseconds.
+     MQ Light will endeavour to discard, without delivering, any copy of this
+     message that has not been delivered within its time to live time value.
+     The value supplied for this argument must be greater than zero and finite,
+     otherwise a TypeError will be thrown when this method is called.  If this
+     property is omitted then a default of 7 days will be assumed.
 * `callback` - (Function) (optional) callback to be notified of errors &
   completion
 
@@ -186,6 +192,23 @@ message will be delivered to a particular `Destination`, and hence
   *  **qos**, (Number) The quality of service to use for delivering messages to
      the subscription.  Valid values are: 0 to denote at most once (the default)
      and 1 is used for at least once.
+  *  **ttl**, (Number) The time-to-live, in milliseconds, for the destination
+     corresponding to this subscription.  If the destination already exists
+     then this value will replace any existing time to live value associated
+     with the destination.  If the destination does not already exist then it
+     will be created with this time to live value.  The time to live timer
+     starts counting down when there are no subscriptions open against a
+     destination and is reset each time a new subscription is established.  If
+     the time to live timer, for a subscription, reaches zero then the MQ Light
+     listener will delete the destination by discarding any messages held at
+     the destination and removing the definition of the destination (so no
+     further messages will be accrued for the destination).  The value must
+     evaluate to being greater than or equal to zero otherwise a TypeError will
+     be thrown by this method.  If the value specified exceeds the maximum time
+     to live value that the MQ Light listener will accept for a destination
+     then the `client.subscribe(...)` method will behave as if the maximum
+     value was specified.  If this property is not specified then a value of 0
+     is assumed.
 * `callback` - (Function) callback to be notified of errors & completion.
 
 Returns the `Client` object that the subscribe was called on.  `message` events
