@@ -818,8 +818,8 @@ var Client = function(service, id, securityOptions) {
                                             securityOptions.sslVerifyName);
           if (rc) {
             error = new Error(client.messenger.getLastErrorText());
-            logger.log('data', client.id, 'failed to connect to: ' + service +
-                ' due to error: ' + error);
+            logger.log('data', client.id, 'failed to connect to: ' + logUrl +
+                       ' due to error: ' + error);
           } else {
             logger.log('data', client.id, 'successfully connected to: ' +
                 service);
