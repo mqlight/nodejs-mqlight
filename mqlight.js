@@ -50,10 +50,6 @@ if (process.env.NODE_ENV === 'unittest') {
       return proton;
     }
   });
-  /**
-  * exported for unittest purposes
-  */
-  exports.reconnect = reconnect;
 } else {
   try {
     var proton = require('./lib/' + _system + '/proton');
@@ -500,13 +496,12 @@ var Client = function(service, id, securityOptions) {
   }
 
   // Add generateServiceList function to client with embedded securityOptions
-  // FIXME: change NO_CLIENT_ID to client.id
   this.generateServiceList = function(service) {
-    //var client = this;
-    logger.entry('generateServiceList', logger.NO_CLIENT_ID);
-    logger.log('parms', logger.NO_CLIENT_ID, 'service:',
+    var client = this;
+    logger.entry('generateServiceList', client.id);
+    logger.log('parms', client.id, 'service:',
         String(service).replace(/:[^\/:]+@/g, ':********@'));
-    logger.log('parms', logger.NO_CLIENT_ID, 'securityOptions:',
+    logger.log('parms', client.id, 'securityOptions:',
                securityOptions.toString());
   
     var err;
@@ -515,16 +510,16 @@ var Client = function(service, id, securityOptions) {
     var inputServiceList = [];
     if (!service) {
       err = new Error('service is undefined');
-      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+      logger.throw('generateServiceList', client.id, err);
       throw err;
     } else if (service instanceof Function) {
       err = new TypeError('service cannot be a function');
-      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+      logger.throw('generateServiceList', client.id, err);
       throw err;
     } else if (service instanceof Array) {
       if (service.length === 0) {
         err = new Error('service array is empty');
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+        logger.throw('generateServiceList', client.id, err);
         throw err;
       }
       inputServiceList = service;
@@ -532,7 +527,7 @@ var Client = function(service, id, securityOptions) {
       inputServiceList[0] = service;
     } else {
       err = new TypeError('service must be a string or array type');
-      logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+      logger.throw('generateServiceList', client.id, err);
       throw err;
     }
   
@@ -562,7 +557,7 @@ var Client = function(service, id, securityOptions) {
           msg = "URLs supplied via the 'service' property must specify both a" +
                 ' user name and a password value, or omit both values';
           err = new Error(msg);
-          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          logger.throw('generateServiceList', client.id, err);
           throw err;
         }
         if (securityOptions.propertyUser && authUser &&
@@ -572,7 +567,7 @@ var Client = function(service, id, securityOptions) {
                 "supplied via a URL passed via the 'service' property (" +
                 authUser + ')';
           err = new Error(msg);
-          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          logger.throw('generateServiceList', client.id, err);
           throw err;
         }
         if (securityOptions.propertyPassword && authPassword &&
@@ -580,7 +575,7 @@ var Client = function(service, id, securityOptions) {
           msg = "Password supplied as 'password' property does not match a " +
                 "password supplied via a URL passed via the 'service' property";
           err = new Error(msg);
-          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          logger.throw('generateServiceList', client.id, err);
           throw err;
         }
         if (i === 0) {
@@ -597,13 +592,13 @@ var Client = function(service, id, securityOptions) {
           msg = "URLs supplied via the 'service' property contain " +
                 'inconsistent user names';
           err = new Error(msg);
-          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          logger.throw('generateServiceList', client.id, err);
           throw err;
         } else if (securityOptions.urlPassword !== authPassword) {
           msg = "URLs supplied via the 'service' property contain " +
                 'inconsistent password values';
           err = new Error(msg);
-          logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+          logger.throw('generateServiceList', client.id, err);
           throw err;
         }
       }
@@ -614,7 +609,7 @@ var Client = function(service, id, securityOptions) {
               "' specified for service. Only the amqp or amqps protocol are " +
               'supported.';
         err = new Error(msg);
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+        logger.throw('generateServiceList', client.id, err);
         throw err;
       }
       // Check we have a hostname
@@ -623,7 +618,7 @@ var Client = function(service, id, securityOptions) {
         msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
               'service. Must supply a hostname.';
         err = new Error(msg);
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+        logger.throw('generateServiceList', client.id, err);
         throw err;
       }
       // Set default port if not supplied
@@ -637,14 +632,14 @@ var Client = function(service, id, securityOptions) {
         msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
               " ) can't be part of a service URL.";
         err = new Error(msg);
-        logger.throw('generateServiceList', logger.NO_CLIENT_ID, err);
+        logger.throw('generateServiceList', client.id, err);
         throw err;
       }
   
       serviceList[i] = protocol + '//' + host + ':' + port;
     }
   
-    logger.exit('generateServiceList', logger.NO_CLIENT_ID,
+    logger.exit('generateServiceList', client.id,
                 [
                   'serviceList:',
                   String(serviceList).replace(/:[^\/:]+@/g, ':********@'),
@@ -652,10 +647,6 @@ var Client = function(service, id, securityOptions) {
                 ]);
     return serviceList;
   };
-
-  if (!serviceFunction) {
-    serviceList = this.generateServiceList(service);
-  }
 
   // performs the connect
   this.performConnect = function(callback) {
@@ -728,7 +719,7 @@ var Client = function(service, id, securityOptions) {
         } else {
           try {
             serviceList =
-                client.generateServiceList(service);
+                client.generateServiceList.apply(client, [service]);
             client.connectToService(serviceList, callback);
           } catch (err) {
             var name = 'Client.connect.performConnect.serviceFunction.callback';
@@ -740,7 +731,7 @@ var Client = function(service, id, securityOptions) {
       });
     } else {
       try {
-        serviceList = client.generateServiceList(service);
+        serviceList = client.generateServiceList.apply(client, [service]);
         client.connectToService(serviceList, callback);
       } catch (err) {
         if (callback) {
@@ -1024,6 +1015,9 @@ var Client = function(service, id, securityOptions) {
   // List of queuedSends for resending on a reconnect
   this.queuedSends = [];
 
+  if (!serviceFunction) {
+    serviceList = this.generateServiceList.apply(this, [service]);
+  }
   logger.exit('Client.constructor', this.id, this);
 };
 util.inherits(Client, EventEmitter);
@@ -1188,7 +1182,7 @@ Client.prototype.disconnect = function(callback) {
             client.id);
 
         if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
-    
+
         // clear queuedSends as we are disconnecting
         while (client.queuedSends.length > 0) {
           var msg = client.queuedSends.pop();
@@ -1272,10 +1266,11 @@ Client.prototype.disconnect = function(callback) {
  * @return {Object} The instance of client that it is invoked on - allowing
  *          for chaining of other method calls on the client object.
  */
-function reconnect(client) {
+var reconnect = function(client) {
   if (client === undefined || client.constructor !== Client) {
-    logger.entry('reconnect', 'client was not set');
-    logger.exit('reconnect', 'client not set returning');
+    logger.entry('Client.reconnect', logger.NO_CLIENT_ID);
+    logger.log('parms', logger.NO_CLIENT_ID, 'client:', client);
+    logger.exit('Client.reconnect', logger.NO_CLIENT_ID, undefined);
     return;
   }
   logger.entry('Client.reconnect', client.id);
@@ -1298,7 +1293,9 @@ function reconnect(client) {
         
     // clear the subscriptions list, if the cause of the reconnect happens
     // during check for messages we need a 0 length so it will check once
-    //reconnected.
+    // reconnected.
+    logger.log('data', client.id, 'client.subscriptions:',
+               client.subscriptions);
     while (client.subscriptions.length > 0) {
       client.queuedSubscriptions.push(client.subscriptions.pop());
     }
@@ -1313,6 +1310,12 @@ function reconnect(client) {
   
   logger.exit('Client.reconnect', client.id, client);
   return client;
+};
+if (process.env.NODE_ENV === 'unittest') {
+  /**
+   * Export for unittest purposes.
+   */
+  exports.reconnect = reconnect;
 }
 
 
@@ -1741,7 +1744,8 @@ Client.prototype.checkForMessages = function() {
   var client = this;
   logger.entryLevel('entry_often', 'checkForMessages', client.id);
   var messenger = client.messenger;
-  if (client.state !== 'connected' || client.subscriptions.length === 0) {
+  if (client.state !== 'connected' || client.subscriptions.length === 0 ||
+      client.listeners('message').length === 0) {
     logger.exitLevel('exit_often', 'checkForMessages', client.id);
     return;
   }
@@ -2100,9 +2104,12 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var address = this.service + '/' + share + topicPattern;
   var client = this;
   var subscriptionAddress = this.service + '/' + topicPattern;
-  // If retrying queue this subscribe
-  if ( client.state === 'retrying' || client.state === 'connecting'){
-    //first check if its already there and if so remove old and add new
+
+  // if client is in the retrying state, then queue this subscribe request
+  if (client.state === 'retrying' || client.state === 'connecting') {
+    logger.log('data', client.id, 'client waiting for connection so queued ' +
+               'subscription');
+    // first check if its already there and if so remove old and add new
     for ( var qs = 0; qs < client.queuedSubscriptions; qs++ ){
       if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
           client.queuedSubscriptions[qs].share === originalShareValue){
@@ -2112,22 +2119,51 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     client.queuedSubscriptions.push({address: subscriptionAddress,
       qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
       share: originalShareValue, options: options, callback: callback });
+    logger.exit('Client.subscribe', client.id, client);
     return client;
   }
 
   var err;
   try {
     messenger.subscribe(address, qos, ttl);
+  } catch (e) {
+    logger.caught('Client.subscribe', client.id, e);
+    err = e;
+  }
 
-    // If this is the first subscription to be added, schedule a request to
-    // start the polling loop to check for messages arriving
-    if (client.subscriptions.length === 0) {
-      process.nextTick(function() {
-        client.checkForMessages();
+  if (callback) {
+    process.nextTick(function() {
+      logger.entry('Client.subscribe.callback', client.id);
+      logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+                 topicPattern, ', originalShareValue:', originalShareValue);
+      callback.apply(client, [err, topicPattern, originalShareValue]);
+      logger.exit('Client.subscribe.callback', client.id, null);
+    });
+  }
+
+  if (err) {
+    setImmediate(function() {
+      logger.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+    });
+    if (!(err instanceof TypeError)) {
+      logger.log('data', client.id, 'queued subscription and calling ' +
+                 'reconnect');
+      // error during subscribe so add to list of queued to resub
+      client.queuedSubscriptions.push({address: subscriptionAddress,
+        qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
+        share: originalShareValue, options: options, callback: callback });
+      // schedule a reconnect
+      setImmediate(function() {
+        reconnect(client);
       });
     }
+  } else {
+    // if no errors, add this to the stored list of subscriptions, replacing
+    // any existing entry
+    var isFirstSub = (client.subscriptions.length === 0);
+    logger.log('data', client.id, 'isFirstSub:', isFirstSub);
 
-    // Add address to list of subscriptions, replacing any existing entry
     for (var i = 0; i < client.subscriptions.length; i++) {
       if (client.subscriptions[i].address === subscriptionAddress &&
           client.subscriptions[i].share === originalShareValue) {
@@ -2139,44 +2175,14 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
       share: originalShareValue, options: options, callback: callback });
 
-  } catch (e) {
-    logger.caught('Client.subscribe', client.id, e);
-    err = e;
-    if (!(err instanceof TypeError)) {
+    // If this is the first subscription to be added, schedule a request to
+    // start the polling loop to check for messages arriving
+    if (isFirstSub) {
       setImmediate(function() {
-        logger.log('data', client.id, 'queued subscription and calling ' +
-                   'reconnect');
-        // error during subscribe so add to list of queued to resub
-        client.queuedSubscriptions.push({address: subscriptionAddress,
-          qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
-          share: originalShareValue, options: options, callback: callback });
-        reconnect(client);
+        client.checkForMessages.apply(client);
       });
     }
   }
-
-  setImmediate(function() {
-    if (callback) {
-      //call if success or if disconnected otherwise it will be retried
-      if ( err === undefined ){
-        logger.entry('Client.subscribe.callback', client.id);
-        logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-                   topicPattern, ', originalShareValue:', originalShareValue);
-        callback.apply(client, [err, topicPattern, originalShareValue]);
-        logger.exit('Client.subscribe.callback', client.id, null);
-      } else if ( client.isDisconnected() ){
-        logger.entry('Client.subscribe.callback', client.id);
-        logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-                   topicPattern, ', originalShareValue:', originalShareValue);
-        callback.apply(client, [err, topicPattern, originalShareValue]);
-        logger.exit('Client.subscribe.callback', client.id, null);
-      }
-    }
-    if (err) {
-      logger.log('emit', client.id, 'error', err);
-      client.emit('error', err);
-    }
-  });
 
   logger.exit('Client.subscribe', client.id, client);
   return client;
