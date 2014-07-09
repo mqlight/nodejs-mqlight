@@ -217,12 +217,12 @@ module.exports.test_subscribe_fail_callback = function(test) {
   // Replace the messeneger subscribe method with our own implementation.
   var savedSubscribe = mqlight.proton.messenger.subscribe;
   mqlight.proton.messenger.subscribe = function(address) {
-    throw new Error('topic space on fire');
+    throw new TypeError('topic space on fire');
   };
 
-  client.connect(function() {
+  client.connect(function(err) {
     client.subscribe('/foo', 'share', function(err) {
-      test.ok(err instanceof Error);
+      test.ok(err instanceof TypeError);
       test.equals(arguments.length, 3);
       test.deepEqual(arguments[1], '/foo');
       test.deepEqual(arguments[2], 'share');
@@ -230,13 +230,14 @@ module.exports.test_subscribe_fail_callback = function(test) {
 
       mqlight.proton.messenger.subscribe = savedSubscribe;
       if (++count == 2) test.done();
+      setImmediate(function() {
+        client.disconnect();
+      });
     });
-
-    client.disconnect();
   });
 
   client.on('error', function(err) {
-    test.ok(err instanceof Error);
+    test.ok(err instanceof TypeError);
     test.equals(arguments.length, 1);
     test.ok(this === client);
     if (++count == 2) test.done();

@@ -60,22 +60,23 @@ module.exports.test_receive_message = function(test) {
   mqlight.proton.messenger.receive = function() {};
 
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.connect(function() {
-    client.subscribe('/kittens/#');
-    client.subscribe('/kittens/+/boots');
-  });
 
   var first = true;
-  client.on('message', function(data, delivery) {
-    if (first) {
-      test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
-      first = false;
-    } else {
-      test.deepEqual(delivery.destination.topicPattern, '/kittens/+/boots');
-      test.done();
-      client.disconnect();
-      mqlight.proton.messenger.receive = originalReceiveMethod;
-    }
+  client.connect(function(err) {
+    test.ifError(err);
+    client.on('message', function(data, delivery) {
+      if (first) {
+        test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
+        first = false;
+      } else {
+        test.deepEqual(delivery.destination.topicPattern, '/kittens/+/boots');
+        test.done();
+        client.disconnect();
+        mqlight.proton.messenger.receive = originalReceiveMethod;
+      }
+    });
+    client.subscribe('/kittens/#');
+    client.subscribe('/kittens/+/boots');
   });
 
   client.on('malformed', function() {

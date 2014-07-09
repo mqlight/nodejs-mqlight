@@ -46,7 +46,7 @@ module.exports.test_successful_reconnect = function(test) {
     if (client) client.disconnect();
   }, 5000);
 
-  client.on('connected', function(x, y) {
+  client.on('connected', function(err) {
     test.deepEqual(client.state, 'connected',
         'client status connected after connect');
     stubproton.setConnectStatus(2);
@@ -59,7 +59,7 @@ module.exports.test_successful_reconnect = function(test) {
     stubproton.setConnectStatus(0);
   });
 
-  client.on('reconnected', function(x, y) {
+  client.on('reconnected', function() {
     test.deepEqual(client.state, 'connected', 'client has reconnected');
     client.disconnect();
     test.done();
@@ -138,39 +138,58 @@ module.exports.test_multi_reconnect_call = function(test) {
 * @param {object} test the unittest interface
 */
 module.exports.test_resubscribe_on_reconnect = function(test) {
-  test.expect(5);
+  test.expect(7);
   var client = mqlight.createClient({id: 'test_resubscribe_on_reconnect',
     service: 'amqp://host'});
+
   var timeout = setTimeout(function() {
     test.ok(false, 'Test timed out waiting for event emitions');
     test.done();
     if (client) client.disconnect();
   }, 5000);
+
+  var connectErrors = 0;
+  client.on('error', function(err) {
+    if (/connect error: 1/.test(err.message)) {
+      connectErrors++;
+      test.ok(client.subscriptions.length === 0, 'subs list has not ' +
+              'been cleared');
+      test.equal(client.queuedSubscriptions.length, 3, 'subs have ' +
+                 'not been queued');
+      stubproton.setConnectStatus(0);
+    }
+  });
+
   var origSubsList = [];
-  client.on('connected', function(x, y) {
-    client.subscribe('/topic', 'myshare');
-    client.subscribe('/another/topic');
-    client.subscribe('/final/topic/', 'diffshare');
-    origSubsList = origSubsList.concat(client.subscriptions);
-    stubproton.setConnectStatus(1);
-    mqlight.reconnect(client);
+  client.once('connected', function(err) {
+    client.subscribe('/topic', 'myshare', function(err) {
+      client.subscribe('/another/topic', function(err) {
+        client.subscribe('/final/topic/', 'diffshare', function(err) {
+          if (connectErrors === 0) {
+            setImmediate(function() {
+              origSubsList = origSubsList.concat(client.subscriptions);
+              stubproton.setConnectStatus(1);
+              mqlight.reconnect(client);
+            });
+          }
+        });
+      });
+    });
   });
 
-  client.on('error', function(x, y) {
-    test.equals(client.subscriptions.length, 0, 'Check subs list is cleared');
-    stubproton.setConnectStatus(0);
-  });
-
-  client.on('reconnected', function(x, y) {
-    //this allows the reconnected callback to get in and resubscribe
+  client.once('reconnected', function() {
+    // this allows the reconnected callback to get in and resubscribe
     setImmediate(function() {
-      test.equals(client.subscriptions.length, origSubsList.length,
-          'On reconect subs lists match');
+      test.equal(3, origSubsList.length, 'origSubsList length is wrong');
+      test.equal(client.subscriptions.length, origSubsList.length,
+          'after reconect subs lists does not match original');
       while (client.subscriptions.length > 0) {
-        test.deepEqual(origSubsList.pop(), client.subscriptions.pop(),
-            'sub list objects equal');
+        var expected = origSubsList.pop();
+        expected.callback = undefined;
+        var actual = client.subscriptions.pop();
+        actual.callback = undefined;
+        test.deepEqual(actual, expected, 'sub list objects do not match');
       }
-      client.disconnect();
       test.done();
       clearTimeout(timeout);
     });
@@ -342,42 +361,36 @@ module.exports.test_queued_subs_retrying = function(test) {
     throw new Error('error on subscribe');
   };
 
-  var successCallbacks = 0; 
-  client.on('connected', function() {
-    stubproton.setConnectStatus(1);
-    client.subscribe('/test', function(err){
-      if(err){
-        test.ok(false, 'should not be called in err');
-      } else {
-        successCallbacks++;
-      }
-    });
-  });
-
-  var first = true; 
+  var subscribeErrors = 0;
   client.on('error', function(err) {
-    if (first) {
-      first = false;
-      // queue up 3 subscribes
-      for (var i = 0; i < 3; i++) {
-        client.subscribe('queue'+i, function(err) {
-          if (err){
-            test.ok(false, 'should not be called in err');
-          } else {
-            successCallbacks++;
-          }
-        });
-      }
-    } else {
-      test.equals(client.queuedSubscriptions.length, 4, 
-          'all 4 attempted subs queued');
+    if (/error on subscribe/.test(err.message)) {
+      subscribeErrors++;
+      return;
+    }
+
+    if (subscribeErrors === 4) {
+      test.strictEqual(client.queuedSubscriptions.length, 4,
+                       'expected to see 4 queued subscriptions, but saw ' +
+          client.queuedSubscriptions.length);
       mqlight.proton.messenger.subscribe = savedSubFunction;
       stubproton.setConnectStatus(0);
       setTimeout(function(){client.disconnect();},500);
     }
-
   });
-  
+
+  var successCallbacks = 0; 
+  client.once('connected', function() {
+    stubproton.setConnectStatus(1);
+    // queue up 4 subscribes
+    for (var i = 1; i < 5; i++) {
+      client.subscribe('queue'+i, function(err) {
+        if (!err) {
+          successCallbacks++;
+        }
+      });
+    }
+  });
+
   client.on('disconnected', function() {
     test.equal(successCallbacks, 4, 'expecting 4 success callbacks, saw ' +
         successCallbacks);
