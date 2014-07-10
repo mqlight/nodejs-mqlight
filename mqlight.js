@@ -613,8 +613,8 @@ var Client = function(service, id, securityOptions) {
         throw err;
       }
       // Check we have a hostname
-      var host = serviceUrl.hostname;
-      if (!host) {
+      var host = serviceUrl.host;
+      if (!host || !serviceUrl.hostname) {
         msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
               'service. Must supply a hostname.';
         err = new Error(msg);
@@ -628,7 +628,7 @@ var Client = function(service, id, securityOptions) {
       }
       // Check for no path
       var path = serviceUrl.path;
-      if (path) {
+      if (path && path !== '/') {
         msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
               " ) can't be part of a service URL.";
         err = new Error(msg);
@@ -636,7 +636,10 @@ var Client = function(service, id, securityOptions) {
         throw err;
       }
 
-      serviceList[i] = protocol + '//' + host + ':' + port;
+      serviceList[i] = protocol + '//' + host;
+      if (!serviceUrl.port) {
+        serviceList[i] += ':' + port;
+      }
     }
 
     logger.exit('generateServiceList', client.id,
