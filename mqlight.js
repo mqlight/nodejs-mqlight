@@ -1195,6 +1195,13 @@ Client.prototype.disconnect = function(callback) {
                 'stopProcessing.queuedSendCallback', client.id, null);
           });
         }
+        // clear the active subscriptions list as we were asked to disconnect
+        logger.log('data', client.id, 'client.subscriptions:',
+                   client.subscriptions);
+        while (client.subscriptions.length > 0) {
+          client.subscriptions.pop();
+        }
+
         // Indicate that we've disconnected
         client.state = 'disconnected';
         process.nextTick(function() {

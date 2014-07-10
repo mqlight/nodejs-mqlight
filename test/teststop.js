@@ -139,3 +139,28 @@ module.exports.test_disconnect_too_many_arguments = function(test) {
     test.done();
   }, 'spurious');
 };
+
+
+/**
+ * Test that the client.subscriptions list is cleared upon a user-requested
+ * client.disconnect(...) call.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_disconnect_cleared_subscriptions = function(test) {
+  var client = mqlight.createClient({service: 'amqp://host'});
+  client.on('connected', function() {
+    client.on('disconnected', function() {
+      test.deepEqual(client.subscriptions, [], 'client.subscriptions was not ' +
+                     'cleared during client.disconnect() call');
+      test.done();
+    });
+    client.subscribe('/foo', function(err) {
+      test.ifError(err);
+      test.deepEqual(client.subscriptions.length, 1, 'client.subscriptions ' +
+                     'was not appended to');
+      client.disconnect();
+    });
+  });
+  client.connect();
+};
