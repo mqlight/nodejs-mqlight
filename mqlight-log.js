@@ -257,7 +257,7 @@ logger.entryLevel = function(lvl, name, id) {
   if (exceptionThrown) {
     logger.log('error', id, '* Uncaught exception');
     exceptionThrown = null;
-    while(stack.length > 1) {
+    while (stack.length > 1) {
       stack.pop();
     }
   }
@@ -308,7 +308,7 @@ logger.exitLevel = function(lvl, name, id, rc) {
 
     // Get rid of the last function put on the stack.
     last = stack.pop();
-  } while(last != name);
+  } while (last != name);
 };
 
 
@@ -387,7 +387,7 @@ logger.throwLevel = function(lvl, name, id, err) {
   logger.log('error', id, '* Thrown exception:', err);
   exceptionThrown = err;
   logger.exitLevel(lvl, name, id, 'Exception thrown');
-  potentialUnwinds += stack.length-1;
+  potentialUnwinds += stack.length - 1;
   logger.log('debug', id, 'Potential unwinds increased to', potentialUnwinds);
 };
 
@@ -422,7 +422,7 @@ logger.caughtLevel = function(lvl, name, id, err) {
   logger.log('error', id, '* Caught exception:', err);
   if (exceptionThrown) {
     exceptionThrown = null;
-    while(stack.length > 1) {
+    while (stack.length > 1) {
       if (stack[stack.length - 1] === name) {
         break;
       }

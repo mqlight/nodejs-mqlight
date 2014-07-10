@@ -195,7 +195,7 @@ exports.createClient = function(options) {
     urlUser: undefined,
     urlPassword: undefined,
     sslTrustCertificate: options.sslTrustCertificate,
-    sslVerifyName:options.sslVerifyName,
+    sslVerifyName: options.sslVerifyName,
     toString: function() {
       return '[\n' +
           ' propertyUser: ' + this.propertyUser + '\n' +
@@ -503,9 +503,9 @@ var Client = function(service, id, securityOptions) {
         String(service).replace(/:[^\/:]+@/g, ':********@'));
     logger.log('parms', client.id, 'securityOptions:',
                securityOptions.toString());
-  
+
     var err;
-  
+
     // Ensure the service is an Array
     var inputServiceList = [];
     if (!service) {
@@ -530,7 +530,7 @@ var Client = function(service, id, securityOptions) {
       logger.throw('generateServiceList', client.id, err);
       throw err;
     }
-  
+
     /*
      * Validate the list of URLs for the service, inserting default values as
      * necessary Expected format for each URL is: amqp://host:port or
@@ -539,12 +539,12 @@ var Client = function(service, id, securityOptions) {
     */
     var serviceList = [];
     var authUser, authPassword;
-  
+
     for (var i = 0; i < inputServiceList.length; i++) {
       var serviceUrl = url.parse(inputServiceList[i]);
       var protocol = serviceUrl.protocol;
       var msg;
-  
+
       // check for auth details
       var auth = serviceUrl.auth;
       authUser = undefined;
@@ -552,7 +552,7 @@ var Client = function(service, id, securityOptions) {
       if (auth) {
         if (auth.indexOf(':') >= 0) {
           authUser = String(auth).slice(0, auth.indexOf(':'));
-          authPassword = String(auth).slice(auth.indexOf(':')+1);
+          authPassword = String(auth).slice(auth.indexOf(':') + 1);
         } else {
           msg = "URLs supplied via the 'service' property must specify both a" +
                 ' user name and a password value, or omit both values';
@@ -583,7 +583,7 @@ var Client = function(service, id, securityOptions) {
           securityOptions.urlPassword = authPassword;
         }
       }
-  
+
       // Check whatever URL user names / passwords are present this time
       // through the loop - match the ones set on securityOptions by the first
       // pass through the loop.
@@ -602,7 +602,7 @@ var Client = function(service, id, securityOptions) {
           throw err;
         }
       }
-  
+
       // Check we are trying to use the amqp protocol
       if (!protocol || protocol !== 'amqp:' && protocol !== 'amqps:') {
         msg = "Unsupported URL '" + inputServiceList[i] +
@@ -635,10 +635,10 @@ var Client = function(service, id, securityOptions) {
         logger.throw('generateServiceList', client.id, err);
         throw err;
       }
-  
+
       serviceList[i] = protocol + '//' + host + ':' + port;
     }
-  
+
     logger.exit('generateServiceList', client.id,
                 [
                   'serviceList:',
@@ -659,7 +659,7 @@ var Client = function(service, id, securityOptions) {
       if (currentState === 'disconnecting') {
         var stillDisconnecting = function(client, callback) {
           logger.entry('stillDisconnecting', client.id);
-      
+
           if (client.state === 'disconnecting') {
             setImmediate(function() {
               stillDisconnecting(client, callback);
@@ -669,7 +669,7 @@ var Client = function(service, id, securityOptions) {
               client.performConnect(callback);
             });
           }
-      
+
           logger.exit('stillDisconnecting', client.id, null);
         };
 
@@ -762,7 +762,7 @@ var Client = function(service, id, securityOptions) {
   this.connectToService = function(serviceList, callback) {
     var client = this;
     logger.entry('Client.connectToService', client.id);
-  
+
     if (client.state === 'disconnecting' ||
         client.state === 'disconnected') {
       if (callback) {
@@ -773,10 +773,10 @@ var Client = function(service, id, securityOptions) {
       logger.exit('Client.connectToService', client.id, null);
       return;
     }
-  
+
     var connected = false;
     var error;
-  
+
     // Try each service in turn until we can successfully connect, or exhaust
     // the list
     if (!error) {
@@ -838,7 +838,7 @@ var Client = function(service, id, securityOptions) {
         }
       }
     }
-  
+
     // If we've successfully connected then we're done, otherwise we'll retry
     if (connected) {
       // Indicate that we're connected
@@ -855,12 +855,12 @@ var Client = function(service, id, securityOptions) {
       } else {
         statusClient = 'reconnected';
       }
-  
+
       process.nextTick(function() {
         logger.log('emit', client.id, statusClient);
         client.emit(statusClient);
       });
-  
+
       if (callback) {
         process.nextTick(function() {
           logger.entry('Client.connectToService.callback', client.id);
@@ -868,7 +868,7 @@ var Client = function(service, id, securityOptions) {
           logger.exit('Client.connectToService.callback', client.id, null);
         });
       }
-  
+
       // Setup heartbeat timer to ensure that while connected we send heartbeat
       // frames to keep the connection alive, when required.
       var remoteIdleTimeout =
@@ -891,7 +891,7 @@ var Client = function(service, id, securityOptions) {
                                              heartbeatInterval,
                                              client, heartbeatInterval);
       }
-  
+
     } else {
       // We've tried all services without success. Pause for a while before
       // trying again
@@ -907,16 +907,16 @@ var Client = function(service, id, securityOptions) {
       // TODO 10 seconds is an arbitrary value, need to review if this is
       // appropriate. Timeout should be adjusted based on reconnect algo.
       logger.log('data', client.id, 'trying to connect again ' +
-                 ((CONNECT_RETRY_INTERVAL >0) ? ('after ' +
-                                                 CONNECT_RETRY_INTERVAL /
-                                                 1000 + ' seconds') :
+                 ((CONNECT_RETRY_INTERVAL > 0) ? ('after ' +
+          CONNECT_RETRY_INTERVAL /
+          1000 + ' seconds') :
           'immediately'));
       setTimeout(retry, CONNECT_RETRY_INTERVAL);
       // XXX: should we even emit an error in this case? we're going to retry
       logger.log('emit', client.id, 'error', error);
       client.emit('error', error);
     }
-  
+
     logger.exit('Client.connectToService', client.id, null);
     return;
   };
@@ -1110,24 +1110,24 @@ Client.prototype.connect = function(callback) {
  */
 var stopMessenger = function(client, stopProcessingCallback, callback) {
   logger.entry('stopMessenger', client.id);
-  
+
   var stopped = true;
-  
+
   // If messenger available then request it to stop
   // (otherwise it must have already been stopped)
   if (client.messenger) {
     stopped = client.messenger.stop();
   }
-  
+
   // If stopped then perform the required stop processing
   if (stopped) {
     stopProcessingCallback(client, callback);
-    
+
   // Otherwise check for the messenger being stopped again
   } else {
     setImmediate(stopMessenger, client, stopProcessingCallback, callback);
   }
-  
+
   logger.exit('stopMessenger', client.id, null);
 };
 
@@ -1188,10 +1188,10 @@ Client.prototype.disconnect = function(callback) {
           var msg = client.queuedSends.pop();
           // call the callback in error as we have disconnected
           process.nextTick(function() {
-            logger.entry('Client.disconnect.performDisconnect.'+
+            logger.entry('Client.disconnect.performDisconnect.' +
                 'stopProcessing.queuedSendCallback', client.id);
             msg.callback(new Error('send aborted due to disconnect'));
-            logger.exit('Client.disconnect.performDisconnect.'+
+            logger.exit('Client.disconnect.performDisconnect.' +
                 'stopProcessing.queuedSendCallback', client.id, null);
           });
         }
@@ -1204,14 +1204,14 @@ Client.prototype.disconnect = function(callback) {
         });
         if (callback) {
           process.nextTick(function() {
-            logger.entry('Client.disconnect.performDisconnect.stopProcessing.'+
+            logger.entry('Client.disconnect.performDisconnect.stopProcessing.' +
                 'callback', client.id);
             callback.apply(client);
-            logger.exit('Client.disconnect.performDisconnect.stopProcessing.'+
+            logger.exit('Client.disconnect.performDisconnect.stopProcessing.' +
                 'callback', client.id, null);
           });
         }
-        
+
         logger.exit('Client.disconnect.performDisconnect.stopProcessing',
             client.id, null);
       }, callback);
@@ -1288,9 +1288,9 @@ var reconnect = function(client) {
   // stop the messenger to free the object then attempt a reconnect
   stopMessenger(client, function(client) {
     logger.entry('Client.reconnect.stopProcessing', client.id);
-    
+
     if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
-        
+
     // clear the subscriptions list, if the cause of the reconnect happens
     // during check for messages we need a 0 length so it will check once
     // reconnected.
@@ -1304,10 +1304,10 @@ var reconnect = function(client) {
       client.outstandingSends.pop();
     }
     client.performConnect.apply(client, [processQueuedActions]);
-    
+
     logger.exit('Client.reconnect.stopProcessing', client.id, null);
   });
-  
+
   logger.exit('Client.reconnect', client.id, client);
   return client;
 };
@@ -1776,33 +1776,33 @@ Client.prototype.checkForMessages = function() {
             decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
         var autoConfirm = true;
         var qos = exports.QOS_AT_MOST_ONCE;
-        var matchedSubs = client.subscriptions.filter(function(el){
+        var matchedSubs = client.subscriptions.filter(function(el) {
           // 1 added to length to account for the / we add
           var addressNoService = el.address.slice(client.service.length + 1);
           //possible to have 2 matches work out whether this is
           //for a share or private topic
           if (el.share === undefined &&
-              protonMsg.linkAddress.indexOf('private:') === 0){
+              protonMsg.linkAddress.indexOf('private:') === 0) {
             //slice off private: and compare to the no service address
             var linkNoPrivShare = protonMsg.linkAddress.slice(8);
-            if ( addressNoService === linkNoPrivShare ){
+            if (addressNoService === linkNoPrivShare) {
               return el;
             }
           } else if (el.share !== undefined &&
-                     protonMsg.linkAddress.indexOf('share:') === 0){
+                     protonMsg.linkAddress.indexOf('share:') === 0) {
             //starting after the share: look for the next : denoting the end
             //of the share name and get everything past that
-            var linkNoShare = protonMsg.linkAddress.slice
-            (protonMsg.linkAddress.indexOf(':',7) + 1);
-            if ( addressNoService === linkNoShare ){
+            var linkNoShare = protonMsg.linkAddress.slice;
+            (protonMsg.linkAddress.indexOf(':', 7) + 1);
+            if (addressNoService === linkNoShare) {
               return el;
             }
           }
         });
         //should only ever be one entry in matchedSubs
-        if ( matchedSubs[0] !== undefined ){
+        if (matchedSubs[0] !== undefined) {
           qos = matchedSubs[0].qos;
-          if ( qos === exports.QOS_AT_LEAST_ONCE ){
+          if (qos === exports.QOS_AT_LEAST_ONCE) {
             autoConfirm = matchedSubs[0].autoConfirm;
           }
         } else {
@@ -2110,10 +2110,10 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     logger.log('data', client.id, 'client waiting for connection so queued ' +
                'subscription');
     // first check if its already there and if so remove old and add new
-    for ( var qs = 0; qs < client.queuedSubscriptions; qs++ ){
+    for (var qs = 0; qs < client.queuedSubscriptions; qs++) {
       if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
-          client.queuedSubscriptions[qs].share === originalShareValue){
-        client.queuedSubscriptions.splice(qs,1);
+          client.queuedSubscriptions[qs].share === originalShareValue) {
+        client.queuedSubscriptions.splice(qs, 1);
       }
     }
     client.queuedSubscriptions.push({address: subscriptionAddress,

@@ -30,28 +30,23 @@ var childProcess = require('child_process');
 
 
 /** @constructor */
-module.exports = testCase({
-  'Test conformance to Google JavaScript Style Guide': testCase({
-    'gjslint': function(test) {
+module.exports.test_gjslint_strict = testCase({
+  'Test strict conformance to the Google JavaScript Style Guide': testCase({
+    'test_gjslint_strict': function(test) {
       var child = childProcess.spawn('gjslint', [
         '--jslint_error=all',
         '--strict',
-        '--disable',
-        '1,0002,0010',
         '--unix_mode',
         'mqlight.js',
         'mqlight-log.js',
-        'bin/mqlight-debug.js',
         'samples/send.js',
-        'samples/recv.js',
-        'tests/*.js',
-        'tests/stubs/*.js'
+        'samples/recv.js'
       ], { stdio: 'inherit' });
       child.on('exit', function(code, signal) {
         if (signal) {
-          console.log('gjslint killed by signal: ' + signal);
-        } else {
-          console.log('gjslint ended with return code: ' + code);
+          console.error('gjslint killed by signal: ' + signal);
+        } else if (code > 0) {
+          console.error('gjslint ended with return code: ' + code);
         }
         test.equal(signal, undefined, 'expected gjslint not to be killed by ' +
                    'signal: ' + signal);
@@ -59,8 +54,8 @@ module.exports = testCase({
                    'rc=' + code);
         test.done();
       }).on('error', function(err) {
-        console.log('Unable to run gjslint for reason: ');
-        console.log('  ' + err);
+        console.error('Unable to run gjslint for reason: ');
+        console.error('  ' + err);
         test.ok(false, 'Error running gjslint');
         test.done();
       });
@@ -68,3 +63,39 @@ module.exports = testCase({
   })
 });
 
+
+
+/** @constructor */
+module.exports.test_gjslint_basic = testCase({
+  'Test basic conformance to the Google JavaScript Style Guide': testCase({
+    'test_gjslint_basic': function(test) {
+      var child = childProcess.spawn('gjslint', [
+        '--jslint_error=all',
+        '--strict',
+        '--disable',
+        '1,0002,0010',
+        '--unix_mode',
+        'bin/mqlight-debug.js',
+        'tests/*.js',
+        'tests/stubs/*.js'
+      ], { stdio: 'inherit' });
+      child.on('exit', function(code, signal) {
+        if (signal) {
+          console.error('gjslint killed by signal: ' + signal);
+        } else if (code > 0) {
+          console.error('gjslint ended with return code: ' + code);
+        }
+        test.equal(signal, undefined, 'expected gjslint not to be killed by ' +
+                   'signal: ' + signal);
+        test.equal(code, 0, 'expected gjslint to exit with rc=0, not with ' +
+                   'rc=' + code);
+        test.done();
+      }).on('error', function(err) {
+        console.error('Unable to run gjslint for reason: ');
+        console.error('  ' + err);
+        test.ok(false, 'Error running gjslint');
+        test.done();
+      });
+    }
+  })
+});
