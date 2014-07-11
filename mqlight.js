@@ -1802,8 +1802,8 @@ Client.prototype.checkForMessages = function() {
                      protonMsg.linkAddress.indexOf('share:') === 0) {
             //starting after the share: look for the next : denoting the end
             //of the share name and get everything past that
-            var linkNoShare = protonMsg.linkAddress.slice;
-            (protonMsg.linkAddress.indexOf(':', 7) + 1);
+            var linkNoShare = protonMsg.linkAddress.slice
+                              (protonMsg.linkAddress.indexOf(':', 7) + 1);
             if (addressNoService === linkNoShare) {
               return el;
             }
