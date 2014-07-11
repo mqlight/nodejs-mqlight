@@ -825,7 +825,7 @@ var Client = function(service, id, securityOptions) {
                        ' due to error: ' + error);
           } else {
             logger.log('data', client.id, 'successfully connected to: ' +
-                service);
+                logUrl);
             client.service = serviceList[i];
             connected = true;
             break;
