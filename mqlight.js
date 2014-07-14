@@ -816,7 +816,14 @@ var Client = function(service, id, securityOptions) {
           }
           logger.log('data', client.id, 'attempting to connect to: ' + logUrl);
 
-          var rc = client.messenger.connect(url.parse(service),
+          var connectUrl = url.parse(service);
+          // remove any path elements from the URL (for ipv6 which appends /)
+          if (connectUrl.path) {
+            var hrefLength = connectUrl.href.length - connectUrl.path.length;
+            connectUrl.href = connectUrl.href.substr(0, hrefLength);
+            connectUrl.pathname = connectUrl.path = null;
+          }
+          var rc = client.messenger.connect(connectUrl,
                                             securityOptions.sslTrustCertificate,
                                             securityOptions.sslVerifyName);
           if (rc) {
@@ -1802,8 +1809,8 @@ Client.prototype.checkForMessages = function() {
                      protonMsg.linkAddress.indexOf('share:') === 0) {
             //starting after the share: look for the next : denoting the end
             //of the share name and get everything past that
-            var linkNoShare = protonMsg.linkAddress.slice
-                              (protonMsg.linkAddress.indexOf(':', 7) + 1);
+            var linkNoShare = protonMsg.linkAddress.slice(
+                                  protonMsg.linkAddress.indexOf(':', 7) + 1);
             if (addressNoService === linkNoShare) {
               return el;
             }
