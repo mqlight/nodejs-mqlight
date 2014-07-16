@@ -1465,6 +1465,10 @@ Client.prototype.isDisconnected = function() {
  *           If one of the specified parameters is of the wrong type.
  * @throws {Error}
  *           If the topic or data parameter is undefined.
+ * @return {Boolean} <code>true</code> if the message was
+ *         sent or <code>false</code> if the message was not yet
+ *         sent because the network could not accept it or
+ *         because the client was not in a connected state.
  */
 Client.prototype.send = function(topic, data, options, callback) {
   logger.entry('Client.send', this.id);
@@ -1567,7 +1571,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     this.queuedSends.push({topic: topic, data: data, options: options,
       callback: callback});
     logger.exit('Client.send', this.id);
-    return;
+    return false;
   }
 
   // Send the data as a message to the specified topic
@@ -1612,7 +1616,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     // setup a timer to trigger the callback once the msg has been sent, or
     // immediately if no message to be sent
     var untilSendComplete = function(protonMsg, localMessageId, sendCallback) {
-      logger.entry('Client.send.utilSendComplete', client.id);
+      logger.entry('Client.send.untilSendComplete', client.id);
 
       try {
         var complete = false;
@@ -1650,16 +1654,16 @@ Client.prototype.send = function(topic, data, options, callback) {
             if (sendCallback) {
               var body = protonMsg.body;
               setImmediate(function() {
-                logger.entry('Client.send.utilSendComplete.callback',
+                logger.entry('Client.send.untilSendComplete.callback',
                              client.id);
                 sendCallback.apply(client, [err, topic, body, options]);
-                logger.exit('Client.send.utilSendComplete.callback', client.id,
+                logger.exit('Client.send.untilSendComplete.callback', client.id,
                             null);
               });
             }
             protonMsg.destroy();
 
-            logger.exit('Client.send.utilSendComplete', client.id, null);
+            logger.exit('Client.send.untilSendComplete', client.id, null);
             return;
           }
 
@@ -1673,18 +1677,18 @@ Client.prototype.send = function(topic, data, options, callback) {
           if (index >= 0) client.outstandingSends.splice(index, 1);
           if (sendCallback) {
             err = new Error('send may have not completed due to disconnect');
-            logger.entry('Client.send.utilSendComplete.callback', client.id);
+            logger.entry('Client.send.untilSendComplete.callback', client.id);
             sendCallback.apply(client, [err, topic, protonMsg.body, options]);
-            logger.exit('Client.send.utilSendComplete.callback',
+            logger.exit('Client.send.untilSendComplete.callback',
                         client.id, null);
           }
           protonMsg.destroy();
 
-          logger.exit('Client.send.utilSendComplete', client.id, null);
+          logger.exit('Client.send.untilSendComplete', client.id, null);
           return;
         }
       } catch (e) {
-        logger.caught('Client.send.utilSendComplete', client.id, e);
+        logger.caught('Client.send.untilSendComplete', client.id, e);
         //error condition so won't retry send remove from list of unsent
         index = client.outstandingSends.indexOf(localMessageId);
         if (index >= 0) client.outstandingSends.splice(index, 1);
@@ -1700,10 +1704,10 @@ Client.prototype.send = function(topic, data, options, callback) {
               //we don't know if an at most once message made it across
               //call the callback with undefined to indicate success to
               //avoid user resending on error.
-              logger.entry('Client.send.utilSendComplete.callback', client.id);
+              logger.entry('Client.send.untilSendComplete.callback', client.id);
               sendCallback.apply(client, [undefined, topic, protonMsg.body,
                 options]);
-              logger.exit('Client.send.utilSendComplete.callback', client.id,
+              logger.exit('Client.send.untilSendComplete.callback', client.id,
                   null);
             }
           }
@@ -1716,7 +1720,7 @@ Client.prototype.send = function(topic, data, options, callback) {
           }
         });
       }
-      logger.exit('Client.send.utilSendComplete', client.id, null);
+      logger.exit('Client.send.untilSendComplete', client.id, null);
     };
     // start the timer to trigger it to keep sending until msg has sent
     setImmediate(untilSendComplete, protonMsg, localMessageId, callback);
@@ -1746,6 +1750,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   logger.exit('Client.send', this.id, null);
+  return false;
 };
 
 

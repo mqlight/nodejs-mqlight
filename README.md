@@ -165,6 +165,10 @@ Object type when received.
 * `callback` - (Function) (optional) callback to be notified of errors &
   completion
 
+Returns true if if the message was sent or false if the message was not yet
+sent because the network could not accept it or because the client was not in a
+connected state.
+
 ### mqlight.Client.subscribe(`pattern`, [`share`], [`options`], [`callback`])
 
 Create a `Destination` and associates it with a `pattern`.
