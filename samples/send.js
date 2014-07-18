@@ -32,7 +32,9 @@ var types = {
   id: String,
   'message-ttl': Number,
   delay: Number,
-  file: String
+  file: String,
+  'trust-certificate': String,
+  repeat: Number
 };
 var shorthands = {
   h: ['--help'],
@@ -40,7 +42,9 @@ var shorthands = {
   t: ['--topic'],
   i: ['--id'],
   d: ['--delay'],
-  f: ['--file']
+  f: ['--file'],
+  c: ['--trust-certificate'],
+  r: ['--repeat']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 
@@ -54,6 +58,12 @@ var showUsage = function() {
        '                        amqp://user:password@host:5672 or\n' +
        '                        amqps://host:5671 to use SSL/TLS\n' +
        '                        (default: amqp://localhost)');
+  puts('  -c FILE, --trust-certificate=FILE\n' +
+       '                        use the certificate contained in FILE (in\n' +
+       '                        PEM or DER format) to validate the\n' +
+       '                        identify of the server. The connection must\n' +
+       '                        be secured with SSL/TLS (e.g. the service\n' +
+       "                        URL must start 'amqps://')");
   puts('  -t TOPIC, --topic=TOPIC');
   puts('                        send messages to topic TOPIC\n' +
        '                        (default: public)');
@@ -61,10 +71,15 @@ var showUsage = function() {
        '                        (default: send_[0-9a-f]{7})');
   puts('  --message-ttl=NUM     set message time-to-live to NUM seconds');
   puts('  -d NUM, --delay=NUM   add NUM seconds delay between each request');
+  puts('  -r NUM, --repeat=NUM  send messages NUM times, default is 1, if\n' +
+       '                        NUM <= 0 then repeat forever');
+  puts('   --sequence           prefix a sequence number to the message\n' +
+       '                        payload (ignored for binary messages)');
   puts('  -f FILE, --file=FILE  send FILE as binary data. Cannot be\n' +
-       '                        specified at the same time as <msg1>.');
+       '                        specified at the same time as <msg1>');
   puts('');
 };
+
 
 if (parsed.help) {
   showUsage();
@@ -74,12 +89,16 @@ if (parsed.help) {
 var service = parsed.service ? parsed.service : 'amqp://localhost';
 var topic = parsed.topic ? parsed.topic : 'public';
 var id = parsed.id ? parsed.id : 'send_' + uuid.v4().substring(0, 7);
+var repeat = parsed.repeat !== undefined ? Number(parsed.repeat) : 1;
 
-// create client to connect to broker with
+// create client to connect to server with:
 var opts = {
   service: service,
   id: id
 };
+if (parsed['trust-certificate']) {
+  opts['sslTrustCertificate'] = parsed['trust-certificate'];
+}
 var client = mqlight.createClient(opts);
 
 // get message body data to send
@@ -109,11 +128,15 @@ client.on('connected', function() {
 
   // queue all messages for sending
   var i = 0;
+  var sequenceNum = 0;
   var sendNextMessage = function() {
     var body = messages[i];
     var options = { qos: mqlight.QOS_AT_LEAST_ONCE };
     if (parsed['message-ttl']) {
       options.ttl = Number(parsed['message-ttl']) * 1000;
+    }
+    if (parsed['sequence'] && !parsed.file) {
+      body = (++sequenceNum) + ': ' + body;
     }
     client.send(topic, body, options, function(err, topic, data, options) {
       if (err) {
@@ -121,11 +144,15 @@ client.on('connected', function() {
         process.exit(1);
       }
       if (data) {
-        console.log('# sent message:');
         console.log(data);
       }
       // if there are more messages pending, send the next in <delay> seconds
-      if (messages.length > ++i) {
+      ++i;
+      if (i == messages.length) {
+        if (repeat != 1) i = 0;
+        if (repeat > 1) --repeat;
+      }
+      if (messages.length > i) {
         if (delay > 0) {
           setTimeout(sendNextMessage, delay);
         } else {

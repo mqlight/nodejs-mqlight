@@ -33,7 +33,8 @@ var types = {
   'destination-ttl': Number,
   'share-name': String,
   file: String,
-  delay: Number
+  delay: Number,
+  'trust-certificate': String
 };
 var shorthands = {
   h: ['--help'],
@@ -42,7 +43,8 @@ var shorthands = {
   i: ['--id'],
   n: ['--share-name'],
   f: ['--file'],
-  d: ['--delay']
+  d: ['--delay'],
+  c: ['--trust-certificate']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 var remain = parsed.argv.remain;
@@ -57,6 +59,12 @@ var showUsage = function() {
        '                        amqp://user:password@host:5672 or\n' +
        '                        amqps://host:5671 to use SSL/TLS\n' +
        '                        (default: amqp://localhost)');
+  puts('  -c FILE, --trust-certificate=FILE\n' +
+       '                        use the certificate contained in FILE (in\n' +
+       '                        PEM or DER format) to validate the\n' +
+       '                        identify of the server. The connection must\n' +
+       '                        be secured with SSL/TLS (e.g. the service\n' +
+       "                        URL must start 'amqps://')");
   puts('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN\n' +
        '                        subscribe to receive messages matching' +
        ' TOPICPATTERN');
@@ -94,11 +102,14 @@ var pattern = parsed['topic-pattern'] ? parsed['topic-pattern'] : 'public';
 var id = parsed.id ? parsed.id : 'recv_' + uuid.v4().substring(0, 7);
 var share = parsed['share-name'] ? parsed['share-name'] : undefined;
 
-// connect client to broker
+// connect client to server
 var opts = {
   service: service,
   id: id
 };
+if (parsed['trust-certificate']) {
+  opts['sslTrustCertificate'] = parsed['trust-certificate'];
+}
 var client = mqlight.createClient(opts);
 
 // once connection is acquired, receive messages for the supplied pattern
