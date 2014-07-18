@@ -1026,9 +1026,6 @@ var Client = function(service, id, securityOptions) {
   // List of queuedSends for resending on a reconnect
   this.queuedSends = [];
 
-  // No drain event initially required
-  this.drainEventRequired = false;
-
   if (!serviceFunction) {
     serviceList = this.generateServiceList.apply(this, [service]);
   }
@@ -1477,7 +1474,6 @@ Client.prototype.isDisconnected = function() {
 Client.prototype.send = function(topic, data, options, callback) {
   logger.entry('Client.send', this.id);
   var err;
-  var alreadySent = false;
 
   // Validate the passed parameters
   if (!topic) {
@@ -1575,7 +1571,6 @@ Client.prototype.send = function(topic, data, options, callback) {
   if (this.state === 'retrying' || this.state === 'connecting') {
     this.queuedSends.push({topic: topic, data: data, options: options,
       callback: callback});
-    this.drainEventRequired = true;
     logger.exit('Client.send', this.id, false);
     return false;
   }
@@ -1669,17 +1664,6 @@ Client.prototype.send = function(topic, data, options, callback) {
             }
             protonMsg.destroy();
 
-            // If previously send() returned false and now the backlog of
-            // messages is cleared, emit a drain event.
-            logger.log('debug', client.id,
-                       'outstandingSends:', client.outstandingSends.length);
-            if (client.drainEventRequired &&
-                (client.outstandingSends.length === 0)) {
-              logger.log('emit', client.id, 'drain');
-              client.emit('drain');
-              client.drainEventRequired = false;
-            }
-
             logger.exit('Client.send.untilSendComplete', client.id, null);
             return;
           }
@@ -1741,14 +1725,6 @@ Client.prototype.send = function(topic, data, options, callback) {
     };
     // start the timer to trigger it to keep sending until msg has sent
     setImmediate(untilSendComplete, protonMsg, localMessageId, callback);
-
-    // If the message hasn't yet been sent, then we'll need to emit a drain
-    // event later to indicate the backlog has been cleared.
-    if (client.outstandingSends.length === 0) {
-      alreadySent = true;
-    } else {
-      client.drainEventRequired = true;
-    }
   } catch (err) {
     logger.caught('Client.send', client.id, err);
     //error condition so won't retry send need to remove it from list of unsent
@@ -1774,8 +1750,8 @@ Client.prototype.send = function(topic, data, options, callback) {
     });
   }
 
-  logger.exit('Client.send', this.id, alreadySent);
-  return alreadySent;
+  logger.exit('Client.send', this.id, false);
+  return false;
 };
 
 
@@ -1852,6 +1828,7 @@ Client.prototype.checkForMessages = function() {
           if (qos === exports.QOS_AT_LEAST_ONCE) {
             autoConfirm = matchedSubs[0].autoConfirm;
           }
+          ++matchedSubs[0].unconfirmed;
         } else {
           //shouldn't get here
           var err = new Error('No listener matched for this message: ' +
@@ -1872,8 +1849,26 @@ Client.prototype.checkForMessages = function() {
             } : function() {
               logger.entry('message.confirmDelivery', this.id);
               logger.log('data', this.id, 'delivery:', delivery);
+              var subscription = matchedSubs[0];
               if (protonMsg) {
                 messenger.settle(protonMsg);
+                --subscription.unconfirmed;
+                ++subscription.confirmed;
+                logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
+                           '[' + subscription.credit + ',' +
+                           subscription.unconfirmed + ',' +
+                           subscription.confirmed + ']');
+                // Ask to flow more messages if >= 80% of available credit
+                // (e.g. not including unconfirmed messages) has been used.
+                // Or we have just confirmed everything.
+                var available = subscription.credit - subscription.unconfirmed;
+                if ((available / subscription.confirmed) <= 1.25 ||
+                    (subscription.unconfirmed == 0 &&
+                     subscription.confirmed > 0)) {
+                  messenger.flow(client.service + '/' + protonMsg.linkAddress,
+                                 subscription.confirmed);
+                  subscription.confirmed = 0;
+                }
                 protonMsg.destroy();
                 protonMsg = undefined;
               }
@@ -1942,15 +1937,30 @@ Client.prototype.checkForMessages = function() {
             client.emit('error', err);
           }
         }
+
         if (qos === exports.QOS_AT_MOST_ONCE) {
           messenger.accept(protonMsg);
+        }
+        if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
           messenger.settle(protonMsg);
-          protonMsg.destroy();
-        } else {
-          if (autoConfirm) {
-            messenger.settle(protonMsg);
-            protonMsg.destroy();
+          --matchedSubs[0].unconfirmed;
+          ++matchedSubs[0].confirmed;
+          logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
+                     '[' + matchedSubs[0].credit + ',' +
+                     matchedSubs[0].unconfirmed + ',' +
+                     matchedSubs[0].confirmed + ']');
+          // Ask to flow more messages if >= 80% of available credit
+          // (e.g. not including unconfirmed messages) has been used.
+          // Or we have just confirmed everything.
+          var available = matchedSubs[0].credit - matchedSubs[0].unconfirmed;
+          if ((available / matchedSubs[0].confirmed <= 1.25) ||
+              (matchedSubs[0].unconfirmed == 0 &&
+               matchedSubs[0].confirmed > 0)) {
+            messenger.flow(client.service + '/' + protonMsg.linkAddress,
+                           matchedSubs[0].confirmed);
+            matchedSubs[0].confirmed = 0;
           }
+          protonMsg.destroy();
         }
       }
     }
@@ -2094,6 +2104,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var qos = exports.QOS_AT_MOST_ONCE;
   var autoConfirm = true;
   var ttl = 0;
+  var credit = 1024;
   if (options) {
     if ('qos' in options) {
       if (options.qos === exports.QOS_AT_MOST_ONCE) {
@@ -2130,6 +2141,17 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
         throw err;
       }
       ttl = Math.round(ttl / 1000);
+    }
+    if ('credit' in options) {
+      credit = Number(options.credit);
+      if (Number.isNaN(credit) || !Number.isFinite(credit) || credit < 0 ||
+          credit > 4294967295) {
+        err = new TypeError("options:credit value '" +
+                            options.credit +
+                            "' is invalid, must be an unsigned integer number");
+        logger.throw('Client.subscribe', this.id, err);
+        throw err;
+      }
     }
   }
 
@@ -2172,7 +2194,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   var err;
   try {
-    messenger.subscribe(address, qos, ttl);
+    messenger.subscribe(address, qos, ttl, credit);
   } catch (e) {
     logger.caught('Client.subscribe', client.id, e);
     err = e;
@@ -2220,7 +2242,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
     client.subscriptions.push({ address: subscriptionAddress,
       qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
-      share: originalShareValue, options: options, callback: callback });
+      share: originalShareValue, options: options, callback: callback,
+      credit: credit, unconfirmed: 0, confirmed: 0});
 
     // If this is the first subscription to be added, schedule a request to
     // start the polling loop to check for messages arriving

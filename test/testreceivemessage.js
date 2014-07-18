@@ -319,3 +319,206 @@ module.exports.test_receive_ttl = function(test) {
     }
   });
 };
+
+
+/**
+ * Parametrises a test case for checking that the credit value supplied
+ * on a client.subscribe(...) call does not cause the client to stall
+ * due to a logic error in when new messages are requested.
+ *  
+ * @param {object} test - the unittest interface
+ * @param {Number} credit - the credit value to supply to client.subscribe(...)
+ * @param {Number} qos - the qos level to use for the test
+ * @param {Number} numMessages - the number of messages to simulate receiving
+ */
+function run_receiver_credit_testcase(test, credit, qos, numMessages) {
+
+  var savedReceiveMethod = mqlight.proton.messenger.receive;
+  var savedFlowMethod = mqlight.proton.messenger.flow;
+  
+  var maxCredit = credit;
+  var currentCredit = maxCredit;
+  mqlight.proton.messenger.receive = function() {
+    test.ok(currentCredit >= 0, 'credit should never be negative');
+    if (currentCredit > 0) {
+      --currentCredit;
+      return [testMessage('/kittens/wearing/boots', '/kittens/#')];
+    } else {
+      return [];
+    }
+  };
+  mqlight.proton.messenger.flow = function(linkAddress, credit) {
+    currentCredit += credit;
+    test.ok(currentCredit <= maxCredit, 
+            'maximum credit for link should never be exceeded');
+  };
+  
+  var client = mqlight.createClient({service: 'amqp://host'});
+
+  client.connect(function(err) {
+    var receiveCount = 0;
+    test.ifError(err);
+    
+    client.on('message', function(data, delivery) {
+      if (++receiveCount >= numMessages) {
+        client.disconnect();
+        mqlight.proton.messenger.receive = savedReceiveMethod;
+        mqlight.proton.messenger.flow = savedFlowMethod;
+        test.done();
+      }
+    });
+    
+    client.subscribe('/kittens/#', {qos: qos, credit: maxCredit});
+  });
+
+  client.on('malformed', function() {
+    test.ok(false, 'malformed event should not be emitted');
+  });
+
+  client.on('error', function(err) {
+    test.ok(false, 'error event should not be emitted');
+  });
+}
+
+
+/**
+ * Tests that a qos 0 subscription with a modest amount of credit
+ * does not stall due to a problem requesting more credit.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_credit10_qos0 = function(test) {
+  run_receiver_credit_testcase(test, 10, 0, 250);
+};
+
+
+/**
+ * Tests that a qos 0 subscription with a large amount of credit
+ * does not stall due to a problem requesting more credit.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_credit5000_qos0 = function(test) {
+  run_receiver_credit_testcase(test, 5000, 0, 20000);
+};
+
+
+/**
+ * Tests that a qos 0 subscription with the smallest amount of credit
+ * does not stall due to a problem requesting more credit.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_credit1_qos0 = function(test) {
+  run_receiver_credit_testcase(test, 1, 0, 50);
+};
+
+
+/**
+ * Tests that a qos 1 subscription with a modest amount of credit
+ * does not stall due to a problem requesting more credit.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_credit10_qos1 = function(test) {
+  run_receiver_credit_testcase(test, 10, 0, 250);
+};
+
+
+/**
+ * Tests that a qos 1 subscription with a large amount of credit
+ * does not stall due to a problem requesting more credit.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_credit5000_qos1 = function(test) {
+  run_receiver_credit_testcase(test, 5000, 0, 20000);
+};
+
+
+/**
+ * Tests that a qos 1 subscription with the smallest amount of credit
+ * does not stall due to a problem requesting more credit.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_credit1_qos1 = function(test) {
+  run_receiver_credit_testcase(test, 1, 0, 50);
+};
+
+
+/**
+ * Tests that a qos 1 subscription using manual message confirmation does
+ * not stall due to a problem requesting more credit.  The test sets a small
+ * credit limit when subscribing and receives / confirms messages in batches.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_credit_confirm = function(test) {
+  var savedReceiveMethod = mqlight.proton.messenger.receive;
+  var savedFlowMethod = mqlight.proton.messenger.flow;
+  
+  var maxCredit = 10;
+  var currentCredit = maxCredit;
+  mqlight.proton.messenger.receive = function() {
+    test.ok(currentCredit >= 0, 'credit should never be negative');
+    if (currentCredit > 0) {
+      --currentCredit;
+      return [testMessage('/kittens/wearing/boots', '/kittens/#')];
+    } else {
+      return [];
+    }
+  };
+  mqlight.proton.messenger.flow = function(linkAddress, credit) {
+    test.ok((currentCredit + credit) <= maxCredit, 
+            'maximum credit for link should never be exceeded,'+
+            ' current: ' + currentCredit + ' flowed: ' + credit +
+            ' max: ' + maxCredit);
+    currentCredit += credit;
+  };
+  
+  var client = mqlight.createClient({service: 'amqp://host'});
+  var deliveryArray = [];
+  var interval = undefined;
+  var confirmBatch = 0;
+
+  client.connect(function(err) {
+    var receiveCount = 0;
+    test.ifError(err);
+    
+    client.on('message', function(data, delivery) {
+      deliveryArray.push(delivery);
+      if (++receiveCount >= 50) {
+        if (interval) clearInterval(interval);
+        test.ok(confirmBatch === 4);
+        client.disconnect();
+        mqlight.proton.messenger.receive = savedReceiveMethod;
+        mqlight.proton.messenger.flow = savedFlowMethod;
+        test.done();
+      }
+    });
+    
+    client.subscribe('/kittens/#', 
+                     {qos: 1, credit: maxCredit, autoConfirm: false});
+    
+
+    interval = setInterval(function() {
+      ++confirmBatch;
+      test.ok(deliveryArray.length, maxCredit);
+      while(deliveryArray.length > 0) {
+        var delivery = deliveryArray.pop();
+        delivery.message.confirmDelivery();
+      }
+      
+    }, 250);
+  });
+
+  client.on('malformed', function() {
+    test.ok(false, 'malformed event should not be emitted');
+  });
+
+  client.on('error', function(err) {
+    test.ok(false, 'error event should not be emitted');
+  });
+};
+

@@ -180,6 +180,10 @@ module.exports.createProtonStub = function() {
                                timeout);
         if (workCallback) workCallback.apply();
         return 0;
+      },
+      flow: function(linkAddress, credit) {
+        if (DEBUG) console.log('stub flow function called with link address: ' +
+                               linkAddress + ' and credit: ' + credit);
       }
     },
 

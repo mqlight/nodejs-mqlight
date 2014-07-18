@@ -568,3 +568,69 @@ module.exports.test_subscribe_ttl_rounding = function(test) {
 };
 
 
+/**
+ * Tests that passing a variety of credit values to the subscribe method
+ * results in invalid values being rejected and valid values being passed
+ * through to the Proton Messenger mock.
+ * 
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_credit_values = function(test) {
+  var data = [
+    {credit: undefined, expected: 1024},  // default value
+    {credit: 0, expected: 0},
+    {credit: 1, expected: 1},
+    {credit: 2, expected: 2},
+    {credit: NaN},
+    {credit: -1},
+    {credit: -2},
+    {credit: -NaN},
+    {credit: 4294967294, expected: 4294967294},
+    {credit: 4294967295, expected: 4294967295},
+    {credit: 4294967296},
+    {credit: '4294967294', expected: 4294967294},
+    {credit: '4294967295', expected: '4294967295'},
+    {credit: '4294967296'},
+    {credit: '0', expected: 0},
+    {credit: '1', expected: 1},
+    {credit: '-1'},
+    {credit: "Credit is a system whereby a person who can't pay, gets " +
+          "another person who can't pay to guarentee that he can pay"},
+    {credit: function() {}},
+    {credit: true, expected: 1},
+    {credit: false, expected: 0}
+  ];
+
+  var savedSubscribe = mqlight.proton.messenger.subscribe;
+  var subscribedCredit = -1;
+  mqlight.proton.messenger.subscribe = function(address, qos, ttl, credit) {
+    subscribedCredit = credit;
+  };
+  var savedSubscribe = mqlight.proton.messenger.subscribe;
+  var subscribedCredit = -1;
+  mqlight.proton.messenger.subscribe = function(address, qos, ttl, credit) {
+    subscribedCredit = credit;
+  };
+  var client = mqlight.createClient({id: 'test_subscribe_credit_values',
+    service: 'amqp://host'});
+  client.connect(function() {
+    for (var i = 0; i < data.length; ++i) {
+      if (data[i].expected !== undefined) {
+        test.doesNotThrow(function() {
+          client.subscribe('testpattern', 
+                           data[i].credit != undefined ? data[i] : {});
+        }, undefined, 'test data index: ' + i);
+        test.deepEqual(subscribedCredit, data[i].expected,
+            'wrong value passed to proton messenger - test data index: ' + i +
+            ' expected: ' + data[i].expected + ' actual : ' + subscribedCredit);
+      } else {
+        test.throws(function() {
+          client.subscribe('testpattern', data[i]);
+        }, undefined, 'test data index: ' + i);
+      }
+    }
+    mqlight.proton.messenger.subscribe = savedSubscribe;
+    client.disconnect();
+    test.done();
+  });
+};
