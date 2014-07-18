@@ -895,7 +895,8 @@ var Client = function(service, id, securityOptions) {
             client.heartbeatTimeout = setTimeout(performHeartbeat,
                 heartbeatInterval, client, heartbeatInterval);
           }
-          logger.exit('Client.connectToService.performHeartbeat', client.id, null);
+          logger.exit('Client.connectToService.performHeartbeat',
+                      client.id, null);
         };
         client.heartbeatTimeout = setTimeout(performHeartbeat,
                                              heartbeatInterval,
@@ -1024,6 +1025,9 @@ var Client = function(service, id, securityOptions) {
   this.outstandingSends = [];
   // List of queuedSends for resending on a reconnect
   this.queuedSends = [];
+
+  // No drain event initially required
+  this.drainEventRequired = false;
 
   if (!serviceFunction) {
     serviceList = this.generateServiceList.apply(this, [service]);
@@ -1473,6 +1477,7 @@ Client.prototype.isDisconnected = function() {
 Client.prototype.send = function(topic, data, options, callback) {
   logger.entry('Client.send', this.id);
   var err;
+  var alreadySent = false;
 
   // Validate the passed parameters
   if (!topic) {
@@ -1570,6 +1575,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   if (this.state === 'retrying' || this.state === 'connecting') {
     this.queuedSends.push({topic: topic, data: data, options: options,
       callback: callback});
+    this.drainEventRequired = true;
     logger.exit('Client.send', this.id, false);
     return false;
   }
@@ -1663,6 +1669,17 @@ Client.prototype.send = function(topic, data, options, callback) {
             }
             protonMsg.destroy();
 
+            // If previously send() returned false and now the backlog of
+            // messages is cleared, emit a drain event.
+            logger.log('debug', client.id,
+                       'outstandingSends:', client.outstandingSends.length);
+            if (client.drainEventRequired &&
+                (client.outstandingSends.length === 0)) {
+              logger.log('emit', client.id, 'drain');
+              client.emit('drain');
+              client.drainEventRequired = false;
+            }
+
             logger.exit('Client.send.untilSendComplete', client.id, null);
             return;
           }
@@ -1724,6 +1741,14 @@ Client.prototype.send = function(topic, data, options, callback) {
     };
     // start the timer to trigger it to keep sending until msg has sent
     setImmediate(untilSendComplete, protonMsg, localMessageId, callback);
+
+    // If the message hasn't yet been sent, then we'll need to emit a drain
+    // event later to indicate the backlog has been cleared.
+    if (client.outstandingSends.length === 0) {
+      alreadySent = true;
+    } else {
+      client.drainEventRequired = true;
+    }
   } catch (err) {
     logger.caught('Client.send', client.id, err);
     //error condition so won't retry send need to remove it from list of unsent
@@ -1749,8 +1774,8 @@ Client.prototype.send = function(topic, data, options, callback) {
     });
   }
 
-  logger.exit('Client.send', this.id, false);
-  return false;
+  logger.exit('Client.send', this.id, alreadySent);
+  return alreadySent;
 };
 
 

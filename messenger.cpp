@@ -446,7 +446,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   }
 
   /*
-   * Set the route and enable PN_FLAGS_CHECK_ROUTES so that messenger 
+   * Set the route and enable PN_FLAGS_CHECK_ROUTES so that messenger
    * confirms that it can connect at startup.
    */
   int error;
@@ -738,7 +738,16 @@ Handle<Value> ProtonMessenger::HasOutgoing(Local<String> property,
 
   bool hasOutgoing;
   if (obj->messenger) {
-    hasOutgoing = (pn_messenger_outgoing(obj->messenger) > 0);
+    int outgoing;
+    Proton::Entry("pn_messenger_outgoing", name);
+    outgoing = pn_messenger_outgoing(obj->messenger);
+    int error = pn_messenger_errno(obj->messenger);
+    Proton::Exit("pn_messenger_outgoing", name, outgoing);
+    if (error) {
+      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+      THROW_EXCEPTION(text, "ProtonMessenger::HasOutgoing", name)
+    }
+    hasOutgoing = (outgoing > 0);
   } else {
     hasOutgoing = false;
   }
