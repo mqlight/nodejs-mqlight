@@ -97,6 +97,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(
       constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
   NODE_SET_PROTOTYPE_METHOD(constructor, "work", Work);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "flow", Flow);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
   tpl->InstanceTemplate()->SetAccessor(String::New("hasOutgoing"), HasOutgoing);
@@ -446,7 +447,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   }
 
   /*
-   * Set the route and enable PN_FLAGS_CHECK_ROUTES so that messenger
+   * Set the route and enable PN_FLAGS_CHECK_ROUTES so that messenger 
    * confirms that it can connect at startup.
    */
   int error;
@@ -560,9 +561,9 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   Proton::Entry("ProtonMessenger::Subscribe", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 3 || args[0].IsEmpty() || args[1].IsEmpty() ||
-      args[2].IsEmpty()) {
-    THROW_EXCEPTION("Missing required pattern or qos argument.",
+  if (args.Length() < 4 || args[0].IsEmpty() || args[1].IsEmpty() ||
+      args[2].IsEmpty() || args[3].IsEmpty()) {
+    THROW_EXCEPTION("Missing required argument",
                     "ProtonMessenger::Subscribe",
                     name);
   }
@@ -571,9 +572,13 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   std::string address = std::string(*param);
   int qos = (int)args[1]->ToInteger()->Value();
   int ttl = (int)args[2]->ToInteger()->Value();
+  long creditLong = (long) args[3]->ToInteger()->Value();
+  if (creditLong > 4294967295) creditLong = 4294967295;
+  unsigned int credit = (unsigned int) creditLong;
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("parms", name, "qos:", qos);
   Proton::Log("parms", name, "ttl:", ttl);
+  Proton::Log("parms", name, "credit:", credit);
 
   // throw Error if not connected
   if (!obj->messenger) {
@@ -604,7 +609,7 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   Proton::Exit("pn_messenger_subscribe_ttl", name, 0);
 
   Proton::Entry("pn_messenger_recv", name);
-  pn_messenger_recv(obj->messenger, -1);
+  pn_messenger_recv(obj->messenger, -2);
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_recv", name, error);
   if (error) {
@@ -613,6 +618,14 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
                          pn_error_text(pn_messenger_error(obj->messenger)),
                          "ProtonMessenger::Subscribe",
                          name)
+  }
+
+  if (credit > 0) {
+    pn_link_t *link =
+      pn_messenger_get_link(obj->messenger, address.c_str(), false);
+    if (link) {
+      pn_link_flow(link, credit);
+    }
   }
 
   Proton::Entry("pn_messenger_work", name);
@@ -661,7 +674,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
   }
 
   Proton::Entry("entry_often", "pn_messenger_recv", name);
-  pn_messenger_recv(obj->messenger, -1);
+  pn_messenger_recv(obj->messenger, -2);
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("exit_often", "pn_messenger_recv", name, error);
   if (error) {
@@ -738,16 +751,7 @@ Handle<Value> ProtonMessenger::HasOutgoing(Local<String> property,
 
   bool hasOutgoing;
   if (obj->messenger) {
-    int outgoing;
-    Proton::Entry("pn_messenger_outgoing", name);
-    outgoing = pn_messenger_outgoing(obj->messenger);
-    int error = pn_messenger_errno(obj->messenger);
-    Proton::Exit("pn_messenger_outgoing", name, outgoing);
-    if (error) {
-      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-      THROW_EXCEPTION(text, "ProtonMessenger::HasOutgoing", name)
-    }
-    hasOutgoing = (outgoing > 0);
+    hasOutgoing = (pn_messenger_outgoing(obj->messenger) > 0);
   } else {
     hasOutgoing = false;
   }
@@ -933,4 +937,47 @@ Handle<Value> ProtonMessenger::Work(const Arguments& args)
 
   Proton::Exit("ProtonMessenger::Work", name, status);
   return scope.Close(Number::New(status));
+}
+
+Handle<Value> ProtonMessenger::Flow(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::Flow", name);
+  
+  // throw exception if not enough args
+  if (args.Length() < 2 || args[0].IsEmpty() || args[0]->IsNull() ||
+      args[0]->IsUndefined() || args[1].IsEmpty()) {
+    THROW_EXCEPTION(
+        "Missing required argument", "ProtonMessenger::Work", name);
+  }
+  
+  String::Utf8Value param(args[0]->ToString());
+  std::string address = std::string(*param);
+  Proton::Log("parms", name, "address:", address.c_str());
+  long creditLong = (long) args[1]->ToInteger()->Value();
+  if (creditLong > 4294967295) creditLong = 4294967295;
+  unsigned int credit = (unsigned int)creditLong;
+  
+  Proton::Log("parms", name, "address:", address.c_str());
+  Proton::Log("parms", name, "credit:", credit);
+  
+  // throw exception if not connected
+  if (!obj->messenger) {
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::Flow", name);
+  }
+  
+  // Find link based on address, and flow link credit.
+  pn_link_t *link =
+    pn_messenger_get_link(obj->messenger, address.c_str(), false);
+  if (link) {
+    pn_link_flow(link, credit);
+  } else {
+    Proton::Log("parms", name, "link:", "null");
+  }
+
+  Proton::Exit("ProtonMessenger::Flow", name, true);
+  return scope.Close(Undefined());
 }
