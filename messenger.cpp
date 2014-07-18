@@ -960,7 +960,7 @@ Handle<Value> ProtonMessenger::Flow(const Arguments& args)
   if (args.Length() < 2 || args[0].IsEmpty() || args[0]->IsNull() ||
       args[0]->IsUndefined() || args[1].IsEmpty()) {
     THROW_EXCEPTION(
-        "Missing required argument", "ProtonMessenger::Work", name);
+        "Missing required argument", "ProtonMessenger::Flow", name);
   }
   
   String::Utf8Value param(args[0]->ToString());
