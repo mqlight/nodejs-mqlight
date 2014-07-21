@@ -2282,4 +2282,194 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   return client;
 };
 
+/**
+ * Stops the flow of messages from a destination to this client. The client's
+ * <code>message</code> callback will no longer be driven when messages arrive,
+ * that match the pattern associate with the destination. The
+ * <code>pattern</code> (and optional) <code>share</code> arguments must match
+ * those specified when the destination was created by calling the original
+ * <code>client.subscribe(...)</code> method. 
+ * <p>
+ * The optional <code>options</code> argument can be used to specify how the
+ * call to <code>client.unsubscribe(...)</code> behaves. If the
+ * <code>options</code> argument has any of the following properties they will
+ * be interpreted as follows:
+ * <ul>
+ * <li><code>ttl</code> - Optional, coerced to a <code>Number</code>, if
+ * specified and must be equal to 0. If specified the client will reset the
+ * destination's time to live to 0 as part of the unsubscribe operation. If
+ * the destination is private to the client, then setting the TTL to zero will
+ * ensure that the destination is deleted. If the destination is shared when
+ * setting the TTL to zero, the destination will be deleted when no more
+ * clients are associated with the destination.
+ *
+ * @param {String}
+ *          topicPattern that was supplied in the previous call to subscribe.
+ * @param {String}
+ *          share (Optional) that was supplied in the previous call to
+ *          subscribe.
+ * @param {Object}
+ *          options (Optional) The options argument accepts an object with
+ *          properties set to customise the unsubscribe behaviour.
+ * @param {function()}
+ *          callback - (Optional) Invoked if the unsubscribe request has
+ *          been processed successfully.
+ * @return {@link Client} the instance of the client this was called on which
+ * will emit 'message' events on arrival.
+ * @throws {TypeError}
+ *           If one of the specified parameters is of the wrong type or
+ *           missing. Also thrown if the client is not subscribed to a
+ *           subscription matching the given pattern (and share) arguments.
+ * @throws {Error}
+ *           If the topic pattern parameter is undefined.
+ */
+Client.prototype.unsubscribe = function(topicPattern, share, options, callback) {
+  logger.entry('Client.unsubscribe', this.id);
+  logger.log('parms', this.id, 'topicPattern:', topicPattern);
+
+  // Must accept at least one option - and first option is always a
+  // topicPattern.
+  if (arguments.length === 0) {
+    err = new TypeError("You must specify a 'topicPattern' argument");
+    logger.throw('Client.unsubscribe', this.id, err);
+    throw err;
+  }
+  if (!topicPattern) {
+    err = new TypeError("You must specify a 'topicPattern' argument");
+    logger.throw('Client.unsubscribe', this.id, err);
+    throw err;
+  }
+  topicPattern = String(topicPattern);
+
+  // Two or three arguments are the interesting cases - the rules we use to
+  // disambiguate are:
+  //   1) If the last argument is a function - it's the callback
+  //   2) If we are unsure if something is the share or the options then
+  //      a) It's the share if it's a String
+  //      b) It's the options if it's an Object
+  //      c) If it's neither of the above, then it's the share
+  //         (and convert it to a String).
+  if (arguments.length === 2) {
+    if (arguments[1] instanceof Function) {
+      callback = share;
+      share = undefined;
+    } else if (!(arguments[1] instanceof String) &&
+               (arguments[1] instanceof Object)) {
+      options = share;
+      share = undefined;
+    }
+  } else if (arguments.length === 3) {
+    if (arguments[2] instanceof Function) {
+      callback = arguments[2];
+      if (!(arguments[1] instanceof String) &&
+          (arguments[1] instanceof Object)) {
+        options = arguments[1];
+        share = undefined;
+      } else {
+        options = undefined;
+      }
+    }
+  }
+
+  var originalShareValue = share;
+  if (share) {
+    share = String(share);
+    if (share.indexOf(':') >= 0) {
+      err = new Error("share argument value '" + share + "' is invalid " +
+                      "because it contains a colon (\':\') character");
+      logger.throw('Client.unsubscribe', this.id, err);
+      throw err;
+    }
+    share = 'share:' + share + ':';
+  } else {
+    share = 'private:';
+  }
+  logger.log('parms', this.id, 'share:', share);
+
+  // Validate the options parameter, when specified
+  if (options !== undefined) {
+    if (typeof options == 'object') {
+      logger.log('parms', this.id, 'options:', options);
+    } else {
+      err = new TypeError('options must be an object type not a ' +
+                          (typeof options) + ')');
+      logger.throw('Client.unsubscribe', this.id, err);
+      throw err;
+    }
+  }
+
+  var ttl;
+  if (options) {
+    if ('ttl' in options) {
+      ttl = Number(options.ttl);
+      if (Number.isNaN(ttl) || ttl !== 0) {
+        err = new TypeError("options:ttl value '" +
+                            options.ttl +
+                            "' is invalid, only 0 is a supported value for " +
+                            " an unsubscribe request");
+        logger.throw('Client.unsubscribe', this.id, err);
+        throw err;
+      }
+    }
+  }
+
+  if (callback && !(callback instanceof Function)) {
+    err = new TypeError('callback must be a function type');
+    logger.throw('Client.unsubscribe', this.id, err);
+    throw err;
+  }
+
+  // Ensure we have attempted a connect
+  if (this.isDisconnected()) {
+    err = new Error('not connected');
+    logger.throw('Client.unsubscribe', this.id, err);
+    throw err;
+  }
+
+  // Subscribe using the specified topic pattern and share options
+  var messenger = this.messenger;
+  var address = this.service + '/' + share + topicPattern;
+  var client = this;
+  var subscriptionAddress = this.service + '/' + topicPattern;
+
+  // if client is in the retrying state, then queue this unsubscribe request
+  if (client.state === 'retrying' || client.state === 'connecting') {
+    // TODO: will implement this under a separate work item, for now...
+    throw new Error('not connected and queued unsubscribe has not been ' +
+                    'implemented yet');
+    //logger.exit('Client.unsubscribe', client.id, client);
+    //return client;
+  }
+
+  var err;
+  try {
+    messenger.unsubscribe(address, ttl);
+
+    if (callback) {
+      process.nextTick(function() {
+        logger.entry('Client.unsubscribe.callback', client.id);
+        callback.apply(client, [undefined]);
+        logger.exit('Client.unsubscribe.callback', client.id, null);
+      });
+    }
+    // if no errors, remove this from the stored list of subscriptions
+    for (var i = 0; i < client.subscriptions.length; i++) {
+      if (client.subscriptions[i].address === subscriptionAddress &&
+          client.subscriptions[i].share === originalShareValue) {
+        client.subscriptions.splice(i, 1);
+        break;
+      }
+    }
+  } catch (err) {
+    logger.caught('Client.unsubscribe', client.id, err);
+    setImmediate(function() {
+      logger.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+    });
+  }
+
+  logger.exit('Client.unsubscribe', client.id, client);
+  return client;
+};
+
 /* ------------------------------------------------------------------------- */

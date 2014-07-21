@@ -90,6 +90,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "stop", Stop);
   NODE_SET_PROTOTYPE_METHOD(constructor, "connect", Connect);
   NODE_SET_PROTOTYPE_METHOD(constructor, "subscribe", Subscribe);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "unsubscribe", Unsubscribe);
   NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
   NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
   NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
@@ -639,6 +640,79 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
         Exception::Error, text, "ProtonMessenger::Subscribe", name)
   }
   Proton::Exit("ProtonMessenger::Subscribe", name, 0);
+  return scope.Close(Boolean::New(true));
+}
+
+Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::Unsubscribe", name);
+
+  // throw TypeError if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty()) {
+    THROW_EXCEPTION("Missing required argument",
+                    "ProtonMessenger::Unsubscribe",
+                    name);
+  }
+
+  String::Utf8Value param(args[0]->ToString());
+  std::string address = std::string(*param);
+  Proton::Log("parms", name, "address:", address.c_str());
+  int ttl = -1;
+  if (args.Length() > 1 && !args[1]->IsUndefined()) {
+    ttl = (int)args[1]->ToInteger()->Value();
+    Proton::Log("parms", name, "ttl:", ttl);
+  } else {
+    Proton::Log("parms", name, "ttl:", "undefined");
+  }
+
+  // throw Error if not connected
+  if (!obj->messenger) {
+    THROW_EXCEPTION_TYPE(
+        Exception::Error, "Not connected", "ProtonMessenger::Unsubscribe", name);
+  }
+
+  // find link based on address
+  pn_link_t* link =
+      pn_messenger_get_link(obj->messenger, address.c_str(), false);
+
+  if (!link) {
+    // throw Error if unable to find a matching Link
+    THROW_EXCEPTION_TYPE(Exception::Error,
+                         ("unable to locate link for " + address).c_str(),
+                         "ProtonMessenger::Unsubscribe",
+                         name)
+  }
+
+  if (ttl == 0) {
+    Proton::Entry("pn_terminus_set_expiry_policy", name);
+    pn_terminus_set_expiry_policy(pn_link_target(link), PN_LINK_CLOSE);
+    pn_terminus_set_expiry_policy(pn_link_source(link), PN_LINK_CLOSE);
+    Proton::Exit("pn_terminus_set_expiry_policy", name, 0);
+    Proton::Entry("pn_terminus_set_timeout", name);
+    Proton::Log("parms", name, "ttl:", ttl);
+    pn_terminus_set_timeout(pn_link_target(link), ttl);
+    pn_terminus_set_timeout(pn_link_source(link), ttl);
+    Proton::Exit("pn_terminus_set_timeout", name, 0);
+  }
+  Proton::Entry("pn_link_close", name);
+  pn_link_close(link);
+  Proton::Exit("pn_link_close", name, 0);
+
+  Proton::Entry("pn_messenger_work", name);
+  pn_messenger_work(obj->messenger, 50);
+  int error = pn_messenger_errno(obj->messenger);
+  Proton::Exit("pn_messenger_work", name, error);
+  if (error) {
+    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+    // throw Error if error from messenger
+    THROW_EXCEPTION_TYPE(
+        Exception::Error, text, "ProtonMessenger::Unsubscribe", name)
+  }
+  Proton::Exit("ProtonMessenger::Unsubscribe", name, 0);
   return scope.Close(Boolean::New(true));
 }
 
