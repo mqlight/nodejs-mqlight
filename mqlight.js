@@ -857,9 +857,9 @@ var Client = function(service, id, securityOptions) {
       if (client.firstConnect) {
         statusClient = 'connected';
         client.firstConnect = false;
-        //could be queued actions so need to process those here. On reconnect
-        //this would be done via the callback we set, first connect its the
-        //users callback so won't process anything.
+        // could be queued actions so need to process those here. On reconnect
+        // this would be done via the callback we set, first connect its the
+        // users callback so won't process anything.
         logger.log('data', client.id, 'first connect since being disconnected');
         processQueuedActions.apply(client);
       } else {
@@ -1012,13 +1012,16 @@ var Client = function(service, id, securityOptions) {
   // Set the initial state to disconnected
   this.state = 'disconnected';
   this.service = undefined;
-  //the first connect, set to false after connect and back to true on disconnect
+  // the first connect, set to false after connect and back to true on
+  // disconnect
   this.firstConnect = true;
 
   // List of message subscriptions
   this.subscriptions = [];
   // List of queued subscriptions
   this.queuedSubscriptions = [];
+  // List of queued unsubscribe requests
+  this.queuedUnsubscribes = [];
 
   // List of outstanding send operations waiting to be accepted, settled, etc
   // by the listener.
@@ -1253,7 +1256,7 @@ Client.prototype.disconnect = function(callback) {
     throw err;
   }
 
-  //just return if already disconnected or in the process of disconnecting
+  // just return if already disconnected or in the process of disconnecting
   if (client.isDisconnected()) {
     process.nextTick(function() {
       if (callback) {
@@ -1368,6 +1371,13 @@ var processQueuedActions = function(err) {
             client.state === 'connected') {
       var sub = client.queuedSubscriptions.pop();
       client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
+    }
+    logger.log('data', client.id, 'client.queuedUnsubscribes',
+               client.queuedUnsubscribes);
+    while (client.queuedUnsubscribes.length > 0 &&
+            client.state === 'connected') {
+      var rm = client.queuedUnsubscribes.pop();
+      client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
     }
     logger.log('data', client.id, 'client.queuedSends',
                client.queuedSends);
@@ -1573,8 +1583,12 @@ Client.prototype.send = function(topic, data, options, callback) {
 
   // Ensure we are not retrying otherwise queue message and return
   if (this.state === 'retrying' || this.state === 'connecting') {
-    this.queuedSends.push({topic: topic, data: data, options: options,
-      callback: callback});
+    this.queuedSends.push({
+      topic: topic,
+      data: data,
+      options: options,
+      callback: callback
+    });
     this.drainEventRequired = true;
     logger.exit('Client.send', this.id, false);
     return false;
@@ -1706,21 +1720,25 @@ Client.prototype.send = function(topic, data, options, callback) {
         }
       } catch (e) {
         logger.caught('Client.send.untilSendComplete', client.id, e);
-        //error condition so won't retry send remove from list of unsent
+        // error condition so won't retry send remove from list of unsent
         index = client.outstandingSends.indexOf(localMessageId);
         if (index >= 0) client.outstandingSends.splice(index, 1);
         // an error here could still mean the message made it over
         // so we only care about at least once messages
         if (qos === exports.QOS_AT_LEAST_ONCE) {
-          client.queuedSends.push({topic: topic, data: data, options: options,
-            callback: callback});
+          client.queuedSends.push({
+            topic: topic,
+            data: data,
+            options: options,
+            callback: callback
+          });
         }
         process.nextTick(function() {
           if (sendCallback) {
             if (qos === exports.QOS_AT_MOST_ONCE) {
-              //we don't know if an at most once message made it across
-              //call the callback with undefined to indicate success to
-              //avoid user resending on error.
+              // we don't know if an at most once message made it across
+              // call the callback with undefined to indicate success to
+              // avoid user resending on error.
               logger.entry('Client.send.untilSendComplete.callback', client.id);
               sendCallback.apply(client, [undefined, topic, protonMsg.body,
                 options]);
@@ -1751,12 +1769,17 @@ Client.prototype.send = function(topic, data, options, callback) {
     }
   } catch (err) {
     logger.caught('Client.send', client.id, err);
-    //error condition so won't retry send need to remove it from list of unsent
+    // error condition so won't retry send need to remove it from list of
+    // unsent
     var index = client.outstandingSends.indexOf(localMessageId);
     if (index >= 0) client.outstandingSends.splice(index, 1);
     if (qos === exports.QOS_AT_LEAST_ONCE) {
-      client.queuedSends.push({topic: topic, data: data, options: options,
-        callback: callback});
+      client.queuedSends.push({
+        topic: topic,
+        data: data,
+        options: options,
+        callback: callback
+      });
     }
     setImmediate(function() {
       if (callback) {
@@ -1826,19 +1849,19 @@ Client.prototype.checkForMessages = function() {
         var matchedSubs = client.subscriptions.filter(function(el) {
           // 1 added to length to account for the / we add
           var addressNoService = el.address.slice(client.service.length + 1);
-          //possible to have 2 matches work out whether this is
-          //for a share or private topic
+          // possible to have 2 matches work out whether this is
+          // for a share or private topic
           if (el.share === undefined &&
               protonMsg.linkAddress.indexOf('private:') === 0) {
-            //slice off private: and compare to the no service address
+            // slice off private: and compare to the no service address
             var linkNoPrivShare = protonMsg.linkAddress.slice(8);
             if (addressNoService === linkNoPrivShare) {
               return el;
             }
           } else if (el.share !== undefined &&
                      protonMsg.linkAddress.indexOf('share:') === 0) {
-            //starting after the share: look for the next : denoting the end
-            //of the share name and get everything past that
+            // starting after the share: look for the next : denoting the end
+            // of the share name and get everything past that
             var linkNoShare = protonMsg.linkAddress.slice(
                                   protonMsg.linkAddress.indexOf(':', 7) + 1);
             if (addressNoService === linkNoShare) {
@@ -1846,7 +1869,7 @@ Client.prototype.checkForMessages = function() {
             }
           }
         });
-        //should only ever be one entry in matchedSubs
+        // should only ever be one entry in matchedSubs
         if (matchedSubs[0] !== undefined) {
           qos = matchedSubs[0].qos;
           if (qos === exports.QOS_AT_LEAST_ONCE) {
@@ -1854,7 +1877,7 @@ Client.prototype.checkForMessages = function() {
           }
           ++matchedSubs[0].unconfirmed;
         } else {
-          //shouldn't get here
+          // shouldn't get here
           var err = new Error('No listener matched for this message: ' +
                               data + ' going to address: ' + protonMsg.address);
           throw err;
@@ -2209,9 +2232,15 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
         client.queuedSubscriptions.splice(qs, 1);
       }
     }
-    client.queuedSubscriptions.push({address: subscriptionAddress,
-      qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
-      share: originalShareValue, options: options, callback: callback });
+    client.queuedSubscriptions.push({
+      address: subscriptionAddress,
+      qos: qos,
+      autoConfirm: autoConfirm,
+      topicPattern: topicPattern,
+      share: originalShareValue,
+      options: options,
+      callback: callback
+    });
     logger.exit('Client.subscribe', client.id, client);
     return client;
   }
@@ -2243,9 +2272,15 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       logger.log('data', client.id, 'queued subscription and calling ' +
                  'reconnect');
       // error during subscribe so add to list of queued to resub
-      client.queuedSubscriptions.push({address: subscriptionAddress,
-        qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
-        share: originalShareValue, options: options, callback: callback });
+      client.queuedSubscriptions.push({
+        address: subscriptionAddress,
+        qos: qos,
+        autoConfirm: autoConfirm,
+        topicPattern: topicPattern,
+        share: originalShareValue,
+        options: options,
+        callback: callback
+      });
       // schedule a reconnect
       setImmediate(function() {
         reconnect(client);
@@ -2264,10 +2299,18 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
         break;
       }
     }
-    client.subscriptions.push({ address: subscriptionAddress,
-      qos: qos, autoConfirm: autoConfirm, topicPattern: topicPattern,
-      share: originalShareValue, options: options, callback: callback,
-      credit: credit, unconfirmed: 0, confirmed: 0});
+    client.subscriptions.push({
+      address: subscriptionAddress,
+      qos: qos,
+      autoConfirm: autoConfirm,
+      topicPattern: topicPattern,
+      share: originalShareValue,
+      options: options,
+      callback: callback,
+      credit: credit,
+      unconfirmed: 0,
+      confirmed: 0
+    });
 
     // If this is the first subscription to be added, schedule a request to
     // start the polling loop to check for messages arriving
@@ -2282,13 +2325,14 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   return client;
 };
 
+
 /**
  * Stops the flow of messages from a destination to this client. The client's
  * <code>message</code> callback will no longer be driven when messages arrive,
  * that match the pattern associate with the destination. The
  * <code>pattern</code> (and optional) <code>share</code> arguments must match
  * those specified when the destination was created by calling the original
- * <code>client.subscribe(...)</code> method. 
+ * <code>client.subscribe(...)</code> method.
  * <p>
  * The optional <code>options</code> argument can be used to specify how the
  * call to <code>client.unsubscribe(...)</code> behaves. If the
@@ -2323,7 +2367,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
  * @throws {Error}
  *           If the topic pattern parameter is undefined.
  */
-Client.prototype.unsubscribe = function(topicPattern, share, options, callback) {
+Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
+                               {
   logger.entry('Client.unsubscribe', this.id);
   logger.log('parms', this.id, 'topicPattern:', topicPattern);
 
@@ -2406,7 +2451,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback) 
         err = new TypeError("options:ttl value '" +
                             options.ttl +
                             "' is invalid, only 0 is a supported value for " +
-                            " an unsubscribe request");
+                            ' an unsubscribe request');
         logger.throw('Client.unsubscribe', this.id, err);
         throw err;
       }
@@ -2426,7 +2471,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback) 
     throw err;
   }
 
-  // Subscribe using the specified topic pattern and share options
+  // unsubscribe using the specified topic pattern and share options
   var messenger = this.messenger;
   var address = this.service + '/' + share + topicPattern;
   var client = this;
@@ -2434,11 +2479,45 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback) 
 
   // if client is in the retrying state, then queue this unsubscribe request
   if (client.state === 'retrying' || client.state === 'connecting') {
-    // TODO: will implement this under a separate work item, for now...
-    throw new Error('not connected and queued unsubscribe has not been ' +
-                    'implemented yet');
-    //logger.exit('Client.unsubscribe', client.id, client);
-    //return client;
+    // first check if the unsubscribe request is already queued, and remove it
+    var qs = 0;
+    for (qs = 0; qs < client.queuedUnsubscribes.length; qs++) {
+      if (client.queuedUnsubscribes[qs].address === subscriptionAddress &&
+          client.queuedUnsubscribes[qs].share === originalShareValue) {
+        client.queuedUnsubscribes.splice(qs, 1);
+      }
+    }
+
+    // check if there's a queued subscribe for the same topic, if so remove
+    // that and don't bother queueing the subscribe
+    var nop = false;
+    for (qs = 0; qs < client.queuedSubscriptions.length; qs++) {
+      if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
+          client.queuedSubscriptions[qs].share === originalShareValue) {
+        client.queuedSubscriptions.splice(qs, 1);
+        nop = true;
+      }
+    }
+
+    // queue unsubscribe request as appropriate
+    if (nop) {
+      logger.log('data', client.id, 'client already had a queued subscribe ' +
+                 'request for this address, so removed that instead and no ' +
+                 'need to queue this unsubscribe request');
+    } else {
+      logger.log('data', client.id, 'client waiting for connection so ' +
+                 'queueing the unsubscribe request');
+      client.queuedUnsubscribes.push({
+        address: subscriptionAddress,
+        topicPattern: topicPattern,
+        share: originalShareValue,
+        options: options,
+        callback: callback
+      });
+    }
+
+    logger.exit('Client.unsubscribe', client.id, client);
+    return client;
   }
 
   var err;
