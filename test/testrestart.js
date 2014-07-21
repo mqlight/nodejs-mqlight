@@ -283,7 +283,7 @@ module.exports.test_single_queued_send = function(test) {
 
   client.once('error', function(err) {
     stubproton.setConnectStatus(0);
-    test.equals(client.queuedSends.length, 1, 'check for queued send'); 
+    test.equals(client.queuedSends.length, 1, 'check for queued send');
   });
 
   client.on('reconnected', function(x, y) {
@@ -307,7 +307,7 @@ module.exports.test_queue_sends_retrying = function(test) {
         'amqp://host'});
   var callbacksCalled = 0;
   var callbacksCalledInError = 0;
-  
+
   client.on('disconnected', function() {
     test.equal(client.queuedSends.length, 0, 'queued sends drained');
     test.equal(callbacksCalled, 3, '3 callbacks called with success');
@@ -319,9 +319,9 @@ module.exports.test_queue_sends_retrying = function(test) {
     stubproton.setConnectStatus(1);
     mqlight.reconnect(client);
     // these 3 sends should get queued
-    for ( var i = 0; i < 3; i++ ) { 
-      client.send('topic ' + i, 'message ' + i , function(err) {
-        if (err){
+    for (var i = 0; i < 3; i++) {
+      client.send('topic ' + i, 'message ' + i, function(err) {
+        if (err) {
           callbacksCalledInError++;
           process.nextTick(function() {
             client.disconnect();
@@ -354,7 +354,7 @@ module.exports.test_queue_sends_retrying = function(test) {
 */
 module.exports.test_queued_subs_retrying = function(test) {
   var client = mqlight.createClient({id: 'test_queued_subs_retrying', service:
-        'amqp://host'}); 
+        'amqp://host'});
 
   var savedSubFunction = mqlight.proton.messenger.subscribe;
   mqlight.proton.messenger.subscribe = function() {
@@ -374,16 +374,16 @@ module.exports.test_queued_subs_retrying = function(test) {
           client.queuedSubscriptions.length);
       mqlight.proton.messenger.subscribe = savedSubFunction;
       stubproton.setConnectStatus(0);
-      setTimeout(function(){client.disconnect();},500);
+      setTimeout(function() {client.disconnect();},500);
     }
   });
 
-  var successCallbacks = 0; 
+  var successCallbacks = 0;
   client.once('connected', function() {
     stubproton.setConnectStatus(1);
     // queue up 4 subscribes
     for (var i = 1; i < 5; i++) {
-      client.subscribe('queue'+i, function(err) {
+      client.subscribe('queue' + i, function(err) {
         if (!err) {
           successCallbacks++;
         }
@@ -405,22 +405,22 @@ module.exports.test_queued_subs_retrying = function(test) {
 * will get processed, when it connects.
 * @param {object} test the unittest interface.
 */
-module.exports.test_initial_failure_retry_sub = function(test){
+module.exports.test_initial_failure_retry_sub = function(test) {
 
   var client = mqlight.createClient({id: 'test_initial_failure_retry_sub',
     service: 'amqp://host'});
   var callbackCalled = 0;
   var first = true;
   client.on('connected', function() {
-    test.equal(client.queuedSubscriptions.length, 0, 
+    test.equal(client.queuedSubscriptions.length, 0,
         'should be no queued subs');
-    setTimeout(function(){  client.disconnect() },10);
+    setTimeout(function() { client.disconnect(); },10);
   });
 
   client.on('error', function() {
-    if ( first ) {
-      client.subscribe('queuedSub', function(err){
-        if (err){
+    if (first) {
+      client.subscribe('queuedSub', function(err) {
+        if (err) {
           test.ok(false, 'should not be called in err');
         } else {
           callbackCalled++;
@@ -428,13 +428,13 @@ module.exports.test_initial_failure_retry_sub = function(test){
       });
       first = false;
     } else {
-      test.equal(client.queuedSubscriptions.length, 1, 
+      test.equal(client.queuedSubscriptions.length, 1,
                  'should be a queued sub');
       stubproton.setConnectStatus(0);
-    } 
+    }
   });
 
-  client.on('disconnected', function(){
+  client.on('disconnected', function() {
     test.equal(callbackCalled, 1, 'should have called in success');
     test.done();
   });
@@ -449,22 +449,22 @@ module.exports.test_initial_failure_retry_sub = function(test){
 * will get processed, when it connects.
 * @param {object} test the unittest interface.
 */
-module.exports.test_initial_failure_retry_send = function(test){
+module.exports.test_initial_failure_retry_send = function(test) {
 
   var client = mqlight.createClient({id: 'test_initial_failure_retry_send',
     service: 'amqp://host'});
   var callbackCalled = 0;
   var first = true;
   client.on('connected', function() {
-    test.equal(client.queuedSends.length, 0, 
+    test.equal(client.queuedSends.length, 0,
         'should be no queued sends');
-    setTimeout(function(){  client.disconnect() },10);
+    setTimeout(function() { client.disconnect(); },10);
   });
 
   client.on('error', function() {
-    if ( first ) {
-      client.send('topic', 'message', function(err){
-        if (err){
+    if (first) {
+      client.send('topic', 'message', function(err) {
+        if (err) {
           test.ok(false, 'should not be called in err');
         } else {
           callbackCalled++;
@@ -472,13 +472,13 @@ module.exports.test_initial_failure_retry_send = function(test){
       });
       first = false;
     } else {
-      test.equal(client.queuedSends.length, 1, 
+      test.equal(client.queuedSends.length, 1,
                  'should be a queued send');
       stubproton.setConnectStatus(0);
     }
-  }); 
+  });
 
-  client.on('disconnected', function(){
+  client.on('disconnected', function() {
     test.equal(callbackCalled, 1, 'should be one callback called');
     test.done();
   });
