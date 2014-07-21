@@ -164,6 +164,9 @@ module.exports.createProtonStub = function() {
       subscribe: function() {
         if (DEBUG) console.log('stub subscribe function called');
       },
+      unsubscribe: function() {
+        if (DEBUG) console.log('stub unsubscribe function called');
+      },
       lastErrorText: '',
       getLastErrorText: function() {
         if (DEBUG) console.log('stub getLastErrorText function called, ' +
