@@ -359,3 +359,47 @@ module.exports.test_unsubscribe_options = function(test) {
     test.done();
   });
 };
+
+
+/**
+ * Test a variety of valid and invalid ttl options.  Invalid ttl values should
+ * result in the client.unsubscribe(...) method throwing a TypeError.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_unsubscribe_ttl_validity = function(test) {
+  var data = [
+    {valid: false, ttl: undefined},
+    {valid: false, ttl: function() {}},
+    {valid: false, ttl: -9007199254740992},
+    {valid: false, ttl: -NaN},
+    {valid: false, ttl: NaN},
+    {valid: false, ttl: -Infinity},
+    {valid: false, ttl: Infinity},
+    {valid: false, ttl: -1},
+    {valid: false, ttl: 1},
+    {valid: false, ttl: 9007199254740992},
+    {valid: true, ttl: 0},
+    {valid: true, ttl: null}, // treated as 0
+    {valid: true, ttl: ''}    // treated as 0
+  ];
+
+  var client = mqlight.createClient({id: 'test_unsubscribe_ttl_validity',
+    service: 'amqp://host'});
+  client.connect(function() {
+    for (var i = 0; i < data.length; ++i) {
+      var opts = { ttl: data[i].ttl };
+      if (data[i].valid) {
+        test.doesNotThrow(function() {
+          client.unsubscribe('testpattern', opts);
+        });
+      } else {
+        test.throws(function() {
+          client.unsubscribe('testpattern', opts);
+        }, TypeError, 'ttl should have been rejected: ' + data[i].ttl);
+      }
+    }
+    client.disconnect();
+    test.done();
+  });
+};

@@ -1370,14 +1370,36 @@ var processQueuedActions = function(err) {
     while (client.queuedSubscriptions.length > 0 &&
             client.state === 'connected') {
       var sub = client.queuedSubscriptions.pop();
-      client.subscribe(sub.topicPattern, sub.share, sub.options, sub.callback);
+      if (sub.noop) {
+        // no-op, so just trigger the callback without actually subscribing
+        if (sub.callback) {
+          process.nextTick(function() {
+            logger.entry('Client.subscribe.callback', client.id);
+            logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+                       sub.topicPattern, ', originalShareValue:', sub.share);
+            sub.callback.apply(client,
+                [err, sub.topicPattern, sub.originalShareValue]);
+            logger.exit('Client.subscribe.callback', client.id, null);
+          });
+        }
+      } else {
+        client.subscribe(sub.topicPattern, sub.share, sub.options,
+                         sub.callback);
+      }
     }
     logger.log('data', client.id, 'client.queuedUnsubscribes',
                client.queuedUnsubscribes);
     while (client.queuedUnsubscribes.length > 0 &&
             client.state === 'connected') {
       var rm = client.queuedUnsubscribes.pop();
-      client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
+      if (rm.noop) {
+        // no-op, so just trigger the callback without actually unsubscribing
+        if (rm.callback) {
+          rm.callback.apply(client, []);
+        }
+      } else {
+        client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
+      }
     }
     logger.log('data', client.id, 'client.queuedSends',
                client.queuedSends);
@@ -2477,45 +2499,43 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   var client = this;
   var subscriptionAddress = this.service + '/' + topicPattern;
 
-  // if client is in the retrying state, then queue this unsubscribe request
-  if (client.state === 'retrying' || client.state === 'connecting') {
-    // first check if the unsubscribe request is already queued, and remove it
-    var qs = 0;
-    for (qs = 0; qs < client.queuedUnsubscribes.length; qs++) {
-      if (client.queuedUnsubscribes[qs].address === subscriptionAddress &&
-          client.queuedUnsubscribes[qs].share === originalShareValue) {
-        client.queuedUnsubscribes.splice(qs, 1);
-      }
-    }
-
-    // check if there's a queued subscribe for the same topic, if so remove
-    // that and don't bother queueing the subscribe
-    var nop = false;
-    for (qs = 0; qs < client.queuedSubscriptions.length; qs++) {
+  var queueUnsubscribe = function() {
+    // check if there's a queued subscribe for the same topic, if so mark that
+    // as a no-op operation, so the callback is called but a no-op takes place
+    // on reconnection
+    var noop = false;
+    for (var qs = 0; qs < client.queuedSubscriptions.length; qs++) {
       if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
-          client.queuedSubscriptions[qs].share === originalShareValue) {
-        client.queuedSubscriptions.splice(qs, 1);
-        nop = true;
+          client.queuedSubscriptions[qs].share === originalShareValue &&
+          !(client.queuedSubscriptions[qs].noop)) {
+        noop = client.queuedSubscriptions[qs].noop = true;
       }
     }
 
     // queue unsubscribe request as appropriate
-    if (nop) {
+    if (noop) {
       logger.log('data', client.id, 'client already had a queued subscribe ' +
-                 'request for this address, so removed that instead and no ' +
-                 'need to queue this unsubscribe request');
+                 'request for this address, so marked that as a noop and ' +
+                 'will queue this unsubscribe request as a noop too');
     } else {
       logger.log('data', client.id, 'client waiting for connection so ' +
                  'queueing the unsubscribe request');
-      client.queuedUnsubscribes.push({
-        address: subscriptionAddress,
-        topicPattern: topicPattern,
-        share: originalShareValue,
-        options: options,
-        callback: callback
-      });
     }
+    client.queuedUnsubscribes.push({
+      noop: noop,
+      address: subscriptionAddress,
+      topicPattern: topicPattern,
+      share: originalShareValue,
+      options: options,
+      callback: callback
+    });
+  };
 
+  // if client is in the retrying state, then queue this unsubscribe request
+  if (client.state === 'retrying' || client.state === 'connecting') {
+    logger.log('data', client.id, 'client is still in the process of ' +
+               'connecting so queueing the unsubscribe request');
+    queueUnsubscribe();
     logger.exit('Client.unsubscribe', client.id, client);
     return client;
   }
@@ -2545,6 +2565,15 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
       logger.log('emit', client.id, 'error', err);
       client.emit('error', err);
     });
+    if (!(err instanceof TypeError)) {
+      logger.log('data', client.id, 'client error "' + err + '" during ' +
+                 'messenger.unsubscribe call so queueing the unsubscribe ' +
+                 'request');
+      queueUnsubscribe();
+      setImmediate(function() {
+        reconnect(client);
+      });
+    }
   }
 
   logger.exit('Client.unsubscribe', client.id, client);

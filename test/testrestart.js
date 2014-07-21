@@ -401,8 +401,269 @@ module.exports.test_queued_subs_retrying = function(test) {
 
 
 /**
+ * Test that when the client is still in the 'connecting' state, any attempted
+ * unsubscribes are queued and then go through following a connection.
+ *
+ * @param {object} test the unittest interface.
+ */
+module.exports.test_queued_unsubscribe_before_connect = function(test) {
+  var client = mqlight.createClient({
+    id: 'test_queued_unsubscribe_before_connect',
+    service: function(callback) {
+      test.strictEqual(client.state, 'connecting');
+      // queue up 4 unsubscribes before allowing the connection through
+      for (var i = 1; i < 5; i++) {
+        client.unsubscribe('queue' + i, function() {
+          successCallbacks++;
+        });
+      }
+      test.strictEqual(client.queuedUnsubscribes.length, 4,
+                       'expected to see 4 queued unsubscriptions, but saw ' +
+          client.queuedUnsubscribes.length);
+      callback(null, 'amqp://host');
+    }
+  });
+
+  var successCallbacks = 0;
+  client.once('connected', function() {
+    setTimeout(function() {client.disconnect();},500);
+  });
+
+  client.on('disconnected', function() {
+    test.equal(successCallbacks, 4, 'expecting 4 success callbacks, saw ' +
+        successCallbacks);
+    test.done();
+  });
+
+  // call connect to transition into 'connecting' state
+  client.connect();
+};
+
+
+/**
+ * Test that when messenger.unsubscribe throws an error, any attempted
+ * unsubscribes are queued and then go through following a reconnect.
+ *
+ * @param {object} test the unittest interface.
+ */
+module.exports.test_queued_unsubscribe_via_error = function(test) {
+  var client = mqlight.createClient({
+    id: 'test_queued_unsubscribe_retry',
+    service: 'amqp://host'
+  });
+
+  var savedUnsubscribeFn = mqlight.proton.messenger.unsubscribe;
+  mqlight.proton.messenger.unsubscribe = function() {
+    throw new Error('error on unsubscribe');
+  };
+
+  var unsubscribeErrors = 0;
+  client.on('error', function(err) {
+    if (/error on unsubscribe/.test(err.message)) {
+      unsubscribeErrors++;
+      return;
+    }
+
+    if (unsubscribeErrors === 4) {
+      test.strictEqual(client.queuedUnsubscribes.length, 4,
+                       'expected to see 4 queued unsubscriptions, but saw ' +
+          client.queuedUnsubscribes.length);
+      mqlight.proton.messenger.unsubscribe = savedUnsubscribeFn;
+      stubproton.setConnectStatus(0);
+      setTimeout(function() {client.disconnect();},500);
+    }
+  });
+
+  var successCallbacks = 0;
+  client.once('connected', function() {
+    stubproton.setConnectStatus(1);
+    // queue up 4 unsubscribes
+    for (var i = 1; i < 5; i++) {
+      client.unsubscribe('queue' + i, function() {
+        successCallbacks++;
+      });
+    }
+  });
+
+  client.on('disconnected', function() {
+    test.equal(successCallbacks, 4, 'expecting 4 success callbacks, saw ' +
+        successCallbacks);
+    test.done();
+  });
+  client.connect();
+};
+
+
+/**
+ * Test that a queued subscribe and unsubscribe for the same address cancel
+ * each other out. We'll do this by submitting 4 subscribes and 4 unsubscribes
+ * where there is an intersection between two of the topics used in these
+ * cases.
+ *
+ * @param {object} test the unittest interface.
+ */
+module.exports.test_queued_before_connect_unsubscribe_nop = function(test) {
+  var callbacks = 0,
+      subscribes = 0,
+      unsubscribes = 0;
+
+  var savedSubscribeFn = mqlight.proton.messenger.subscribe;
+  mqlight.proton.messenger.subscribe = function() {
+    ++subscribes;
+  };
+  var savedUnsubscribeFn = mqlight.proton.messenger.unsubscribe;
+  mqlight.proton.messenger.unsubscribe = function() {
+    ++unsubscribes;
+  };
+
+  var client = mqlight.createClient({
+    id: 'test_queued_before_connect_unsubscribe_nop',
+    service: function(callback) {
+      test.strictEqual(client.state, 'connecting');
+      // queue up 4 subscribes to queue{1,2,3,4} before allowing connection
+      for (var i = 1; i < 5; i++) {
+        client.subscribe('queue' + i, function() {
+          callbacks++;
+        });
+      }
+      // queue up 4 unsubscribes to queue{2,4,6,8} before allowing connection
+      for (var j = 2; j < 9; j += 2) {
+        client.unsubscribe('queue' + j, function() {
+          callbacks++;
+        });
+      }
+      test.strictEqual(client.queuedSubscriptions.length, 4,
+                       'expected to see 4 queued subscriptions, but saw ' +
+          client.queuedSubscriptions.length);
+      test.strictEqual(client.queuedUnsubscribes.length, 4,
+                       'expected to see 4 queued unsubscriptions, but saw ' +
+          client.queuedUnsubscribes.length);
+      callback(null, 'amqp://host');
+    }
+  });
+
+  client.once('connected', function() {
+    setTimeout(function() {client.disconnect();},500);
+  });
+
+  client.on('disconnected', function() {
+    // we expect all 8 of the subscribe and unsubscribe requests to have their
+    // callbacks called
+    test.equal(callbacks, 8, 'expecting 8 success callbacks, but saw ' +
+        callbacks);
+    // but we only expect 2 subscribes and 2 unsubscribes to have required
+    // processing
+    test.equal(subscribes, 2, 'expecting 2 subscribes, but saw ' +
+        subscribes);
+    test.equal(unsubscribes, 2, 'expecting 2 unsubscribes, but saw ' +
+        unsubscribes);
+    mqlight.proton.messenger.subscribe = savedSubscribeFn;
+    mqlight.proton.messenger.unsubscribe = savedUnsubscribeFn;
+    test.done();
+  });
+
+  // call connect to transition into 'connecting' state
+  client.connect();
+};
+
+
+/**
+ * Test that a queued subscribe and unsubscribe for the same address cancel
+ * each other out. We'll do this by submitting 4 subscribes and 4 unsubscribes
+ * where there is an intersection between two of the topics used in these
+ * cases.
+ *
+ * @param {object} test the unittest interface.
+ */
+module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
+  var client = mqlight.createClient({
+    id: 'test_queued_via_error_unsubscribe_nop',
+    service: 'amqp://host'
+  });
+
+  var savedSubscribeFn = mqlight.proton.messenger.subscribe;
+  mqlight.proton.messenger.subscribe = function() {
+    throw new Error('error on subscribe');
+  };
+  var savedUnsubscribeFn = mqlight.proton.messenger.unsubscribe;
+  mqlight.proton.messenger.unsubscribe = function() {
+    throw new Error('error on unsubscribe');
+  };
+
+  var subscribeErrors = 0,
+      unsubscribeErrors = 0,
+      subscribes = 0,
+      unsubscribes = 0;
+  client.on('error', function(err) {
+    if (/error on subscribe/.test(err.message)) {
+      subscribeErrors++;
+      return;
+    }
+    if (/error on unsubscribe/.test(err.message)) {
+      unsubscribeErrors++;
+      return;
+    }
+
+    if (subscribeErrors === 4 && unsubscribeErrors === 4) {
+      test.strictEqual(client.queuedSubscriptions.length, 4,
+                       'expected to see 4 queued subscriptions, but saw ' +
+          client.queuedSubscriptions.length);
+      test.strictEqual(client.queuedUnsubscribes.length, 4,
+                       'expected to see 4 queued unsubscriptions, but saw ' +
+          client.queuedUnsubscribes.length);
+      mqlight.proton.messenger.subscribe = function() {
+        ++subscribes;
+      };
+      mqlight.proton.messenger.unsubscribe = function() {
+        ++unsubscribes;
+      };
+      stubproton.setConnectStatus(0);
+      setTimeout(function() {client.disconnect();},500);
+    }
+  });
+
+  var successCallbacks = 0;
+  client.once('connected', function() {
+    stubproton.setConnectStatus(1);
+    // queue up 4 subscribes to queue{1,2,3,4}
+    for (var i = 1; i < 5; i++) {
+      client.subscribe('queue' + i, function(err) {
+        if (!err) {
+          successCallbacks++;
+        }
+      });
+    }
+    // queue up 4 unsubscribes to queue{2,4,6,8}
+    for (var j = 2; j < 9; j += 2) {
+      client.unsubscribe('queue' + j, function() {
+        successCallbacks++;
+      });
+    }
+  });
+
+  client.on('disconnected', function() {
+    // we expect all 8 of the subscribe and unsubscribe requests to have their
+    // callbacks called
+    test.equal(successCallbacks, 8, 'expecting 8 success callbacks, saw ' +
+        successCallbacks);
+    // but we only expect 2 subscribes and 2 unsubscribes to have required
+    // processing
+    test.equal(subscribes, 2, 'expecting 2 subscribes, but saw ' +
+        subscribes);
+    test.equal(unsubscribes, 2, 'expecting 2 unsubscribes, but saw ' +
+        unsubscribes);
+    mqlight.proton.messenger.subscribe = savedSubscribeFn;
+    mqlight.proton.messenger.unsubscribe = savedUnsubscribeFn;
+    test.done();
+  });
+  client.connect();
+};
+
+
+/**
 * Test that when the initial connection fails a queued subscribe
 * will get processed, when it connects.
+*
 * @param {object} test the unittest interface.
 */
 module.exports.test_initial_failure_retry_sub = function(test) {
