@@ -1501,15 +1501,17 @@ Client.prototype.isDisconnected = function() {
  *           If one of the specified parameters is of the wrong type.
  * @throws {Error}
  *           If the topic or data parameter is undefined.
- * @return {Boolean} <code>true</code> if the message was
- *         sent or <code>false</code> if the message was not yet
- *         sent, because either the network could not accept it,
- *         or the client was not in a connected state.
+ * @return {Boolean} <code>true</code> if this message was either sent or is the
+ *           next to be sent, or <code>false</code> if the message was queued in
+ *           user memory, because either there was a backlog of messages, or the
+ *           client was not in a connected state.
+ *           <code>drain</code> will be emitted when the backlog of messages is
+ *           cleared.
  */
 Client.prototype.send = function(topic, data, options, callback) {
   logger.entry('Client.send', this.id);
   var err;
-  var alreadySent = false;
+  var nextMessage = false;
 
   // Validate the passed parameters
   if (!topic) {
@@ -1689,10 +1691,23 @@ Client.prototype.send = function(topic, data, options, callback) {
               break;
           }
 
-          // If complete then invoke the callback, when specified
+          // If complete then do final processing of this message.
           if (complete) {
             index = client.outstandingSends.indexOf(localMessageId);
             if (index >= 0) client.outstandingSends.splice(index, 1);
+
+            // If previously send() returned false and now the backlog of
+            // messages is cleared, emit a drain event.
+            logger.log('debug', client.id,
+                       'outstandingSends:', client.outstandingSends.length);
+            if (client.drainEventRequired &&
+                (client.outstandingSends.length <= 1)) {
+              logger.log('emit', client.id, 'drain');
+              client.emit('drain');
+              client.drainEventRequired = false;
+            }
+
+            // invoke the callback, if specified
             if (sendCallback) {
               var body = protonMsg.body;
               setImmediate(function() {
@@ -1704,17 +1719,6 @@ Client.prototype.send = function(topic, data, options, callback) {
               });
             }
             protonMsg.destroy();
-
-            // If previously send() returned false and now the backlog of
-            // messages is cleared, emit a drain event.
-            logger.log('debug', client.id,
-                       'outstandingSends:', client.outstandingSends.length);
-            if (client.drainEventRequired &&
-                (client.outstandingSends.length === 0)) {
-              logger.log('emit', client.id, 'drain');
-              client.emit('drain');
-              client.drainEventRequired = false;
-            }
 
             logger.exit('Client.send.untilSendComplete', client.id, null);
             return;
@@ -1782,10 +1786,10 @@ Client.prototype.send = function(topic, data, options, callback) {
     // start the timer to trigger it to keep sending until msg has sent
     setImmediate(untilSendComplete, protonMsg, localMessageId, callback);
 
-    // If the message hasn't yet been sent, then we'll need to emit a drain
+    // If we have a backlog of messages, then record the need to emit a drain
     // event later to indicate the backlog has been cleared.
-    if (client.outstandingSends.length === 0) {
-      alreadySent = true;
+    if (client.outstandingSends.length <= 1) {
+      nextMessage = true;
     } else {
       client.drainEventRequired = true;
     }
@@ -1819,8 +1823,8 @@ Client.prototype.send = function(topic, data, options, callback) {
     });
   }
 
-  logger.exit('Client.send', this.id, alreadySent);
-  return alreadySent;
+  logger.exit('Client.send', this.id, nextMessage);
+  return nextMessage;
 };
 
 

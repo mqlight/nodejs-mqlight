@@ -165,9 +165,11 @@ Object type when received.
 * `callback` - (Function) (optional) callback to be notified of errors &
   completion
 
-Returns true if if the message was sent. Returns false if the message was not
-yet sent, because either the network could not accept it, or the client was not
-in a connected state.
+Returns `true` if this message was either sent or is the next to be sent.
+
+Returns `false` if the message was queued in user memory, because either there
+was a backlog of messages, or the client was not in a connected state. `drain`
+will be emitted when the backlog of messages is cleared.
 
 ### mqlight.Client.subscribe(`pattern`, [`share`], [`options`], [`callback`])
 
