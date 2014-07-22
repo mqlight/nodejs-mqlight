@@ -124,47 +124,65 @@ var delay = parsed.delay * 1000 || 0;
 // once connection is acquired, send messages
 client.on('connected', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
-  console.log('Sending to: %s', topic);
+  console.log('Publishing to: %s', topic);
+
+  // send the next message, inserting a delay if requested
+  var sendNextMessage = function() {
+    if (delay > 0) {
+      setTimeout(sendMessage, delay);
+    } else {
+      setImmediate(sendMessage);
+    }
+  };
 
   // queue all messages for sending
   var i = 0;
   var sequenceNum = 0;
-  var sendNextMessage = function() {
-    var body = messages[i];
-    var options = { qos: mqlight.QOS_AT_LEAST_ONCE };
-    if (parsed['message-ttl']) {
-      options.ttl = Number(parsed['message-ttl']) * 1000;
+  var sendMessage = function() {
+    var msgNum = i++;
+
+    // check if the messages should be repeated again
+    if (messages.length == i) {
+      if (repeat != 1) i = 0;
+      if (repeat > 1) --repeat;
     }
-    if (parsed['sequence'] && !parsed.file) {
-      body = (++sequenceNum) + ': ' + body;
-    }
-    client.send(topic, body, options, function(err, topic, data, options) {
-      if (err) {
-        console.error('Problem with send request: %s', err.message);
-        process.exit(1);
-      }
-      if (data) {
-        console.log(data);
-      }
-      // if there are more messages pending, send the next in <delay> seconds
-      ++i;
-      if (i == messages.length) {
-        if (repeat != 1) i = 0;
-        if (repeat > 1) --repeat;
-      }
-      if (messages.length > i) {
-        if (delay > 0) {
-          setTimeout(sendNextMessage, delay);
-        } else {
-          setImmediate(sendNextMessage);
+
+    // keep going until all messages have been sent
+    if (messages.length > msgNum) {
+      var body = messages[msgNum];
+      var options = { qos: mqlight.QOS_AT_LEAST_ONCE };
+      var callback = function(err, topic, data, options) {
+        if (err) {
+          console.error('Problem with send request: %s', err.message);
+          process.exit(1);
         }
-      } else {
-        client.disconnect();
+        if (data) {
+          console.log(data);
+        }
+      };
+
+      if (parsed['message-ttl']) {
+        options.ttl = Number(parsed['message-ttl']) * 1000;
       }
-    });
+      if (parsed['sequence'] && !parsed.file) {
+        body = (++sequenceNum) + ': ' + body;
+      }
+
+      if (client.send(topic, body, options, callback)) {
+        // Send the next message now
+        sendNextMessage();
+      } else {
+        // There's a backlog of messages to send, so wait until the backlog is
+        // cleared before sending any more
+        client.once('drain', sendNextMessage);
+      }
+    } else {
+      // No more messages to send, so disconnect
+      client.disconnect();
+    }
   };
 
-  sendNextMessage();
+  sendMessage();
 });
 
 client.on('error', function(error) {
