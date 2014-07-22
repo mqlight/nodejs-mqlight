@@ -124,7 +124,7 @@ var delay = parsed.delay * 1000 || 0;
 // once connection is acquired, send messages
 client.on('connected', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
-  console.log('Publishing to: %s', topic);
+  console.log('Sending to: %s', topic);
 
   // queue all messages for sending
   var i = 0;
