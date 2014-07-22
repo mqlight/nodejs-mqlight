@@ -1501,12 +1501,11 @@ Client.prototype.isDisconnected = function() {
  *           If one of the specified parameters is of the wrong type.
  * @throws {Error}
  *           If the topic or data parameter is undefined.
- * @return {Boolean} <code>true</code> if this message was either sent or is the
- *           next to be sent, or <code>false</code> if the message was queued in
- *           user memory, because either there was a backlog of messages, or the
- *           client was not in a connected state.
- *           <code>drain</code> will be emitted when the backlog of messages is
- *           cleared.
+ * @return {Boolean} <code>true</code> if this message was sent, or is the next
+ *           to be sent, or <code>false</code> if the message was queued in user
+ *           memory, due to either a backlog of messages, or because the client
+ *           was not in a connected state. When the backlog of messages is
+ *           cleared, <code>drain</code> will be emitted.
  */
 Client.prototype.send = function(topic, data, options, callback) {
   logger.entry('Client.send', this.id);
