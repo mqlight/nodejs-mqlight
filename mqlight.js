@@ -1701,9 +1701,11 @@ Client.prototype.send = function(topic, data, options, callback) {
                        'outstandingSends:', client.outstandingSends.length);
             if (client.drainEventRequired &&
                 (client.outstandingSends.length <= 1)) {
-              logger.log('emit', client.id, 'drain');
               client.drainEventRequired = false;
-              client.emit('drain');
+              process.nextTick(function() {
+                logger.log('emit', client.id, 'drain');
+                client.emit('drain');
+              });
             }
 
             // invoke the callback, if specified
