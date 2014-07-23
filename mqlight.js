@@ -1740,9 +1740,11 @@ Client.prototype.send = function(topic, data, options, callback) {
                        'outstandingSends:', client.outstandingSends.length);
             if (client.drainEventRequired &&
                 (client.outstandingSends.length <= 1)) {
-              logger.log('emit', client.id, 'drain');
-              client.emit('drain');
               client.drainEventRequired = false;
+              process.nextTick(function() {
+                logger.log('emit', client.id, 'drain');
+                client.emit('drain');
+              });
             }
 
             // invoke the callback, if specified
@@ -1826,6 +1828,8 @@ Client.prototype.send = function(topic, data, options, callback) {
 
     // If we have a backlog of messages, then record the need to emit a drain
     // event later to indicate the backlog has been cleared.
+    logger.log('debug', client.id,
+               'outstandingSends:', client.outstandingSends.length);
     if (client.outstandingSends.length <= 1) {
       nextMessage = true;
     } else {
