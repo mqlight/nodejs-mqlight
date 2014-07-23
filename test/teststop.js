@@ -29,25 +29,25 @@ var testCase = require('nodeunit').testCase;
 
 
 /**
- * Test a successful disconnect, ensuring that both the 'disconnected'
- * event and the callback passed into client.disconnect(...) are driven.  In
+ * Test a successful stop, ensuring that both the 'stopped'
+ * event and the callback passed into client.stop(...) are driven.  In
  * both cases 'this' should point at client that the event listener / callback
  * is associated with.
  * @param {object} test the unittest interface
  */
-module.exports.test_disconnect_callback_and_event = function(test) {
+module.exports.test_stop_callback_and_event = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.connect(function() {
+  client.start(function() {
     var count = 0;
-    client.on('disconnected', function() {
+    client.on('stopped', function() {
       test.ok(this === client);
       test.equals(arguments.length, 0);
-      test.equals(client.state, 'disconnected');
+      test.equals(client.state, 'stopped');
       if (++count == 2) {
         test.done();
       }
     });
-    client.disconnect(function() {
+    client.stop(function() {
       test.ok(this === client);
       test.equals(arguments.length, 0);
       if (++count == 2) {
@@ -59,18 +59,18 @@ module.exports.test_disconnect_callback_and_event = function(test) {
 
 
 /**
- * Test that the disconnected event is fired on a subsequent tick from that in
- * which the client.disconnect(...) call is run - meaning that it is possible
- * to call client.disconnect(...) and client.on('disconnected',...) on the same
+ * Test that the stopped event is fired on a subsequent tick from that in
+ * which the client.stop(...) call is run - meaning that it is possible
+ * to call client.stop(...) and client.on('stopped',...) on the same
  * tick and still have the event listener fire.
  * @param {object} test the unittest interface
  */
 module.exports.test_listener_fired_on_subsequent_tick = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.connect();
-  client.on('connected', function() {
-    client.disconnect();
-    client.on('disconnected', function() {
+  client.start();
+  client.on('started', function() {
+    client.stop();
+    client.on('stopped', function() {
       test.done();
     });
   });
@@ -78,63 +78,62 @@ module.exports.test_listener_fired_on_subsequent_tick = function(test) {
 
 
 /**
- * Test that when an argument is specified to the client.disconnect(...)
+ * Test that when an argument is specified to the client.stop(...)
  * function it must be a callback (e.g. of type function).
  * @param {object} test the unittest interface
  */
-module.exports.test_disconnect_argument_is_function = function(test) {
+module.exports.test_stop_argument_is_function = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
   test.throws(
       function() {
-        client.disconnect(1234);
+        client.stop(1234);
       },
       TypeError,
-      'disconnect should throw TypeError if argument is not a function'
+      'stop should throw TypeError if argument is not a function'
   );
   test.done();
 };
 
 
 /**
- * Test that the disconnect(...) method returns the instance of the client that
+ * Test that the stop(...) method returns the instance of the client that
  * it is invoked on.  This is to allow chaining of methods.
  * @param {object} test the unittest interface
  */
-module.exports.test_disconnect_method_returns_client = function(test) {
+module.exports.test_stop_method_returns_client = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
-  var result = client.disconnect();
+  var result = client.stop();
   test.ok(result === client);
   test.done();
 };
 
 
 /**
- * Tests that calling disconnect on an already disconnected client has no
+ * Tests that calling stop on an already stopped client has no
  * effect other than to callback any supplied callback function to indicate
  * success.
  * @param {object} test the unittest interface
  */
-module.exports.test_disconnect_when_already_disconnected = function(test) {
+module.exports.test_stop_when_already_stopped = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.disconnect(function(err) {
+  client.stop(function(err) {
     test.ok(!err);
     test.done();
-  });
-  client.on('disconnected', function() {
-    test.ok(false, "shouldn't receive disconnected event if already " +
-            'disconnected');
+    client.on('stopped', function() {
+      test.ok(false, "shouldn't receive stopped event if already stopped");
+    });
   });
 };
 
 
 /**
- * Test that if too many arguments are supplied to disconnect - then they are
+ * Test that if too many arguments are supplied to stop - then they are
  * ignored.
  * @param {object} test the unittest interface
  */
-module.exports.test_disconnect_too_many_arguments = function(test) {
+module.exports.test_stop_too_many_arguments = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.disconnect(function(err) {
+  client.stop(function(err) {
     test.ok(!err);
     test.done();
   }, 'spurious');
@@ -143,24 +142,23 @@ module.exports.test_disconnect_too_many_arguments = function(test) {
 
 /**
  * Test that the client.subscriptions list is cleared upon a user-requested
- * client.disconnect(...) call.
+ * client.stop(...) call.
  *
  * @param {object} test the unittest interface
  */
-module.exports.test_disconnect_cleared_subscriptions = function(test) {
+module.exports.test_stop_cleared_subscriptions = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.on('connected', function() {
-    client.on('disconnected', function() {
+  client.on('started', function() {
+    client.on('stopped', function() {
       test.deepEqual(client.subscriptions, [], 'client.subscriptions was not ' +
-                     'cleared during client.disconnect() call');
+                     'cleared during client.stop() call');
       test.done();
     });
     client.subscribe('/foo', function(err) {
       test.ifError(err);
       test.deepEqual(client.subscriptions.length, 1, 'client.subscriptions ' +
                      'was not appended to');
-      client.disconnect();
+      client.stop();
     });
   });
-  client.connect();
 };

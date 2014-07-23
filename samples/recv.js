@@ -112,8 +112,8 @@ if (parsed['trust-certificate']) {
 }
 var client = mqlight.createClient(opts);
 
-// once connection is acquired, receive messages for the supplied pattern
-client.on('connected', function() {
+// once started, receive messages for the supplied pattern
+client.on('started', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
   var options = { qos: mqlight.QOS_AT_LEAST_ONCE, autoConfirm: false };
   var delayMs = 0;
@@ -149,7 +149,7 @@ client.on('connected', function() {
       console.log('Writing message data to %s', parsed.file);
       fs.writeFileSync(parsed.file, data);
       delivery.message.confirmDelivery();
-      client.disconnect(function() {
+      client.stop(function() {
         console.error('Exiting.');
         process.exit(0);
       });
@@ -180,10 +180,3 @@ client.on('error', function(error) {
   process.exit(1);
 });
 
-// Make the connection
-client.connect(function(err) {
-  if (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-});

@@ -37,7 +37,7 @@ var mqlight = require('../mqlight');
 module.exports.test_send_too_few_arguments = function(test) {
   var client = mqlight.createClient({id: 'test_send_too_few_arguments',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     test.throws(
         function() {
           client.send();
@@ -48,8 +48,9 @@ module.exports.test_send_too_few_arguments = function(test) {
           client.send('topic');
         }
     );
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -62,14 +63,15 @@ module.exports.test_send_too_few_arguments = function(test) {
 module.exports.test_send_too_many_arguments = function(test) {
   var client = mqlight.createClient({id: 'test_send_too_many_arguments',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     test.doesNotThrow(
         function() {
           client.send('topic', 'message', {}, function() {}, 'interloper');
         }
     );
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -90,7 +92,7 @@ module.exports.test_send_topics = function(test) {
 
   var client = mqlight.createClient({id: 'test_send_topics', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(
@@ -108,7 +110,7 @@ module.exports.test_send_topics = function(test) {
         );
       }
     }
-    client.disconnect();
+    client.stop();
     test.done();
   });
 };
@@ -153,7 +155,7 @@ module.exports.test_send_payloads = function(test) {
 
   var client = mqlight.createClient({id: 'test_send_payloads', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].result === 'error') {
         test.throws(
@@ -187,7 +189,7 @@ module.exports.test_send_payloads = function(test) {
       }
     }
 
-    client.disconnect(function() {
+    client.stop(function() {
       // Restore original implementation of 'put' method before completing.
       mqlight.proton.messenger.put = savedPutMethod;
       test.done();
@@ -223,13 +225,13 @@ module.exports.test_send_callback = function(test) {
       test.ok(this === client);
       ++count;
       if (count === testData.length) {
-        client.disconnect();
+        client.stop();
         clearTimeout(timeout);
         test.done();
       }
     };
   };
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < testData.length; ++i) {
       test.doesNotThrow(function() {
         client.send(testData[i].topic, testData[i].data, testData[i].options,
@@ -246,15 +248,21 @@ module.exports.test_send_callback = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_send_fails_if_disconnected = function(test) {
-  var client = mqlight.createClient({id: 'test_send_fails_if_disconnected',
-    service: 'amqp://host'});
-  test.throws(
-      function() {
-        client.send('topic', 'message');
-      },
-      Error
-  );
-  test.done();
+  var opts = {
+    id: 'test_send_fails_if_disconnected',
+    service: 'amqp://host'
+  };
+  var client = mqlight.createClient(opts, function() {
+    client.stop(function() {
+      test.throws(
+          function() {
+            client.send('topic', 'message');
+          },
+          Error
+      );
+      test.done();
+    });
+  });
 };
 
 
@@ -281,7 +289,7 @@ module.exports.test_send_options = function(test) {
 
   var client = mqlight.createClient({id: 'test_send_options', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(
@@ -299,8 +307,9 @@ module.exports.test_send_options = function(test) {
         );
       }
     }
-    client.disconnect();
-    test.done();
+    client.stop(function() {;
+      test.done();
+    });
   });
 };
 
@@ -327,7 +336,7 @@ module.exports.test_send_qos = function(test) {
 
   var client = mqlight.createClient({id: 'test_send_qos', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { qos: data[i].qos };
       if (data[i].valid) {
@@ -346,7 +355,7 @@ module.exports.test_send_qos = function(test) {
         );
       }
     }
-    client.disconnect();
+    client.stop();
     test.done();
   });
 };
@@ -364,7 +373,7 @@ module.exports.test_send_qos_function = function(test) {
 
   var client = mqlight.createClient({id: 'test_send_qos_function', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { qos: data[i].qos };
       if (data[i].valid) {
@@ -383,14 +392,15 @@ module.exports.test_send_qos_function = function(test) {
         );
       }
     }
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
 
 /**
- * Test that any queued sends are cleared when disconnect is called
+ * Test that any queued sends are cleared when stop is called
  * and that the sends callback is called with an error to indicate
  * failure.
  * @param {object} test the unittest interface
@@ -407,17 +417,17 @@ module.exports.test_clear_queuedsends_disconnect = function(test) {
   var timeout = setTimeout(function() {
     test.ok(false, 'test timed out before callback');
     mqlight.proton.messenger.send = savedSendFunction;
-    client.disconnect();
+    client.stop();
     test.done();
   },
   5000);
   var opts = {qos: mqlight.QOS_AT_LEAST_ONCE};
 
-  client.on('connected', function(err) {
+  client.on('started', function(err) {
     stubproton.setConnectStatus(1);
     client.send('test', 'message', opts, function(err) {
-      test.deepEqual(client.state, 'disconnected',
-          'callback called when disconnected');
+      test.deepEqual(client.state, 'stopped',
+          'callback called when stopped');
       test.notDeepEqual(err, undefined, 'not undefined so err set');
       test.equal(client.queuedSends.length, 0, 'no queued sends left');
       mqlight.proton.messenger.send = savedSendFunction;
@@ -427,15 +437,11 @@ module.exports.test_clear_queuedsends_disconnect = function(test) {
   });
 
   client.on('error', function(err) {
-    client.disconnect();
+    client.stop();
   });
 
   process.on('uncaughtException', function(err) {
     console.log(err);
-  });
-
-  client.connect(function(err) {
-    test.ifError(err);
   });
 };
 
@@ -471,7 +477,7 @@ module.exports.test_send_ttl = function(test) {
   mqlight.proton.messenger.put = function(msg, qos) {
     mqlight.proton.messenger.putMessage = msg;
   };
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { ttl: data[i].ttl };
       if (data[i].valid) {
@@ -488,8 +494,9 @@ module.exports.test_send_ttl = function(test) {
         }, TypeError, 'ttl should have been rejected: ' + data[i].ttl);
       }
     }
-    client.disconnect();
-    mqlight.proton.messenger.put = savedPutFunction;
-    test.done();
+    client.stop(function() {
+      mqlight.proton.messenger.put = savedPutFunction;
+      test.done();
+    });
   });
 };

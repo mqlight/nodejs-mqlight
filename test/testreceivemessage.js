@@ -62,7 +62,7 @@ module.exports.test_receive_message = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
 
   var first = true;
-  client.connect(function(err) {
+  client.start(function(err) {
     test.ifError(err);
     client.on('message', function(data, delivery) {
       if (first) {
@@ -71,7 +71,7 @@ module.exports.test_receive_message = function(test) {
       } else {
         test.deepEqual(delivery.destination.topicPattern, '/kittens/+/boots');
         test.done();
-        client.disconnect();
+        client.stop();
         mqlight.proton.messenger.receive = originalReceiveMethod;
       }
     });
@@ -113,7 +113,7 @@ module.exports.test_receive_topic_pattern = function(test) {
   };
 
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.connect(function() {
+  client.start(function() {
     client.subscribe('/kittens/#');
   });
 
@@ -135,7 +135,7 @@ module.exports.test_receive_topic_pattern = function(test) {
     delivery.message.confirmDelivery();
 
     test.done();
-    client.disconnect();
+    client.stop();
     mqlight.proton.messenger.receive = originalReceiveMethod;
   });
 
@@ -151,7 +151,7 @@ module.exports.test_receive_topic_pattern = function(test) {
 
 
 /**
- * Tests an error in a message listener isn't accidentally caugh in mqlight.js
+ * Tests an error in a message listener isn't accidentally caught in mqlight.js
  * and has the correct stack (referencing this file.
  * @param {object} test the unittest interface
  */
@@ -180,7 +180,7 @@ module.exports.test_bad_listener = function(test) {
   process.addListener('uncaughtException', handler);
   client.on('error', handler);
 
-  client.connect(function() {
+  client.start(function() {
     var first = true;
     client.on('message', function(data, delivery) {
       // purposefully throw an exception the first time
@@ -190,7 +190,7 @@ module.exports.test_bad_listener = function(test) {
       }
       process.removeListener('uncaughtException', handler);
       test.done();
-      client.disconnect();
+      client.stop();
       mqlight.proton.messenger.receive = originalReceiveMethod;
     });
     client.subscribe('/public');
@@ -236,7 +236,7 @@ module.exports.test_malformed_message = function(test) {
   };
 
   var client = mqlight.createClient({service: 'amqp://host'});
-  client.connect(function() {
+  client.start(function() {
     client.subscribe('/kittens/#');
   });
 
@@ -263,7 +263,7 @@ module.exports.test_malformed_message = function(test) {
     test.deepEqual(delivery.malformed.MQMD.CodedCharSetId, 1234);
     test.deepEqual(delivery.malformed.MQMD.Format, 'MQAMQP');
     test.done();
-    client.disconnect();
+    client.stop();
     mqlight.proton.messenger.receive = originalReceiveMethod;
   });
 
@@ -300,7 +300,7 @@ module.exports.test_receive_ttl = function(test) {
   };
   var count = 0;
   var client = mqlight.createClient({service: 'amqp://localhost'});
-  client.connect(function() {
+  client.start(function() {
     client.subscribe('/public');
   }).on('message', function(data, delivery) {
     if (messages[count].ttl == 0) {
@@ -314,7 +314,7 @@ module.exports.test_receive_ttl = function(test) {
                      messages[count].ttl + ')');
     }
     if (++count === messages.length) {
-      client.disconnect();
+      client.stop();
       test.done();
     }
   });
@@ -355,13 +355,13 @@ function run_receiver_credit_testcase(test, credit, qos, numMessages) {
   
   var client = mqlight.createClient({service: 'amqp://host'});
 
-  client.connect(function(err) {
+  client.start(function(err) {
     var receiveCount = 0;
     test.ifError(err);
     
     client.on('message', function(data, delivery) {
       if (++receiveCount >= numMessages) {
-        client.disconnect();
+        client.stop();
         mqlight.proton.messenger.receive = savedReceiveMethod;
         mqlight.proton.messenger.flow = savedFlowMethod;
         test.done();
@@ -482,7 +482,7 @@ module.exports.test_subscribe_credit_confirm = function(test) {
   var interval = undefined;
   var confirmBatch = 0;
 
-  client.connect(function(err) {
+  client.start(function(err) {
     var receiveCount = 0;
     test.ifError(err);
     
@@ -491,7 +491,7 @@ module.exports.test_subscribe_credit_confirm = function(test) {
       if (++receiveCount >= 50) {
         if (interval) clearInterval(interval);
         test.ok(confirmBatch === 4);
-        client.disconnect();
+        client.stop();
         mqlight.proton.messenger.receive = savedReceiveMethod;
         mqlight.proton.messenger.flow = savedFlowMethod;
         test.done();

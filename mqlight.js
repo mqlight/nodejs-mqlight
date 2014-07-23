@@ -124,8 +124,28 @@ var CONNECT_RETRY_INTERVAL = 10000;
 if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
 
 
+/** Client state: trying to re-establish connectivity with the server */
+var STATE_RETRYING = 'retrying';
+
+
+/** Client state: becoming ready to do messaging */
+var STATE_STARTED = 'started';
+
+
+/** Client state: ready to do messaging */
+var STATE_STARTING = 'starting';
+
+
+/** Client state: client disconnected from server, not ready for messaging */
+var STATE_STOPPED = 'stopped';
+
+
+/** Client state: in the process of transitioning to STATE_STOPPED */
+var STATE_STOPPING = 'stopping';
+
+
 /**
- * Constructs a new Client object in the disconnected state.
+ * Constructs a new Client object in the started state.
  * <p>
  * Options:
  * <ul>
@@ -178,14 +198,24 @@ if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
  *
  * @param {Object}
  *          options - (optional) map of options for the client.
+ * @param {Function}
+ *          callback - (optional) callback, invoked when the client has
+ *                     attained 'started' or 'stopped' state.
  * @return {Object} The created Client object.
+ * @this Client
  */
-exports.createClient = function(options) {
+exports.createClient = function(options, callback) {
   logger.entry('createClient', logger.NO_CLIENT_ID);
 
   if (!options) {
     var err = new TypeError('options object missing');
     logger.throw('createClient', logger.NO_CLIENT_ID, err);
+    throw err;
+  }
+
+  if (callback && (typeof callback !== 'function')) {
+    var err = new TypeError('Callback argument must be a function');
+    logger.throw('Client.createClient', this.id, err);
     throw err;
   }
 
@@ -214,16 +244,22 @@ exports.createClient = function(options) {
   process.once('exit', function() {
     logger.entry('createClient.on.exit', logger.NO_CLIENT_ID);
 
-    if (client && client.state == 'connected') {
+    if (client && client.state == STATE_STARTED) {
       try {
         client.messenger.send();
-        client.disconnect();
+        client.stop();
       } catch (err) {
         logger.caught('createClient.on.exit', client.id, err);
       }
     }
 
     logger.exit('createClient.on.exit', logger.NO_CLIENT_ID, null);
+  });
+
+  process.nextTick(function() {
+    client.performConnect(function(err) {
+      if (callback) callback.apply(client, [err, client]);
+    }, true);
   });
 
   logger.exit('createClient', client.id, client);
@@ -652,60 +688,64 @@ var Client = function(service, id, securityOptions) {
   };
 
   // performs the connect
-  this.performConnect = function(callback) {
+  this.performConnect = function(callback, newClient) {
     var client = this;
-    logger.entry('Client.connect.performConnect', client.id);
+    logger.entry('Client.connect.performConnect', client.id, newClient);
 
-    var currentState = client.state;
-    // if we are not disconnected or disconnecting return with the client object
-    if (currentState !== 'disconnected' && currentState !== 'retrying') {
-      if (currentState === 'disconnecting') {
-        var stillDisconnecting = function(client, callback) {
-          logger.entry('stillDisconnecting', client.id);
+    if (!newClient) {
+      var currentState = client.state;
+      // if we are not stopped or stopping state return with the client object
+      if (currentState !== STATE_STOPPED && currentState !== STATE_RETRYING) {
+        if (currentState === STATE_STOPPING) {
+          var stillDisconnecting = function(client, callback) {
+            logger.entry('stillDisconnecting', client.id);
 
-          if (client.state === 'disconnecting') {
-            setImmediate(function() {
-              stillDisconnecting(client, callback);
-            });
-          } else {
-            process.nextTick(function() {
-              client.performConnect(callback);
-            });
-          }
+            if (client.state === STATE_STOPPING) {
+              setImmediate(function() {
+                stillDisconnecting(client, callback);
+              });
+            } else {
+              process.nextTick(function() {
+                client.performConnect(callback, newClient);
+              });
+            }
 
-          logger.exit('stillDisconnecting', client.id, null);
-        };
+            logger.exit('stillDisconnecting', client.id, null);
+          };
 
-        setImmediate(function() {
-          stillDisconnecting(client, callback);
-        });
-        logger.exit('Client.connect.performConnect', client.id, null);
-        return;
-      } else {
-        process.nextTick(function() {
-          if (callback) {
-            logger.entry('Client.connect.performConnect.callback', client.id);
-            callback(undefined);
-            logger.exit('Client.connect.performConnect.callback',
-                        client.id, null);
-          }
-        });
+          setImmediate(function() {
+            stillDisconnecting(client, callback);
+          });
+          logger.exit('Client.connect.performConnect', client.id, null);
+          return;
+        } else {
+          process.nextTick(function() {
+            if (callback) {
+              logger.entry('Client.connect.performConnect.callback', client.id);
+              callback.apply(client);
+              logger.exit('Client.connect.performConnect.callback',
+                          client.id, null);
+            }
+          });
 
-        logger.exit('Client.connect.performConnect', client.id, client);
-        return client;
+          logger.exit('Client.connect.performConnect', client.id, client);
+          return client;
+        }
       }
-    }
 
-    if (client.state === 'disconnected') {
-      client.state = 'connecting';
-    }
+      if (client.state === STATE_STOPPED) {
+        client.state = STATE_STARTING;
+      }
 
-    // If the messenger is not already stopped then something has gone wrong
-    if (client.messenger && !client.messenger.stopped) {
-      var err = new Error('messenger is not stopped');
-      logger.ffdc('Client.connect.performConnect', 'ffdc002', client.id, err);
-      logger.throw('Client.connect.performConnect', client.id, err);
-      throw err;
+      // If the messenger is not already stopped then something has gone wrong
+      if (client.messenger && !client.messenger.stopped) {
+        var err = new Error('messenger is not stopped');
+        logger.ffdc('Client.connect.performConnect', 'ffdc002', client.id, err);
+        logger.throw('Client.connect.performConnect', client.id, err);
+        throw err;
+      }
+    } else {
+      client.state = STATE_STARTING;
     }
 
     // Obtain the list of services for connect and connect to one of the
@@ -766,11 +806,11 @@ var Client = function(service, id, securityOptions) {
     var client = this;
     logger.entry('Client.connectToService', client.id);
 
-    if (client.state === 'disconnecting' ||
-        client.state === 'disconnected') {
+    if (client.state === STATE_STOPPING ||
+        client.state === STATE_STOPPED) {
       if (callback) {
         logger.entry('Client.connectToService.callback', client.id);
-        callback(new Error('connect aborted due to disconnect'));
+        callback(new Error('connect aborted due to stop'));
         logger.exit('Client.connectToService.callback', client.id, null);
       }
       logger.exit('Client.connectToService', client.id, null);
@@ -851,24 +891,24 @@ var Client = function(service, id, securityOptions) {
 
     // If we've successfully connected then we're done, otherwise we'll retry
     if (connected) {
-      // Indicate that we're connected
-      client.state = 'connected';
-      var statusClient;
-      if (client.firstConnect) {
-        statusClient = 'connected';
-        client.firstConnect = false;
-        // could be queued actions so need to process those here. On reconnect
-        // this would be done via the callback we set, first connect its the
-        // users callback so won't process anything.
-        logger.log('data', client.id, 'first connect since being disconnected');
+      // Indicate that we're started
+      client.state = STATE_STARTED;
+      var eventToEmit;
+      if (client.firstStart) {
+        eventToEmit = 'started';
+        client.firstStart = false;
+        //could be queued actions so need to process those here. On reconnect
+        //this would be done via the callback we set, first connect its the
+        //users callback so won't process anything.
+        logger.log('data', client.id, 'first start since being stopped');
         processQueuedActions.apply(client);
       } else {
-        statusClient = 'reconnected';
+        eventToEmit = 'restarted';
       }
 
       process.nextTick(function() {
-        logger.log('emit', client.id, statusClient);
-        client.emit(statusClient);
+        logger.log('emit', client.id, eventToEmit);
+        client.emit(eventToEmit);
       });
 
       if (callback) {
@@ -906,11 +946,11 @@ var Client = function(service, id, securityOptions) {
     } else {
       // We've tried all services without success. Pause for a while before
       // trying again
-      client.state = 'retrying';
+      client.state = STATE_RETRYING;
       var retry = function() {
         logger.entryLevel('entry_often', 'retry', client.id);
-        if (!client.isDisconnected()) {
-          client.performConnect.apply(client, [callback]);
+        if (!client.isStopped()) {
+          client.performConnect.apply(client, [callback, false]);
         }
         logger.entryLevel('exit_often', 'retry', client.id);
       };
@@ -923,7 +963,6 @@ var Client = function(service, id, securityOptions) {
           1000 + ' seconds') :
           'immediately'));
       setTimeout(retry, CONNECT_RETRY_INTERVAL);
-      // XXX: should we even emit an error in this case? we're going to retry
       logger.log('emit', client.id, 'error', error);
       client.emit('error', error);
     }
@@ -1009,12 +1048,11 @@ var Client = function(service, id, securityOptions) {
   this.messenger = proton.createMessenger(this.id);
   logger.exit('proton.createMessenger', this.id, null);
 
-  // Set the initial state to disconnected
-  this.state = 'disconnected';
+  // Set the initial state to starting
+  this.state = STATE_STARTING;
   this.service = undefined;
-  // the first connect, set to false after connect and back to true on
-  // disconnect
-  this.firstConnect = true;
+  // the first start, set to false after start and back to true on stop
+  this.firstStart = true;
 
   // List of message subscriptions
   this.subscriptions = [];
@@ -1083,22 +1121,22 @@ util.inherits(Client, EventEmitter);
  * @throws {TypeError}
  *           If callback is specified and is not a function.
  */
-Client.prototype.connect = function(callback) {
-  logger.entry('Client.connect', this.id);
+Client.prototype.start = function(callback) {
+  logger.entry('Client.start', this.id);
 
   if (callback && (typeof callback !== 'function')) {
     var err = new TypeError('Callback must be a function');
-    logger.throw('Client.connect', this.id, err);
+    logger.throw('Client.start', this.id, err);
     throw err;
   }
 
   var client = this;
 
   process.nextTick(function() {
-    client.performConnect(callback);
+    client.performConnect(callback, false);
   });
 
-  logger.exit('Client.connect', client.id, client);
+  logger.exit('Client.start', client.id, client);
   return client;
 };
 
@@ -1181,21 +1219,21 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
  * @throws {TypeError}
  *           If callback is specified and is not a function.
  */
-Client.prototype.disconnect = function(callback) {
-  logger.entry('Client.disconnect', this.id);
+Client.prototype.stop = function(callback) {
+  logger.entry('Client.stop', this.id);
 
   var client = this;
 
   // Performs the disconnect
   var performDisconnect = function(client, callback) {
-    logger.entry('Client.disconnect.performDisconnect', client.id);
+    logger.entry('Client.stop.performDisconnect', client.id);
 
-    client.state = 'disconnecting';
+    client.state = STATE_STOPPING;
 
     // Only disconnect when all outstanding send operations are complete
     if (client.outstandingSends.length === 0) {
       stopMessenger(client, function(client, callback) {
-        logger.entry('Client.disconnect.performDisconnect.stopProcessing',
+        logger.entry('Client.stop.performDisconnect.stopProcessing',
             client.id);
 
         if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
@@ -1205,10 +1243,10 @@ Client.prototype.disconnect = function(callback) {
           var msg = client.queuedSends.pop();
           // call the callback in error as we have disconnected
           process.nextTick(function() {
-            logger.entry('Client.disconnect.performDisconnect.' +
+            logger.entry('Client.stop.performDisconnect.' +
                 'stopProcessing.queuedSendCallback', client.id);
             msg.callback(new Error('send aborted due to disconnect'));
-            logger.exit('Client.disconnect.performDisconnect.' +
+            logger.exit('Client.stop.performDisconnect.' +
                 'stopProcessing.queuedSendCallback', client.id, null);
           });
         }
@@ -1220,53 +1258,53 @@ Client.prototype.disconnect = function(callback) {
         }
 
         // Indicate that we've disconnected
-        client.state = 'disconnected';
+        client.state = STATE_STOPPED;
         process.nextTick(function() {
-          logger.log('emit', client.id, 'disconnected');
-          client.emit('disconnected');
-          client.firstConnect = true;
+          logger.log('emit', client.id, 'stopped');
+          client.emit('stopped');
+          client.firstStart = true;
         });
         if (callback) {
           process.nextTick(function() {
-            logger.entry('Client.disconnect.performDisconnect.stopProcessing.' +
+            logger.entry('Client.stop.performDisconnect.stopProcessing.' +
                 'callback', client.id);
             callback.apply(client);
-            logger.exit('Client.disconnect.performDisconnect.stopProcessing.' +
+            logger.exit('Client.stop.performDisconnect.stopProcessing.' +
                 'callback', client.id, null);
           });
         }
 
-        logger.exit('Client.disconnect.performDisconnect.stopProcessing',
+        logger.exit('Client.stop.performDisconnect.stopProcessing',
             client.id, null);
       }, callback);
 
-      logger.exit('Client.disconnect.performDisconnect', client.id, null);
+      logger.exit('Client.stop.performDisconnect', client.id, null);
       return;
     }
 
     // try disconnect again
     setImmediate(performDisconnect, client, callback);
 
-    logger.exit('Client.disconnect.performDisconnect', client.id, null);
+    logger.exit('Client.stop.performDisconnect', client.id, null);
   };
 
   if (callback && !(callback instanceof Function)) {
     var err = new TypeError('callback must be a function');
-    logger.throw('Client.disconnect', client.id, err);
+    logger.throw('Client.stop', client.id, err);
     throw err;
   }
 
-  // just return if already disconnected or in the process of disconnecting
-  if (client.isDisconnected()) {
+  //just return if already disconnected or in the process of disconnecting
+  if (client.isStopped()) {
     process.nextTick(function() {
       if (callback) {
-        logger.entry('Client.disconnect.callback', client.id);
+        logger.entry('Client.stop.callback', client.id);
         callback.apply(client);
-        logger.exit('Client.disconnect.callback', client.id, null);
+        logger.exit('Client.stop.callback', client.id, null);
       }
     });
 
-    logger.exit('Client.disconnect', client.id, client);
+    logger.exit('Client.stop', client.id, client);
     return client;
   }
 
@@ -1274,7 +1312,7 @@ Client.prototype.disconnect = function(callback) {
     performDisconnect(client, callback);
   });
 
-  logger.exit('Client.disconnect', client.id, client);
+  logger.exit('Client.stop', client.id, client);
   return client;
 };
 
@@ -1298,16 +1336,16 @@ var reconnect = function(client) {
     return;
   }
   logger.entry('Client.reconnect', client.id);
-  if (client.state !== 'connected') {
-    if (client.isDisconnected()) {
+  if (client.state !== STATE_STARTED) {
+    if (client.isStopped()) {
       logger.exit('Client.reconnect', client.id, null);
       return undefined;
-    } else if (client.state === 'retrying') {
+    } else if (client.state === STATE_RETRYING) {
       logger.exit('Client.reconnect', client.id, client);
       return client;
     }
   }
-  client.state = 'retrying';
+  client.state = STATE_RETRYING;
 
   // stop the messenger to free the object then attempt a reconnect
   stopMessenger(client, function(client) {
@@ -1327,7 +1365,7 @@ var reconnect = function(client) {
     while (client.outstandingSends.length > 0) {
       client.outstandingSends.pop();
     }
-    client.performConnect.apply(client, [processQueuedActions]);
+    client.performConnect.apply(client, [processQueuedActions, false]);
 
     logger.exit('Client.reconnect.stopProcessing', client.id, null);
   });
@@ -1368,7 +1406,7 @@ var processQueuedActions = function(err) {
     logger.log('data', client.id, 'client.queuedSubscriptions',
                client.queuedSubscriptions);
     while (client.queuedSubscriptions.length > 0 &&
-            client.state === 'connected') {
+            client.state === STATE_STARTED) {
       var sub = client.queuedSubscriptions.pop();
       if (sub.noop) {
         // no-op, so just trigger the callback without actually subscribing
@@ -1390,7 +1428,7 @@ var processQueuedActions = function(err) {
     logger.log('data', client.id, 'client.queuedUnsubscribes',
                client.queuedUnsubscribes);
     while (client.queuedUnsubscribes.length > 0 &&
-            client.state === 'connected') {
+            client.state === STATE_STARTED) {
       var rm = client.queuedUnsubscribes.pop();
       if (rm.noop) {
         // no-op, so just trigger the callback without actually unsubscribing
@@ -1404,7 +1442,7 @@ var processQueuedActions = function(err) {
     logger.log('data', client.id, 'client.queuedSends',
                client.queuedSends);
     while (client.queuedSends.length > 0 &&
-            client.state === 'connected') {
+            client.state === STATE_STARTED) {
       var msg = client.queuedSends.pop();
       client.send(msg.topic, msg.data, msg.options, msg.callback);
     }
@@ -1434,7 +1472,7 @@ Object.defineProperty(Client, 'id', {
  */
 Object.defineProperty(Client, 'service', {
   get: function() {
-    return this.state === 'connected' ?
+    return this.state === STATE_STARTED ?
         this.service : undefined;
   }
 });
@@ -1457,8 +1495,9 @@ Object.defineProperty(Client, 'state', {
  * @return {Boolean} <code>true</code> true if in disconnected or
  * disconnecting state, <code>false</code> otherwise.
  */
-Client.prototype.isDisconnected = function() {
-  return (this.state === 'disconnected' || this.state === 'disconnecting');
+Client.prototype.isStopped = function() {
+  return (this.state === STATE_STOPPING ||
+          this.state === STATE_STOPPED);
 };
 
 /**
@@ -1598,14 +1637,14 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   // Ensure we have attempted a connect
-  if (this.isDisconnected()) {
-    err = new Error('not connected');
+  if (this.isStopped()) {
+    err = new Error('not started');
     logger.throw('Client.send', this.id, err);
     throw err;
   }
 
   // Ensure we are not retrying otherwise queue message and return
-  if (this.state === 'retrying' || this.state === 'connecting') {
+  if (this.state === STATE_RETRYING || this.state === STATE_STARTING) {
     this.queuedSends.push({
       topic: topic,
       data: data,
@@ -1701,11 +1740,9 @@ Client.prototype.send = function(topic, data, options, callback) {
                        'outstandingSends:', client.outstandingSends.length);
             if (client.drainEventRequired &&
                 (client.outstandingSends.length <= 1)) {
+              logger.log('emit', client.id, 'drain');
+              client.emit('drain');
               client.drainEventRequired = false;
-              process.nextTick(function() {
-                logger.log('emit', client.id, 'drain');
-                client.emit('drain');
-              });
             }
 
             // invoke the callback, if specified
@@ -1747,7 +1784,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         }
       } catch (e) {
         logger.caught('Client.send.untilSendComplete', client.id, e);
-        // error condition so won't retry send remove from list of unsent
+        //error condition so won't retry send remove from list of unsent
         index = client.outstandingSends.indexOf(localMessageId);
         if (index >= 0) client.outstandingSends.splice(index, 1);
         // an error here could still mean the message made it over
@@ -1763,9 +1800,9 @@ Client.prototype.send = function(topic, data, options, callback) {
         process.nextTick(function() {
           if (sendCallback) {
             if (qos === exports.QOS_AT_MOST_ONCE) {
-              // we don't know if an at most once message made it across
-              // call the callback with undefined to indicate success to
-              // avoid user resending on error.
+              //we don't know if an at most once message made it across
+              //call the callback with undefined to indicate success to
+              //avoid user resending on error.
               logger.entry('Client.send.untilSendComplete.callback', client.id);
               sendCallback.apply(client, [undefined, topic, protonMsg.body,
                 options]);
@@ -1789,8 +1826,6 @@ Client.prototype.send = function(topic, data, options, callback) {
 
     // If we have a backlog of messages, then record the need to emit a drain
     // event later to indicate the backlog has been cleared.
-    logger.log('debug', client.id,
-               'outstandingSends:', client.outstandingSends.length);
     if (client.outstandingSends.length <= 1) {
       nextMessage = true;
     } else {
@@ -1843,7 +1878,7 @@ Client.prototype.checkForMessages = function() {
   var client = this;
   logger.entryLevel('entry_often', 'checkForMessages', client.id);
   var messenger = client.messenger;
-  if (client.state !== 'connected' || client.subscriptions.length === 0 ||
+  if (client.state !== STATE_STARTED || client.subscriptions.length === 0 ||
       client.listeners('message').length === 0) {
     logger.exitLevel('exit_often', 'checkForMessages', client.id);
     return;
@@ -1878,19 +1913,19 @@ Client.prototype.checkForMessages = function() {
         var matchedSubs = client.subscriptions.filter(function(el) {
           // 1 added to length to account for the / we add
           var addressNoService = el.address.slice(client.service.length + 1);
-          // possible to have 2 matches work out whether this is
-          // for a share or private topic
+          //possible to have 2 matches work out whether this is
+          //for a share or private topic
           if (el.share === undefined &&
               protonMsg.linkAddress.indexOf('private:') === 0) {
-            // slice off private: and compare to the no service address
+            //slice off private: and compare to the no service address
             var linkNoPrivShare = protonMsg.linkAddress.slice(8);
             if (addressNoService === linkNoPrivShare) {
               return el;
             }
           } else if (el.share !== undefined &&
                      protonMsg.linkAddress.indexOf('share:') === 0) {
-            // starting after the share: look for the next : denoting the end
-            // of the share name and get everything past that
+            //starting after the share: look for the next : denoting the end
+            //of the share name and get everything past that
             var linkNoShare = protonMsg.linkAddress.slice(
                                   protonMsg.linkAddress.indexOf(':', 7) + 1);
             if (addressNoService === linkNoShare) {
@@ -1898,7 +1933,7 @@ Client.prototype.checkForMessages = function() {
             }
           }
         });
-        // should only ever be one entry in matchedSubs
+        //should only ever be one entry in matchedSubs
         if (matchedSubs[0] !== undefined) {
           qos = matchedSubs[0].qos;
           if (qos === exports.QOS_AT_LEAST_ONCE) {
@@ -1906,7 +1941,7 @@ Client.prototype.checkForMessages = function() {
           }
           ++matchedSubs[0].unconfirmed;
         } else {
-          // shouldn't get here
+          //shouldn't get here
           var err = new Error('No listener matched for this message: ' +
                               data + ' going to address: ' + protonMsg.address);
           throw err;
@@ -2054,7 +2089,7 @@ Client.prototype.checkForMessages = function() {
   logger.exitLevel('exit_often', 'checkForMessages', client.id);
 
   setImmediate(function() {
-    if (client.state === 'connected') {
+    if (client.state === STATE_STARTED) {
       client.checkForMessages.apply(client);
     }
   });
@@ -2238,8 +2273,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   }
 
   // Ensure we have attempted a connect
-  if (this.isDisconnected()) {
-    err = new Error('not connected');
+  if (this.isStopped()) {
+    err = new Error('not started');
     logger.throw('Client.subscribe', this.id, err);
     throw err;
   }
@@ -2251,7 +2286,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var subscriptionAddress = this.service + '/' + topicPattern;
 
   // if client is in the retrying state, then queue this subscribe request
-  if (client.state === 'retrying' || client.state === 'connecting') {
+  if (client.state === STATE_RETRYING || client.state === STATE_STARTING) {
     logger.log('data', client.id, 'client waiting for connection so queued ' +
                'subscription');
     // first check if its already there and if so remove old and add new
@@ -2494,8 +2529,8 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   }
 
   // Ensure we have attempted a connect
-  if (this.isDisconnected()) {
-    err = new Error('not connected');
+  if (this.isStopped()) {
+    err = new Error('not started');
     logger.throw('Client.unsubscribe', this.id, err);
     throw err;
   }
@@ -2539,7 +2574,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   };
 
   // if client is in the retrying state, then queue this unsubscribe request
-  if (client.state === 'retrying' || client.state === 'connecting') {
+  if (client.state === STATE_RETRYING || client.state === STATE_STARTING) {
     logger.log('data', client.id, 'client is still in the process of ' +
                'connecting so queueing the unsubscribe request');
     queueUnsubscribe();

@@ -122,9 +122,9 @@ if (parsed.file) {
 var delay = parsed.delay * 1000 || 0;
 
 // once connection is acquired, send messages
-client.on('connected', function() {
+client.on('started', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
-  console.log('Publishing to: %s', topic);
+  console.log('Sending to: %s', topic);
 
   // send the next message, inserting a delay if requested
   var sendNextMessage = function() {
@@ -178,7 +178,7 @@ client.on('connected', function() {
       }
     } else {
       // No more messages to send, so disconnect
-      client.disconnect();
+      client.stop();
     }
   };
 
@@ -195,10 +195,3 @@ client.on('error', function(error) {
   process.exit(1);
 });
 
-// Make the connection
-client.connect(function(err) {
-  if (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-});

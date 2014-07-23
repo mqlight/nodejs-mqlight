@@ -36,11 +36,11 @@ var testCase = require('nodeunit').testCase;
 module.exports.test_subscribe_too_few_arguments = function(test) {
   var client = mqlight.createClient({id: 'test_subscribe_too_few_arguments',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     test.throws(function() {
       client.subscribe();
     });
-    client.disconnect();
+    client.stop();
     test.done();
   });
 };
@@ -54,11 +54,11 @@ module.exports.test_subscribe_too_few_arguments = function(test) {
 module.exports.test_subscribe_too_many_arguments = function(test) {
   var client = mqlight.createClient({id: 'test_subscribe_too_many_arguments',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     test.doesNotThrow(function() {
       client.subscribe('/foo', 'share1', {}, function() {}, 'stowaway');
     });
-    client.disconnect();
+    client.stop();
     test.done();
   });
 };
@@ -72,7 +72,7 @@ module.exports.test_subscribe_callback_must_be_function = function(test) {
   var client = mqlight.createClient({id:
         'test_subscribe_callback_must_be_function',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     test.throws(function() {
       client.subscribe('/foo', 'share', {}, 7);
     });
@@ -85,7 +85,7 @@ module.exports.test_subscribe_callback_must_be_function = function(test) {
     test.doesNotThrow(function() {
       client.subscribe('/foo', 'share', {}, function() {});
     });
-    client.disconnect();
+    client.stop();
     test.done();
   });
 };
@@ -144,7 +144,7 @@ module.exports.test_subscribe_parameters = function(test) {
 
   var client = mqlight.createClient({id: 'test_subscribe_parameters', service:
         service});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       var clientSubscribeMethod = client.subscribe;
       lastSubscribedAddress = undefined;
@@ -160,8 +160,7 @@ module.exports.test_subscribe_parameters = function(test) {
 
     // Restore the saved messenger subscribe implementation
     mqlight.proton.messenger.subscribe = savedSubscribe;
-    client.disconnect();
-
+    client.stop();
   });
 
   // Callbacks passed into subscribe(...) are scheduled to be run once
@@ -188,14 +187,14 @@ module.exports.test_subscribe_parameters = function(test) {
 module.exports.test_subscribe_ok_callback = function(test) {
   var client = mqlight.createClient({id: 'test_subscribe_ok_callback', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     client.subscribe('/foo', function() {
       test.equals(arguments.length, 3);
       test.deepEqual(arguments[0], undefined);  // error argument
       test.deepEqual(arguments[1], '/foo');     // topic pattern
       test.equals(arguments[2], undefined);  // share name
       test.ok(this === client);
-      client.disconnect();
+      client.stop();
       test.done();
     });
   });
@@ -220,7 +219,7 @@ module.exports.test_subscribe_fail_callback = function(test) {
     throw new TypeError('topic space on fire');
   };
 
-  client.connect(function(err) {
+  client.on('started', function(err) {
     client.subscribe('/foo', 'share', function(err) {
       test.ok(err instanceof TypeError);
       test.equals(arguments.length, 3);
@@ -231,7 +230,7 @@ module.exports.test_subscribe_fail_callback = function(test) {
       mqlight.proton.messenger.subscribe = savedSubscribe;
       if (++count == 2) test.done();
       setImmediate(function() {
-        client.disconnect();
+        client.stop();
       });
     });
   });
@@ -247,16 +246,22 @@ module.exports.test_subscribe_fail_callback = function(test) {
 
 /**
  * Test that trying to establish a subscription, while the client is in
- * disconnected state, throws an Error.
+ * stopped state, throws an Error.
  * @param {object} test the unittest interface
  */
-module.exports.test_subscribe_when_disconnected = function(test) {
-  var client = mqlight.createClient({id: 'test_subscribe_when_disconnected',
-    service: 'amqp://host'});
-  test.throws(function() {
-    client.subscribe('/foo');
-  }, Error);
-  test.done();
+module.exports.test_subscribe_when_stopped = function(test) {
+  var opts = {
+    id: 'test_subscribe_when_stopped',
+    service: 'amqp://host'
+  };
+  var client = mqlight.createClient(opts, function() {
+    client.stop(function() {
+      test.throws(function() {
+        client.subscribe('/foo');
+      }, Error);
+      test.done();
+    })
+  });
 };
 
 
@@ -268,9 +273,9 @@ module.exports.test_subscribe_when_disconnected = function(test) {
 module.exports.test_subscribe_returns_client = function(test) {
   var client = mqlight.createClient({id: 'test_subscribe_returns_client',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     test.deepEqual(client.subscribe('/foo'), client);
-    client.disconnect();
+    client.stop();
     test.done();
   });
 };
@@ -296,7 +301,7 @@ module.exports.test_subscribe_topics = function(test) {
 
   var client = mqlight.createClient({id: 'test_subscribe_topics', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(function() {
@@ -308,8 +313,9 @@ module.exports.test_subscribe_topics = function(test) {
         }, TypeError, 'pattern should have been rejected: ' + data[i].pattern);
       }
     }
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -328,7 +334,7 @@ module.exports.test_subscribe_share_names = function(test) {
 
   var client = mqlight.createClient({id: 'test_subscribe_share_names', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(function() {
@@ -340,8 +346,9 @@ module.exports.test_subscribe_share_names = function(test) {
         }, Error, i);
       }
     }
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -369,7 +376,7 @@ module.exports.test_subscribe_options = function(test) {
 
   var client = mqlight.createClient({id: 'test_subscribe_options', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(
@@ -389,8 +396,9 @@ module.exports.test_subscribe_options = function(test) {
         );
       }
     }
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -417,7 +425,7 @@ module.exports.test_subscribe_qos = function(test) {
 
   var client = mqlight.createClient({id: 'test_subscribe_qos', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { qos: data[i].qos };
       if (data[i].valid) {
@@ -430,8 +438,9 @@ module.exports.test_subscribe_qos = function(test) {
         }, TypeError, 'qos should have been rejected: ' + data[i].qos);
       }
     }
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -464,7 +473,7 @@ module.exports.test_subscribe_autoConfirm = function(test) {
 
   var client = mqlight.createClient({id: 'test_subscribe_autoConfirm', service:
         'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(function() {
@@ -476,8 +485,9 @@ module.exports.test_subscribe_autoConfirm = function(test) {
         }, TypeError, 'autoConfirm should have been rejected: ' + data[i].opts);
       }
     }
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -508,7 +518,7 @@ module.exports.test_subscribe_ttl_validity = function(test) {
 
   var client = mqlight.createClient({id: 'test_subscribe_ttl_validity',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { ttl: data[i].ttl };
       if (data[i].valid) {
@@ -521,8 +531,9 @@ module.exports.test_subscribe_ttl_validity = function(test) {
         }, TypeError, 'ttl should have been rejected: ' + data[i].ttl);
       }
     }
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -552,7 +563,7 @@ module.exports.test_subscribe_ttl_rounding = function(test) {
 
   var client = mqlight.createClient({id: 'test_subscribe_ttl_rounding',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       var opts = { ttl: data[i].ttl };
       test.doesNotThrow(function() {
@@ -562,8 +573,9 @@ module.exports.test_subscribe_ttl_rounding = function(test) {
       });
     }
     mqlight.proton.messenger.subscribe = savedSubscribe;
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
 
@@ -613,7 +625,7 @@ module.exports.test_subscribe_credit_values = function(test) {
   };
   var client = mqlight.createClient({id: 'test_subscribe_credit_values',
     service: 'amqp://host'});
-  client.connect(function() {
+  client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].expected !== undefined) {
         test.doesNotThrow(function() {
@@ -630,7 +642,8 @@ module.exports.test_subscribe_credit_values = function(test) {
       }
     }
     mqlight.proton.messenger.subscribe = savedSubscribe;
-    client.disconnect();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 };
