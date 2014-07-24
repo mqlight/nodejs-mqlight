@@ -25,6 +25,6 @@
     }],
     "scripts": {
         "postinstall": "node bin/mqlight-postinstall.js",
-        "test": "./node_modules/.bin/nodeunit --config tests/nodeunit.json tests"
+        "test": "./node_modules/.bin/nodeunit --config test/nodeunit.json test"
     }
 }

@@ -76,8 +76,8 @@ module.exports.test_gjslint_basic = testCase({
         '1,0002,0010',
         '--unix_mode',
         'bin/mqlight-debug.js',
-        'tests/*.js',
-        'tests/stubs/*.js'
+        'test/*.js',
+        'test/stubs/*.js'
       ], { stdio: 'inherit' });
       child.on('exit', function(code, signal) {
         if (signal) {
