@@ -2539,11 +2539,36 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     throw err;
   }
 
-  // unsubscribe using the specified topic pattern and share options
   var messenger = this.messenger;
   var address = this.service + '/' + share + topicPattern;
   var client = this;
   var subscriptionAddress = this.service + '/' + topicPattern;
+
+  // Check that there is actually a subscription for the pattern and share
+  var subscribed = false;
+  for (var i = 0; i < client.subscriptions.length; i++) {
+    if (client.subscriptions[i].address === subscriptionAddress &&
+        client.subscriptions[i].share === originalShareValue) {
+      subscribed = true;
+      break;
+    }
+  }
+  if (!subscribed) {
+    for (var qs = 0; qs < client.queuedSubscriptions.length; qs++) {
+      if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
+          client.queuedSubscriptions[qs].share === originalShareValue &&
+          !(client.queuedSubscriptions[qs].noop)) {
+        subscribed = true;
+        break;
+      }
+    }
+  }
+  if (!subscribed) {
+    // TODO define a proper type for this Error (e.g. StateError)
+    var err = new Error('not subscribed to ' + address);
+    logger.throw('Client.unsubscribe', this.id, err);
+    throw err;
+  }
 
   var queueUnsubscribe = function() {
     // check if there's a queued subscribe for the same topic, if so mark that
@@ -2586,6 +2611,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     return client;
   }
 
+  // unsubscribe using the specified topic pattern and share options
   var err;
   try {
     messenger.unsubscribe(address, ttl);

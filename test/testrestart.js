@@ -412,6 +412,7 @@ module.exports.test_queued_unsubscribe_before_connect = function(test) {
       test.strictEqual(client.state, 'starting');
       // queue up 4 unsubscribes before allowing the connection through
       for (var i = 1; i < 5; i++) {
+        client.subscribe('queue' + i);
         client.unsubscribe('queue' + i, function() {
           successCallbacks++;
         });
@@ -475,6 +476,7 @@ module.exports.test_queued_unsubscribe_via_error = function(test) {
     stubproton.setConnectStatus(1);
     // queue up 4 unsubscribes
     for (var i = 1; i < 5; i++) {
+      client.subscribe('queue' + i);
       client.unsubscribe('queue' + i, function() {
         successCallbacks++;
       });
@@ -491,9 +493,8 @@ module.exports.test_queued_unsubscribe_via_error = function(test) {
 
 /**
  * Test that a queued subscribe and unsubscribe for the same address cancel
- * each other out. We'll do this by submitting 4 subscribes and 4 unsubscribes
- * where there is an intersection between two of the topics used in these
- * cases.
+ * each other out. We'll do this by submitting 6 subscribes and 4 unsubscribes
+ * which should leave just two subscribes.
  *
  * @param {object} test the unittest interface.
  */
@@ -515,20 +516,20 @@ module.exports.test_queued_before_connect_unsubscribe_nop = function(test) {
     id: 'test_queued_before_connect_unsubscribe_nop',
     service: function(callback) {
       test.strictEqual(client.state, 'starting');
-      // queue up 4 subscribes to queue{1,2,3,4} before allowing connection
-      for (var i = 1; i < 5; i++) {
+      // queue up 4 subscribes to queue{1,2,3,4,5,6} before allowing connection
+      for (var i = 1; i < 7; i++) {
         client.subscribe('queue' + i, function() {
           callbacks++;
         });
       }
-      // queue up 4 unsubscribes to queue{2,4,6,8} before allowing connection
-      for (var j = 2; j < 9; j += 2) {
+      // queue up 4 unsubscribes to queue{2,3,4,5} before allowing connection
+      for (var j = 2; j < 6; j++) {
         client.unsubscribe('queue' + j, function() {
           callbacks++;
         });
       }
-      test.strictEqual(client.queuedSubscriptions.length, 4,
-                       'expected to see 4 queued subscriptions, but saw ' +
+      test.strictEqual(client.queuedSubscriptions.length, 6,
+                       'expected to see 6 queued subscriptions, but saw ' +
           client.queuedSubscriptions.length);
       test.strictEqual(client.queuedUnsubscribes.length, 4,
                        'expected to see 4 queued unsubscriptions, but saw ' +
@@ -544,13 +545,13 @@ module.exports.test_queued_before_connect_unsubscribe_nop = function(test) {
   client.on('stopped', function() {
     // we expect all 8 of the subscribe and unsubscribe requests to have their
     // callbacks called
-    test.equal(callbacks, 8, 'expecting 8 success callbacks, but saw ' +
+    test.equal(callbacks, 10, 'expecting 10 success callbacks, but saw ' +
         callbacks);
     // but we only expect 2 subscribes and 2 unsubscribes to have required
     // processing
     test.equal(subscribes, 2, 'expecting 2 subscribes, but saw ' +
         subscribes);
-    test.equal(unsubscribes, 2, 'expecting 2 unsubscribes, but saw ' +
+    test.equal(unsubscribes, 0, 'expecting 0 unsubscribes, but saw ' +
         unsubscribes);
     mqlight.proton.messenger.subscribe = savedSubscribeFn;
     mqlight.proton.messenger.unsubscribe = savedUnsubscribeFn;
@@ -596,12 +597,12 @@ module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
       return;
     }
 
-    if (subscribeErrors === 4 && unsubscribeErrors === 4) {
+    if (subscribeErrors === 4 && unsubscribeErrors === 2) {
       test.strictEqual(client.queuedSubscriptions.length, 4,
                        'expected to see 4 queued subscriptions, but saw ' +
           client.queuedSubscriptions.length);
-      test.strictEqual(client.queuedUnsubscribes.length, 4,
-                       'expected to see 4 queued unsubscriptions, but saw ' +
+      test.strictEqual(client.queuedUnsubscribes.length, 2,
+                       'expected to see 2 queued unsubscriptions, but saw ' +
           client.queuedUnsubscribes.length);
       mqlight.proton.messenger.subscribe = function() {
         ++subscribes;
@@ -625,8 +626,8 @@ module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
         }
       });
     }
-    // queue up 4 unsubscribes to queue{2,4,6,8}
-    for (var j = 2; j < 9; j += 2) {
+    // queue up 2 unsubscribes to queue{2,4}
+    for (var j = 2; j < 5; j += 2) {
       client.unsubscribe('queue' + j, function() {
         successCallbacks++;
       });
@@ -634,15 +635,15 @@ module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
   });
 
   client.on('stopped', function() {
-    // we expect all 8 of the subscribe and unsubscribe requests to have their
+    // we expect all 6 of the subscribe and unsubscribe requests to have their
     // callbacks called
-    test.equal(successCallbacks, 8, 'expecting 8 success callbacks, saw ' +
+    test.equal(successCallbacks, 6, 'expecting 6 success callbacks, saw ' +
         successCallbacks);
-    // but we only expect 2 subscribes and 2 unsubscribes to have required
+    // but we only expect 2 subscribes and 0 unsubscribes to have required
     // processing
     test.equal(subscribes, 2, 'expecting 2 subscribes, but saw ' +
         subscribes);
-    test.equal(unsubscribes, 2, 'expecting 2 unsubscribes, but saw ' +
+    test.equal(unsubscribes, 0, 'expecting 0 unsubscribes, but saw ' +
         unsubscribes);
     mqlight.proton.messenger.subscribe = savedSubscribeFn;
     mqlight.proton.messenger.unsubscribe = savedUnsubscribeFn;

@@ -61,6 +61,7 @@ module.exports.test_unsubscribe_too_many_arguments = function(test) {
   };
   var client = mqlight.createClient(opts, function() {
     test.doesNotThrow(function() {
+      client.subscribe('/foo', 'share1');
       client.unsubscribe('/foo', 'share1', {}, function() {}, 'stowaway');
     });
     client.stop(function() {
@@ -83,15 +84,19 @@ module.exports.test_unsubscribe_callback_must_be_function = function(test) {
   };
   var client = mqlight.createClient(opts, function() {
     test.throws(function() {
+      client.subscribe('/foo', 'share');
       client.unsubscribe('/foo', 'share', {}, 7);
     });
     test.doesNotThrow(function() {
+      client.subscribe('/foo');
       client.unsubscribe('/foo', function() {});
     });
     test.doesNotThrow(function() {
+      client.subscribe('/foo', 'share');
       client.unsubscribe('/foo', 'share', function() {});
     });
     test.doesNotThrow(function() {
+      client.subscribe('/foo', 'share');
       client.unsubscribe('/foo', 'share', {}, function() {});
     });
     client.stop(function() {
@@ -159,7 +164,9 @@ module.exports.test_unsubscribe_parameters = function(test) {
   }, function() {
     for (var i = 0; i < data.length; ++i) {
       var clientUnsubscribeMethod = client.unsubscribe;
+      var clientSubscribeMethod = client.subscribe;
       lastUnsubscribedAddress = undefined;
+      clientSubscribeMethod.apply(client, data[i].args);
       clientUnsubscribeMethod.apply(client, data[i].args);
 
       var expectedAddress =
@@ -180,7 +187,7 @@ module.exports.test_unsubscribe_parameters = function(test) {
   // outside of the main loop - so use setImmediate(...) to schedule checking
   // for test completion.
   var testIsDone = function() {
-    if (currentCallbackInvocations === expectedCallbackInvocations) {
+    if (currentCallbackInvocations === 2*expectedCallbackInvocations) {
       test.done();
     } else {
       setImmediate(testIsDone);
@@ -203,6 +210,7 @@ module.exports.test_unsubscribe_ok_callback = function(test) {
     service: 'amqp://host'
   });
   client.on('started', function() {
+    client.subscribe('/foo');
     client.unsubscribe('/foo', function() {
       test.equals(arguments.length, 1);
       test.deepEqual(arguments[0], undefined);  // error argument
@@ -225,10 +233,29 @@ module.exports.test_unsubscribe_when_stopped = function(test) {
     service: 'amqp://host'});
   client.stop();
   client.on('stopped', function() {
+    console.log('on stopped called'); 
     test.throws(function() {
       client.unsubscribe('/foo');
     }, Error);
     test.done();
+  });
+};
+
+
+/**
+ * Test that trying to remove a subscription that does not exist throws an
+ * Error.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_unsubscribe_when_not_subscribed = function(test) {
+  var client = mqlight.createClient({
+    id : 'test_unsubscribe_when_not_subscribed',
+    service : 'amqp://host'});
+  client.on('started', function() {
+    client.subscribe('/bar');
+    test.throws(function() { client.unsubscribe('/foo'); }, Error);
+    client.stop(test.done);
   });
 };
 
@@ -243,6 +270,7 @@ module.exports.test_unsubscribe_returns_client = function(test) {
   var client = mqlight.createClient({id: 'test_unsubscribe_returns_client',
     service: 'amqp://host'},
   function() {
+    client.subscribe('/foo');
     test.deepEqual(client.unsubscribe('/foo'), client);
     client.stop(function(){
       test.done();
@@ -275,6 +303,7 @@ module.exports.test_unsubscribe_topics = function(test) {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(function() {
+          client.subscribe(data[i].pattern);
           client.unsubscribe(data[i].pattern);
         });
       } else {
@@ -310,6 +339,7 @@ module.exports.test_unsubscribe_share_names = function(test) {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(function() {
+          client.subscribe('/foo', data[i].share);
           client.unsubscribe('/foo', data[i].share);
         });
       } else {
@@ -353,6 +383,7 @@ module.exports.test_unsubscribe_options = function(test) {
       if (data[i].valid) {
         test.doesNotThrow(
             function() {
+              client.subscribe('testpattern', 'share');
               client.unsubscribe('testpattern', 'share', data[i].options,
                   function() {});
             }
@@ -405,6 +436,7 @@ module.exports.test_unsubscribe_ttl_validity = function(test) {
       var opts = { ttl: data[i].ttl };
       if (data[i].valid) {
         test.doesNotThrow(function() {
+          client.subscribe('testpattern');
           client.unsubscribe('testpattern', opts);
         });
       } else {
