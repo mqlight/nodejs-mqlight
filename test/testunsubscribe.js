@@ -233,7 +233,6 @@ module.exports.test_unsubscribe_when_stopped = function(test) {
     service: 'amqp://host'});
   client.stop();
   client.on('stopped', function() {
-    console.log('on stopped called'); 
     test.throws(function() {
       client.unsubscribe('/foo');
     }, Error);
