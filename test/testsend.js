@@ -500,3 +500,39 @@ module.exports.test_send_ttl = function(test) {
     });
   });
 };
+
+
+/**
+ * Test that if send returns false then, in time, a drain event is emitted.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_send_drain_event = function(test) {
+  var client = mqlight.createClient({id: 'test_send_drain_event', service:
+        'amqp://host'});
+  client.on('started', function() {
+    var drainExpected = false;
+
+    var timeout = setTimeout(function() {
+      test.ok(false, 'Test timed out waiting for drain event to be emitted');
+      test.done();
+      if (client) client.stop();
+    }, 5000);
+
+    client.on('drain', function() {
+      test.ok(drainExpected, 'Drain event not expected to be emitted');
+      clearTimeout(timeout);
+      test.done();
+      if (client) client.stop();
+    });
+
+    for(var i = 0; i < 100; i++) {
+      if(client.send('topic', 'data') == false)
+      {
+        drainExpected = true;
+        break;
+      }
+    }
+
+    test.ok(drainExpected, 'send always returned true');
+  });
+};
