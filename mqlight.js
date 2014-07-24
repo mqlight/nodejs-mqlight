@@ -41,7 +41,7 @@ var logger = GLOBAL.logger;
 var os = require('os');
 var _system = os.platform() + '-' + process.arch;
 if (process.env.NODE_ENV === 'unittest') {
-  var proton = require('./test/stubs/stubproton.js').createProtonStub();
+  var proton = require('./tests/stubs/stubproton.js').createProtonStub();
   Object.defineProperty(exports, 'proton', {
     set: function(value) {
       proton = value;
@@ -122,6 +122,10 @@ var PN_STATUS_SETTLED = 7;
 /** The connection retry interval in milliseconds. */
 var CONNECT_RETRY_INTERVAL = 10000;
 if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
+
+
+/** Client state: connectivity with the server re-established */
+var STATE_RESTARTED = 'restarted';
 
 
 /** Client state: trying to re-establish connectivity with the server */
@@ -895,7 +899,7 @@ var Client = function(service, id, securityOptions) {
       client.state = STATE_STARTED;
       var eventToEmit;
       if (client.firstStart) {
-        eventToEmit = 'started';
+        eventToEmit = STATE_STARTED;
         client.firstStart = false;
         //could be queued actions so need to process those here. On reconnect
         //this would be done via the callback we set, first connect its the
@@ -903,7 +907,7 @@ var Client = function(service, id, securityOptions) {
         logger.log('data', client.id, 'first start since being stopped');
         processQueuedActions.apply(client);
       } else {
-        eventToEmit = 'restarted';
+        eventToEmit = STATE_RESTARTED;
       }
 
       process.nextTick(function() {
@@ -952,7 +956,7 @@ var Client = function(service, id, securityOptions) {
         if (!client.isStopped()) {
           client.performConnect.apply(client, [callback, false]);
         }
-        logger.entryLevel('exit_often', 'retry', client.id);
+        logger.exitLevel('exit_often', 'retry', client.id);
       };
 
       // TODO 10 seconds is an arbitrary value, need to review if this is
@@ -1260,9 +1264,9 @@ Client.prototype.stop = function(callback) {
         // Indicate that we've disconnected
         client.state = STATE_STOPPED;
         process.nextTick(function() {
-          logger.log('emit', client.id, 'stopped');
-          client.emit('stopped');
+          logger.log('emit', client.id, STATE_STOPPED);
           client.firstStart = true;
+          client.emit(STATE_STOPPED);
         });
         if (callback) {
           process.nextTick(function() {
@@ -1614,6 +1618,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         err = new TypeError("options:ttl value '" +
             options.ttl +
             "' is invalid, must be an unsigned non-zero integer number");
+        logger.throw('Client.send', this.id, err);
         throw err;
       } else if (ttl > 4294967295) {
         ttl = 4294967295; // Cap at max AMQP value for TTL (2^32-1)
@@ -1948,6 +1953,7 @@ Client.prototype.checkForMessages = function() {
           //shouldn't get here
           var err = new Error('No listener matched for this message: ' +
                               data + ' going to address: ' + protonMsg.address);
+          logger.throwLevel('exit_often', 'checkForMessages', this.id, err);
           throw err;
         }
 
