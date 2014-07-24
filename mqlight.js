@@ -41,7 +41,7 @@ var logger = GLOBAL.logger;
 var os = require('os');
 var _system = os.platform() + '-' + process.arch;
 if (process.env.NODE_ENV === 'unittest') {
-  var proton = require('./tests/stubs/stubproton.js').createProtonStub();
+  var proton = require('./test/stubs/stubproton.js').createProtonStub();
   Object.defineProperty(exports, 'proton', {
     set: function(value) {
       proton = value;
