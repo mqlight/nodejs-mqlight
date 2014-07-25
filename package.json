@@ -1,6 +1,6 @@
 {
     "name": "mqlight",
-    "version": "0.1.0000000000",
+    "version": "9.9.9999999999",
     "description": "IBM MQ Light Client Module",
     "main": "mqlight.js",
     "gypfile": true,
@@ -25,6 +25,6 @@
     }],
     "scripts": {
         "postinstall": "node bin/mqlight-postinstall.js",
-        "test": "./node_modules/.bin/nodeunit --config test/nodeunit.json test"
+        "test": "./node_modules/.bin/nodeunit --config tests/nodeunit.json tests"
     }
 }

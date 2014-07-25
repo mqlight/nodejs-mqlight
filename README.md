@@ -430,7 +430,13 @@ that goes to stderr when you run your application.
 
 ## Release notes
 
-### 0.1.0000000000
+### 9.9.9999999999
+
+* Third beta release
+* ...
+* ...
+
+### 0.1.2014062301
 
 * Second beta release.
 * Support for Mac OS X.
