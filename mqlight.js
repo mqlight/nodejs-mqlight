@@ -152,8 +152,8 @@ var STATE_STOPPING = 'stopping';
  * Creates and returns a new instance of the Client object.
  * <p>
  * See README.md for more details.
- * 
- * @param {Object}   options - (optional) properties that define the 
+ *
+ * @param {Object}   options - (optional) properties that define the
  *                             characteristics of the client.
  * @param {Function} callback - (optional) callback, invoked when the client has
  *                              attained 'started' or 'stopped' state.
@@ -423,9 +423,9 @@ var getHttpServiceFunction = function(serviceUrl) {
  *          service  - Required; One or more URLs representing the TCP/IP
  *          endpoints to which the client will attempt to connect, in turn.
  *          When a function is specified, it is invoked each time a endpoint
- *          is required and is supplied a callback, in the form 
+ *          is required and is supplied a callback, in the form
  *          function(err, service), as its only argument. The function should
- *          invoked the callback supplying a URL String (or an Array of URL 
+ *          invoked the callback supplying a URL String (or an Array of URL
  *          strings) as the second argument.
  * @param {String}
  *          id - Optional; an identifier that is used to identify this client.
@@ -1289,9 +1289,9 @@ if (process.env.NODE_ENV === 'unittest') {
 
 
 /**
-* Called on reconnect or first connect to process any actions that may have 
+* Called on reconnect or first connect to process any actions that may have
 * been queued.
-* 
+*
 * @this should be set to the client object that has connected or reconnected
 * @param {Error} err if an error occurred in the performConnect function that
 * calls this callback.
@@ -1386,7 +1386,7 @@ Object.defineProperty(Client, 'service', {
 
 /**
  * @return {String} The current state of the client - can will be one of the
- * following string values: 'started', 'starting', 'stopped', 'stopping', or 
+ * following string values: 'started', 'starting', 'stopped', 'stopping', or
  * 'retrying'.
  */
 Object.defineProperty(Client, 'state', {
