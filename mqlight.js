@@ -422,14 +422,14 @@ var getHttpServiceFunction = function(serviceUrl) {
  * @param {String|Array|Function}
  *          service  - Required; One or more URLs representing the TCP/IP
  *          endpoints to which the client will attempt to connect, in turn.
- *          When a function is specified, it is invoked each time a endpoint
+ *          When a function is specified, it is invoked each time an endpoint
  *          is required and is supplied a callback, in the form
  *          function(err, service), as its only argument. The function should
- *          invoked the callback supplying a URL String (or an Array of URL
+ *          invoke the callback supplying a URL String (or an Array of URL
  *          strings) as the second argument.
  * @param {String}
  *          id - Optional; an identifier that is used to identify this client.
- *          If omitted - a probabalistically unique ID will be generated.
+ *          If omitted - a probabilistically unique ID will be generated.
  * @param {Object}
  *          securityOptions - Any required security options for
  *          user name/password authentication and SSL.
@@ -2003,7 +2003,7 @@ Client.prototype.checkForMessages = function() {
 
 
 /**
- * Subscribes to a destination. The client will be elligable to receive messages
+ * Subscribes to a destination. The client will be eligible to receive messages
  * that arrive at the destination.
  * <p>
  * See README.md for more details.
@@ -2275,7 +2275,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
 /**
  * Stops the flow of messages from a destination to this client.  The client's
- * message callback will not longer be driven when messages arrive, that match
+ * message callback will not longer be driven when messages arrive that match
  * the pattern associated with the destination.
  * <p>
  * See README.md for more details.
@@ -2285,7 +2285,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
  * @param {String} share (optional) that was specified when the client
  *                 subscribed to the destination.
  * @param {Object} options (optional) options that affect the behaviour of the
- *                 unsubscribe mehod call.
+ *                 unsubscribe method call.
  * @param {function()} callback (optional) invoked when the subscribe operation
  *                     has completed.
  * @return {@link Client} the instance of the client that the subscribe method
