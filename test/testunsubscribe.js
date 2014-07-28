@@ -212,10 +212,20 @@ module.exports.test_unsubscribe_ok_callback = function(test) {
   client.on('started', function() {
     client.subscribe('/foo');
     client.unsubscribe('/foo', function() {
-      test.equals(arguments.length, 1);
+      test.equals(arguments.length, 3);
       test.deepEqual(arguments[0], undefined);  // error argument
+      test.deepEqual(arguments[1], '/foo');     // topic pattern argument
+      test.deepEqual(arguments[2], undefined);  // share argument
       test.ok(this === client);
-      client.stop();
+      client.subscribe('/foo2', 'share');
+      client.unsubscribe('/foo2', 'share', function() {
+        test.equals(arguments.length, 3);
+        test.deepEqual(arguments[0], undefined);  // error argument
+        test.deepEqual(arguments[1], '/foo2');    // topic pattern argument
+        test.deepEqual(arguments[2], 'share');    // share argument
+        test.ok(this === client);
+        client.stop();
+      });
     });
   });
   client.on('stopped', test.done);

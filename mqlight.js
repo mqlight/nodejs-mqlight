@@ -1339,7 +1339,7 @@ var processQueuedActions = function(err) {
       if (rm.noop) {
         // no-op, so just trigger the callback without actually unsubscribing
         if (rm.callback) {
-          rm.callback.apply(client, []);
+          rm.callback.apply(client, [undefined, rm.topicPattern, rm.share]);
         }
       } else {
         client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
@@ -2477,7 +2477,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     if (callback) {
       process.nextTick(function() {
         logger.entry('Client.unsubscribe.callback', client.id);
-        callback.apply(client, [undefined]);
+        callback.apply(client, [undefined, topicPattern, originalShareValue]);
         logger.exit('Client.unsubscribe.callback', client.id, null);
       });
     }
