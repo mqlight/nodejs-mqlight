@@ -117,10 +117,10 @@ client.on('started', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
   var options = { qos: mqlight.QOS_AT_LEAST_ONCE, autoConfirm: false };
   var delayMs = 0;
-  if (parsed['destination-ttl']) {
+  if (parsed['destination-ttl'] !== undefined) {
     options.ttl = Number(parsed['destination-ttl']) * 1000;
   }
-  if (parsed.delay) {
+  if (parsed.delay !== undefined) {
     delayMs = Number(parsed.delay) * 1000;
     if (delayMs > 0) options.credit = 1;
   }

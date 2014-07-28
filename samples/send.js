@@ -161,7 +161,7 @@ client.on('started', function() {
         }
       };
 
-      if (parsed['message-ttl']) {
+      if (parsed['message-ttl'] !== undefined) {
         options.ttl = Number(parsed['message-ttl']) * 1000;
       }
       if (parsed['sequence'] && !parsed.file) {
