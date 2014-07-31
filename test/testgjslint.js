@@ -40,7 +40,8 @@ module.exports.test_gjslint_strict = testCase({
         'mqlight.js',
         'mqlight-log.js',
         'samples/send.js',
-        'samples/recv.js'
+        'samples/recv.js',
+        'samples/uiworkout.js'
       ], { stdio: 'inherit' });
       child.on('exit', function(code, signal) {
         if (signal) {
