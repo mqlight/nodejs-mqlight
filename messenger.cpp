@@ -101,7 +101,6 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "flow", Flow);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
-  tpl->InstanceTemplate()->SetAccessor(String::New("hasOutgoing"), HasOutgoing);
 
   target->Set(name, constructor->GetFunction());
 }
@@ -826,35 +825,6 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
 
   Proton::Exit("exit_often", "ProtonMessenger::Receive", name, 0);
   return scope.Close(messages);
-}
-
-Handle<Value> ProtonMessenger::HasOutgoing(Local<String> property,
-                                           const AccessorInfo& info)
-{
-  HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.Holder());
-  const char* name = obj->name.c_str();
-
-  Proton::Entry("ProtonMessenger::HasOutgoing", name);
-
-  bool hasOutgoing;
-  if (obj->messenger) {
-    int outgoing;
-    Proton::Entry("pn_messenger_outgoing", name);
-    outgoing = pn_messenger_outgoing(obj->messenger);
-    int error = pn_messenger_errno(obj->messenger);
-    Proton::Exit("pn_messenger_outgoing", name, outgoing);
-    if (error) {
-      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-      THROW_EXCEPTION(text, "ProtonMessenger::HasOutgoing", name)
-    }
-    hasOutgoing = (outgoing > 0);
-  } else {
-    hasOutgoing = false;
-  }
-
-  Proton::Exit("ProtonMessenger::HasOutgoing", name, hasOutgoing);
-  return scope.Close(Boolean::New(hasOutgoing));
 }
 
 Handle<Value> ProtonMessenger::Status(const Arguments& args)
