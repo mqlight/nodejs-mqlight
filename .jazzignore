@@ -3,4 +3,5 @@
 core.ignore= \
              {.git} \
              {build} \
+             {coverage} \
              {proton}

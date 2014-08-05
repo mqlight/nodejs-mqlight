@@ -656,6 +656,62 @@ module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
 
 
 /**
+ * Test that a queued duplicate subscribe for the same address throws the
+ * expected 'already subscribed' / 'not subscribed' error
+ *
+ * @param {object} test the unittest interface.
+ */
+module.exports.test_queued_double_subscribe = function(test) {
+  var callbacks = 0,
+      subscribes = 0;
+
+  var savedSubscribeFn = mqlight.proton.messenger.subscribe;
+  mqlight.proton.messenger.subscribe = function() {
+    ++subscribes;
+  };
+
+  var client = mqlight.createClient({
+    id: 'test_queued_double_subscribe',
+    service: function(callback) {
+      // override client 'service' property
+      client.service = 'amqp://host:5672';
+      test.strictEqual(client.state, 'starting');
+      // queue up 2 duplicate subscribes to queue before allowing connection
+      client.subscribe('queue', function() {
+        callbacks++;
+      });
+      test.throws(function() {
+        client.subscribe('queue', function() {
+          callbacks++;
+        });
+      }, function(err) {
+        if ((err instanceof mqlight.SubscribedError) &&
+            /client already has a queued subscription/.test(err)) {
+          return true;
+        }
+      }, 'Service parameter as non string/array test');
+      test.strictEqual(client.queuedSubscriptions.length, 1,
+                       'expected to see 1 queued subscription, but saw ' +
+          client.queuedSubscriptions.length);
+      callback(null, 'amqp://host');
+    }
+  });
+
+  client.once('started', function() {
+    setTimeout(function() {client.stop();},500);
+  });
+
+  client.on('stopped', function() {
+    // we expect only one of the subscribes to have had a successful callback
+    test.equal(callbacks, 1, 'expecting 1 callback, but saw ' + callbacks);
+    test.equal(subscribes, 1, 'expecting 1 subscribe, but saw ' + subscribes);
+    mqlight.proton.messenger.subscribe = savedSubscribeFn;
+    test.done();
+  });
+};
+
+
+/**
 * Test that when the initial connection fails a queued subscribe
 * will get processed, when it connects.
 * @param {object} test the unittest interface.

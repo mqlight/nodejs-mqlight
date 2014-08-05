@@ -1528,6 +1528,11 @@ Object.defineProperty(Client, 'service', {
   get: function() {
     return this.state === STATE_STARTED ?
         this.service : null;
+  },
+  set: function(value) {
+    if (process.env.NODE_ENV === 'unittest') {
+      this.service = value;
+    }
   }
 });
 
@@ -2337,17 +2342,22 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   var client = this;
   var subscriptionAddress = this.service + '/' + topicPattern;
 
+  var i = 0;
+
   // if client is in the retrying state, then queue this subscribe request
   if (client.state === STATE_RETRYING || client.state === STATE_STARTING) {
-    logger.log('data', client.id, 'client waiting for connection so queued ' +
-               'subscription');
-    // first check if its already there and if so remove old and add new
-    for (var qs = 0; qs < client.queuedSubscriptions.length; qs++) {
-      if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
-          client.queuedSubscriptions[qs].share === originalShareValue) {
-        client.queuedSubscriptions.splice(qs, 1);
+    // reject queued subscription if one already exists
+    for (i = 0; i < client.queuedSubscriptions.length; i++) {
+      if (client.queuedSubscriptions[i].address === subscriptionAddress &&
+          client.queuedSubscriptions[i].share === originalShareValue) {
+        err = new SubscribedError('client already has a queued subscription ' +
+                                  'to this address');
+        logger.throw('Client.subscribe', this.id, err);
+        throw err;
       }
     }
+    logger.log('data', client.id, 'client waiting for connection so queued ' +
+               'subscription');
     client.queuedSubscriptions.push({
       address: subscriptionAddress,
       qos: qos,
@@ -2365,7 +2375,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   // if we already believe this subscription exists, we should reject the
   // request to subscribe by throwing a SubscribedError
-  for (var i = 0; i < client.subscriptions.length; i++) {
+  for (i = 0; i < client.subscriptions.length; i++) {
     if (client.subscriptions[i].address === subscriptionAddress &&
         client.subscriptions[i].share === originalShareValue) {
       err = new SubscribedError('client is already subscribed to this address');
@@ -2598,14 +2608,6 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     }
   }
 
-  var err;
-
-  if (!subscribed) {
-    err = new UnsubscribedError('client is not subscribed to this address');
-    logger.throw('Client.unsubscribe', this.id, err);
-    throw err;
-  }
-
   var queueUnsubscribe = function() {
     // check if there's a queued subscribe for the same topic, if so mark that
     // as a no-op operation, so the callback is called but a no-op takes place
@@ -2645,6 +2647,14 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     queueUnsubscribe();
     logger.exit('Client.unsubscribe', client.id, client);
     return client;
+  }
+
+  var err;
+
+  if (!subscribed) {
+    err = new UnsubscribedError('client is not subscribed to this address');
+    logger.throw('Client.unsubscribe', this.id, err);
+    throw err;
   }
 
   // unsubscribe using the specified topic pattern and share options
