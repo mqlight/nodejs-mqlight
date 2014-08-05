@@ -93,7 +93,17 @@ module.exports.test_createClient_must_have_a_value = function(test) {
         /options object missing/.test(err)) {
       return true;
     }
-  }, 'somr properties myst be passed to createClient(...)');
+  }, 'some properties must be passed to createClient(...)');
+
+  test.throws(function() {
+    mqlight.createClient(function() {});
+  }, function(err) {
+    if ((err instanceof TypeError) &&
+        /options object missing/.test(err)) {
+      return true;
+    }
+  }, 'some properties must be passed to createClient(...)');
+
   test.done();
 };
 
