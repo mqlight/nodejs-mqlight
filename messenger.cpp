@@ -621,24 +621,38 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
                          name)
   }
 
-  if (credit > 0) {
-    pn_link_t *link =
+  pn_link_t* link =
       pn_messenger_get_link(obj->messenger, address.c_str(), false);
-    if (link) {
-      pn_link_flow(link, credit);
+
+  if (!link) {
+    // throw Error if unable to find a matching Link
+    THROW_EXCEPTION_TYPE(Exception::Error,
+                         ("unable to locate link for " + address).c_str(),
+                         "ProtonMessenger::Subscribe",
+                         name)
+  }
+
+  // XXX: this is less than ideal, but as a temporary fix we will block
+  //      until we've received the @attach response back from the server
+  //      and the link is marked as active. Ideally we should be passing
+  //      callbacks around between JS and C++, so will fix better later
+  while (!(pn_link_state(link) & PN_REMOTE_ACTIVE)) {
+    Proton::Entry("pn_messenger_work", name);
+    pn_messenger_work(obj->messenger, 50);
+    error = pn_messenger_errno(obj->messenger);
+    Proton::Exit("pn_messenger_work", name, error);
+    if (error) {
+      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+      // throw Error if error from messenger
+      THROW_EXCEPTION_TYPE(
+          Exception::Error, text, "ProtonMessenger::Subscribe", name)
     }
   }
 
-  Proton::Entry("pn_messenger_work", name);
-  pn_messenger_work(obj->messenger, 50);
-  error = pn_messenger_errno(obj->messenger);
-  Proton::Exit("pn_messenger_work", name, error);
-  if (error) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    // throw Error if error from messenger
-    THROW_EXCEPTION_TYPE(
-        Exception::Error, text, "ProtonMessenger::Subscribe", name)
+  if (credit > 0) {
+    pn_link_flow(link, credit);
   }
+
   Proton::Exit("ProtonMessenger::Subscribe", name, 0);
   return scope.Close(Boolean::New(true));
 }
