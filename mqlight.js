@@ -116,7 +116,7 @@ var PN_STATUS_SETTLED = 7;
 
 
 /** The connection retry interval in milliseconds. */
-var CONNECT_RETRY_INTERVAL = 10000;
+var CONNECT_RETRY_INTERVAL = 1;
 if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
 
 
@@ -983,12 +983,14 @@ var Client = function(service, id, securityOptions) {
       if (client.firstStart) {
         eventToEmit = STATE_STARTED;
         client.firstStart = false;
+        client.retryCount = 0;
         // could be queued actions so need to process those here. On reconnect
         // this would be done via the callback we set, first connect its the
         // users callback so won't process anything.
         logger.log('data', client.id, 'first start since being stopped');
         processQueuedActions.apply(client);
       } else {
+        client.retryCount = 0;
         eventToEmit = STATE_RESTARTED;
       }
       ++client._connectionId;
@@ -1042,14 +1044,20 @@ var Client = function(service, id, securityOptions) {
         logger.exitLevel('exit_often', 'retry', client.id);
       };
 
-      // TODO 10 seconds is an arbitrary value, need to review if this is
-      // appropriate. Timeout should be adjusted based on reconnect algo.
+      client.retryCount++;
+      var retryCap = 60000;
+      //limit to the power of 8 as anything above this will put the interval
+      //higher than the cap straight away.
+      var exponent = (client.retryCount <= 8) ? client.retryCount : 8;
+      var upperBound = Math.pow(2, exponent);
+      var lowerBound = 0.75 * upperBound;
+      var jitter = Math.random() * (0.25 * upperBound);
+      var interval = Math.min(retryCap, (lowerBound + jitter) * 1000);
+      //times by CONNECT_RETRY_INTERVAL for unittest purposes
+      interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
       logger.log('data', client.id, 'trying to connect again ' +
-                 ((CONNECT_RETRY_INTERVAL > 0) ? ('after ' +
-          CONNECT_RETRY_INTERVAL /
-          1000 + ' seconds') :
-          'immediately'));
-      setTimeout(retry, CONNECT_RETRY_INTERVAL);
+                 'after ' + interval / 1000 + ' seconds');
+      setTimeout(retry, interval);
       logger.log('emit', client.id, 'error', error);
       client.emit('error', error);
     }
@@ -1146,6 +1154,9 @@ var Client = function(service, id, securityOptions) {
 
   // No drain event initially required
   this.drainEventRequired = false;
+
+  // Number of attempts the client has tried to reconnect
+  this.retryCount = 0;
 
   // An identifier for the connection
   this._connectionId = 0;
