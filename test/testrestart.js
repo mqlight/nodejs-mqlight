@@ -169,8 +169,11 @@ module.exports.test_resubscribe_on_restart = function(test) {
   var origSubsList = [];
   client.once('started', function(err) {
     client.subscribe('/topic', 'myshare', function(err) {
+      if (connectErrors > 0) return;
       client.subscribe('/another/topic', function(err) {
+        if (connectErrors > 0) return;
         client.subscribe('/final/topic/', 'diffshare', function(err) {
+          if (connectErrors > 0) return;
           if (connectErrors === 0) {
             setImmediate(function() {
               origSubsList = origSubsList.concat(client.subscriptions);

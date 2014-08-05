@@ -74,16 +74,16 @@ module.exports.test_subscribe_callback_must_be_function = function(test) {
     service: 'amqp://host'});
   client.on('started', function() {
     test.throws(function() {
-      client.subscribe('/foo', 'share', {}, 7);
+      client.subscribe('/foo1', 'share', {}, 7);
     });
     test.doesNotThrow(function() {
-      client.subscribe('/foo', function() {});
+      client.subscribe('/foo2', function() {});
     });
     test.doesNotThrow(function() {
-      client.subscribe('/foo', 'share', function() {});
+      client.subscribe('/foo3', 'share', function() {});
     });
     test.doesNotThrow(function() {
-      client.subscribe('/foo', 'share', {}, function() {});
+      client.subscribe('/foo4', 'share', {}, function() {});
     });
     client.stop();
     test.done();
@@ -112,21 +112,23 @@ module.exports.test_subscribe_parameters = function(test) {
   // Data to drive the test with. 'args' is the argument list to pass into
   // the subscribe function.  The 'share', 'object' and 'callback' properties
   // indicate the expected interpretation of 'args'.
-  var data = [{args: [pattern]},
-              {args: [pattern, cb], callback: cb},
-              {args: [pattern, share], share: share},
-              {args: [pattern, object], object: object},
-              {args: [pattern, share, cb], share: share, callback: cb},
-              {args: [pattern, object, cb], object: object, callback: cb},
-              {args: [pattern, share, object], share: share, object: object},
-              {args: [pattern, 7], share: 7},
-              {args: [pattern, 'boo'], share: 'boo'},
-              {args: [pattern, {}], object: {}},
-              {args: [pattern, 7, cb], share: 7, callback: cb},
-              {args: [pattern, {}, cb], object: {}, callback: cb},
-              {args: [pattern, [], []], share: [], object: []},
-              {args: [pattern, share, object, cb],
-                share: share, object: object, callback: cb}];
+  var data = [
+    {args: [pattern + '0']},
+    {args: [pattern + '1', cb], callback: cb},
+    {args: [pattern + '2', share], share: share},
+    {args: [pattern + '3', object], object: object},
+    {args: [pattern + '4', share, cb], share: share, callback: cb},
+    {args: [pattern + '5', object, cb], object: object, callback: cb},
+    {args: [pattern + '6', share, object], share: share, object: object},
+    {args: [pattern + '7', 7], share: 7},
+    {args: [pattern + '8', 'boo'], share: 'boo'},
+    {args: [pattern + '9', {}], object: {}},
+    {args: [pattern + '10', 7, cb], share: 7, callback: cb},
+    {args: [pattern + '11', {}, cb], object: {}, callback: cb},
+    {args: [pattern + '12', [], []], share: [], object: []},
+    {args: [pattern + '13', share, object, cb], share: share, object: object,
+      callback: cb}
+  ];
 
   // Count up the expected number of callback invocations, so the test can
   // wait for these to complete.
@@ -153,7 +155,7 @@ module.exports.test_subscribe_parameters = function(test) {
       var expectedAddress =
           service + '/' +
           ((data[i].share) ? ('share:' + data[i].share + ':') : 'private:') +
-          pattern;
+          pattern + i;
 
       test.deepEqual(lastSubscribedAddress, expectedAddress);
     }
@@ -381,14 +383,14 @@ module.exports.test_subscribe_options = function(test) {
       if (data[i].valid) {
         test.doesNotThrow(
             function() {
-              client.subscribe('testpattern', 'share', data[i].options,
+              client.subscribe('testpattern' + i, 'share', data[i].options,
                                function() {});
             }
         );
       } else {
         test.throws(
             function() {
-              client.subscribe('testpattern', 'share', data[i].options,
+              client.subscribe('testpattern' + i, 'share', data[i].options,
                                function() {});
             },
             TypeError,
@@ -430,11 +432,11 @@ module.exports.test_subscribe_qos = function(test) {
       var opts = { qos: data[i].qos };
       if (data[i].valid) {
         test.doesNotThrow(function() {
-          client.subscribe('testpattern', opts);
+          client.subscribe('testpattern' + i, opts);
         });
       } else {
         test.throws(function() {
-          client.subscribe('testpattern', opts);
+          client.subscribe('testpattern' + i, opts);
         }, TypeError, 'qos should have been rejected: ' + data[i].qos);
       }
     }
@@ -477,11 +479,11 @@ module.exports.test_subscribe_autoConfirm = function(test) {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].valid) {
         test.doesNotThrow(function() {
-          client.subscribe('testpattern', data[i].opts);
+          client.subscribe('testpattern' + i, data[i].opts);
         });
       } else {
         test.throws(function() {
-          client.subscribe('testpattern', data[i].opts);
+          client.subscribe('testpattern' + i, data[i].opts);
         }, TypeError, 'autoConfirm should have been rejected: ' + data[i].opts);
       }
     }
@@ -523,11 +525,11 @@ module.exports.test_subscribe_ttl_validity = function(test) {
       var opts = { ttl: data[i].ttl };
       if (data[i].valid) {
         test.doesNotThrow(function() {
-          client.subscribe('testpattern', opts);
+          client.subscribe('testpattern' + i, opts);
         });
       } else {
         test.throws(function() {
-          client.subscribe('testpattern', opts);
+          client.subscribe('testpattern' + i, opts);
         }, TypeError, 'ttl should have been rejected: ' + data[i].ttl);
       }
     }
@@ -567,7 +569,7 @@ module.exports.test_subscribe_ttl_rounding = function(test) {
     for (var i = 0; i < data.length; ++i) {
       var opts = { ttl: data[i].ttl };
       test.doesNotThrow(function() {
-        client.subscribe('testpattern', opts);
+        client.subscribe('testpattern' + i, opts);
         test.equal(subscribedTtl, data[i].rounded, 'ttl should have been ' +
                    'rounded to ' + data[i].rounded + ' not ' + subscribedTtl);
       });
@@ -618,19 +620,14 @@ module.exports.test_subscribe_credit_values = function(test) {
   mqlight.proton.messenger.subscribe = function(address, qos, ttl, credit) {
     subscribedCredit = credit;
   };
-  var savedSubscribe = mqlight.proton.messenger.subscribe;
-  var subscribedCredit = -1;
-  mqlight.proton.messenger.subscribe = function(address, qos, ttl, credit) {
-    subscribedCredit = credit;
-  };
   var client = mqlight.createClient({id: 'test_subscribe_credit_values',
     service: 'amqp://host'});
   client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].expected !== undefined) {
         test.doesNotThrow(function() {
-          client.subscribe('testpattern', 
-                           data[i].credit != undefined ? data[i] : {});
+          client.subscribe('testpattern' + i, 
+                           data[i].credit !== undefined ? data[i] : {});
         }, undefined, 'test data index: ' + i);
         test.deepEqual(subscribedCredit, data[i].expected,
             'wrong value passed to proton messenger - test data index: ' + i +

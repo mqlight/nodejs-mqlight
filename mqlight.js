@@ -149,6 +149,150 @@ var STATE_STOPPING = 'stopping';
 
 
 /**
+ * Generic helper method to use for Error sub-typing
+ *
+ * @param {Object}
+ *          obj - the object upon which to define Error properties
+ * @param {String}
+ *          name - the sub-type Error object name
+ * @param {String}
+ *          message - Human-readable description of the error
+ */
+function setupError(obj, name, message) {
+  Error.call(obj);
+  Object.defineProperty(obj, 'name', {
+    value: name,
+    enumerable: false
+  });
+  Object.defineProperty(obj, 'message', {
+    value: message,
+    enumerable: false
+  });
+}
+
+
+
+/**
+ * A subtype of Error defined by the MQ Light client. It is considered a
+ * programming error. The underlying cause for this error are the parameter
+ * values passed into a method.
+ *
+ * @param {String}
+ *          message - Human-readable description of the error
+ *
+ * @constructor
+ */
+exports.InvalidArgumentError = function(message) {
+  Error.captureStackTrace(this, this.constructor);
+  setupError(this, 'InvalidArgumentError', message);
+};
+var InvalidArgumentError = exports.InvalidArgumentError;
+util.inherits(InvalidArgumentError, Error);
+
+
+
+/**
+ * This is a subtype of Error defined by the MQ Light client. It is considered
+ * an operational error. NetworkError is passed to an application if the client
+ * cannot establish a network connection to the MQ Light server, or if an
+ * established connection is broken.
+ *
+ * @param {String}
+ *          message - Human-readable description of the error
+ *
+ * @constructor
+ */
+exports.NetworkError = function(message) {
+  Error.captureStackTrace(this, this.constructor);
+  setupError(this, 'NetworkError', message);
+};
+var NetworkError = exports.NetworkError;
+util.inherits(NetworkError, Error);
+
+
+
+/**
+ * This is a subtype of Error defined by the MQ Light client. It is considered
+ * an operational error. SecurityError is thrown when an operation fails due to
+ * a security related problem.
+ *
+ * @param {String}
+ *          message - Human-readable description of the error
+ *
+ * @constructor
+ */
+exports.SecurityError = function(message) {
+  Error.captureStackTrace(this, this.constructor);
+  setupError(this, 'SecurityError', message);
+};
+var SecurityError = exports.SecurityError;
+util.inherits(SecurityError, Error);
+
+
+
+/**
+ * This is a subtype of Error defined by the MQ Light client.  It is
+ * considered a programming error - but is unusual in that, in some
+ * circumstances, a client may reasonably expect to receive StoppedError as a
+ * result of its actions and would typically not be altered to avoid this
+ * condition occurring.  StoppedError is thrown by methods which require
+ * connectivity to the server (e.g. send, subscribe) when they are invoked
+ * while the client is in the stopping or stopped states
+ *
+ * @param {String}
+ *          message - Human-readable description of the error
+ *
+ * @constructor
+ */
+exports.StoppedError = function(message) {
+  Error.captureStackTrace(this, this.constructor);
+  setupError(this, 'StoppedError', message);
+};
+var StoppedError = exports.StoppedError;
+util.inherits(StoppedError, Error);
+
+
+
+/**
+ * This is a subtype of Error defined by the MQ Light client.  It is considered
+ * a programming error.  SubscribedError is thrown from the
+ * client.subscribe(...) method call when a request is made to subscribe to a
+ * destination that the client is already subscribed to.
+ *
+ * @param {String}
+ *          message - Human-readable description of the error
+ *
+ * @constructor
+ */
+exports.SubscribedError = function(message) {
+  Error.captureStackTrace(this, this.constructor);
+  setupError(this, 'SubscribedError', message);
+};
+var SubscribedError = exports.SubscribedError;
+util.inherits(SubscribedError, Error);
+
+
+
+/**
+ * This is a subtype of Error defined by the MQ Light client.  It is considered
+ * a programming error.  UnsubscribedError is thrown from the
+ * client.unsubscribe(...) method call when a request is made to unsubscribe
+ * from a destination that the client is not subscribed to.
+ *
+ * @param {String}
+ *          message - Human-readable description of the error
+ *
+ * @constructor
+ */
+exports.UnsubscribedError = function(message) {
+  Error.captureStackTrace(this, this.constructor);
+  setupError(this, 'UnsubscribedError', message);
+};
+var UnsubscribedError = exports.UnsubscribedError;
+util.inherits(UnsubscribedError, Error);
+
+
+/**
  * Creates and returns a new instance of the Client object.
  * <p>
  * See README.md for more details.
@@ -163,14 +307,16 @@ var STATE_STOPPING = 'stopping';
 exports.createClient = function(options, callback) {
   logger.entry('createClient', logger.NO_CLIENT_ID);
 
+  var err;
+
   if (!options) {
-    var err = new TypeError('options object missing');
+    err = new TypeError('options object missing');
     logger.throw('createClient', logger.NO_CLIENT_ID, err);
     throw err;
   }
 
   if (callback && (typeof callback !== 'function')) {
-    var err = new TypeError('Callback argument must be a function');
+    err = new TypeError('Callback argument must be a function');
     logger.throw('Client.createClient', this.id, err);
     throw err;
   }
@@ -181,7 +327,8 @@ exports.createClient = function(options, callback) {
     urlUser: undefined,
     urlPassword: undefined,
     sslTrustCertificate: options.sslTrustCertificate,
-    sslVerifyName: options.sslVerifyName,
+    sslVerifyName: (typeof options.sslVerifyName === 'undefined') ? true :
+                           Boolean(options.sslVerifyName),
     toString: function() {
       return '[\n' +
           ' propertyUser: ' + this.propertyUser + '\n' +
@@ -289,7 +436,7 @@ var getFileServiceFunction = function(fileUrl) {
         if (obj) {
           logger.entry('fileServiceFunction.callback', logger.NO_CLIENT_ID);
           logger.log('parms', logger.NO_CLIENT_ID, 'service:', obj.service);
-          callback(undefined, obj.service);
+          callback(null, obj.service);
           logger.exit('fileServiceFunction.callback', logger.NO_CLIENT_ID,
                       null);
         }
@@ -365,7 +512,7 @@ var getHttpServiceFunction = function(serviceUrl) {
           if (obj) {
             logger.entry('httpServiceFunction.callback', logger.NO_CLIENT_ID);
             logger.log('parms', logger.NO_CLIENT_ID, 'service:', obj.service);
-            callback(undefined, obj.service);
+            callback(null, obj.service);
             logger.exit('httpServiceFunction.callback', logger.NO_CLIENT_ID,
                         null);
           }
@@ -749,11 +896,11 @@ var Client = function(service, id, securityOptions) {
     var client = this;
     logger.entry('Client.connectToService', client.id);
 
-    if (client.state === STATE_STOPPING ||
-        client.state === STATE_STOPPED) {
+    if (client.isStopped()) {
       if (callback) {
         logger.entry('Client.connectToService.callback', client.id);
-        callback(new Error('connect aborted due to stop'));
+        callback.apply(client,
+                       [new StoppedError('connect aborted due to stop')]);
         logger.exit('Client.connectToService.callback', client.id, null);
       }
       logger.exit('Client.connectToService', client.id, null);
@@ -783,7 +930,7 @@ var Client = function(service, id, securityOptions) {
                 encodeURIComponent(String(securityOptions.propertyPassword));
             auth += '@';
           } else {
-            auth = undefined;
+            auth = null;
           }
           var logUrl;
           // reparse the service url to prepend authentication information
@@ -840,14 +987,15 @@ var Client = function(service, id, securityOptions) {
       if (client.firstStart) {
         eventToEmit = STATE_STARTED;
         client.firstStart = false;
-        //could be queued actions so need to process those here. On reconnect
-        //this would be done via the callback we set, first connect its the
-        //users callback so won't process anything.
+        // could be queued actions so need to process those here. On reconnect
+        // this would be done via the callback we set, first connect its the
+        // users callback so won't process anything.
         logger.log('data', client.id, 'first start since being stopped');
         processQueuedActions.apply(client);
       } else {
         eventToEmit = STATE_RESTARTED;
       }
+      ++client._connectionId;
 
       process.nextTick(function() {
         logger.log('emit', client.id, eventToEmit);
@@ -921,7 +1069,7 @@ var Client = function(service, id, securityOptions) {
   if (id.length > 48) {
     msg = "Client identifier '" + id + "' is longer than the maximum ID " +
           'length of 48.';
-    err = new RangeError(msg);
+    err = new InvalidArgumentError(msg);
     logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
     throw err;
   }
@@ -932,7 +1080,7 @@ var Client = function(service, id, securityOptions) {
   for (var i in id) {
     if (validClientIdChars.indexOf(id[i]) == -1) {
       msg = "Client Identifier '" + id + "' contains invalid char: " + id[i];
-      err = new Error(msg);
+      err = new InvalidArgumentError(msg);
       logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
       throw err;
     }
@@ -941,24 +1089,14 @@ var Client = function(service, id, securityOptions) {
   // User/password must either both be present, or both be absent.
   if ((securityOptions.propertyUser && !securityOptions.propertyPassword) ||
       (!securityOptions.propertyUser && securityOptions.propertyPassword)) {
-    err = new TypeError('both user and password properties ' +
-                        'must be specified together');
+    err = new InvalidArgumentError('both user and password properties ' +
+                                   'must be specified together');
     logger.throw('Client.constructor', id, err);
     throw err;
   }
 
-  // Valdate the ssl security options
-  if (securityOptions.sslVerifyName !== undefined) {
-    if (!(securityOptions.sslVerifyName === true ||
-          securityOptions.sslVerifyName === false)) {
-      err = new TypeError("sslVerifyName value '" +
-                          securityOptions.sslVerifyName +
-                          "' is invalid. Must evaluate to true or false");
-      logger.throw('Client.constructor', this.id, err);
-      throw err;
-    }
-  }
-  if (securityOptions.sslTrustCertificate !== undefined) {
+  // Validate the ssl security options
+  if (typeof securityOptions.sslTrustCertificate !== 'undefined') {
     if (typeof securityOptions.sslTrustCertificate !== 'string') {
       err = new TypeError("sslTrustCertificate value '" +
                           securityOptions.sslTrustCertificate +
@@ -993,7 +1131,7 @@ var Client = function(service, id, securityOptions) {
 
   // Set the initial state to starting
   this.state = STATE_STARTING;
-  this.service = undefined;
+  this.service = null;
   // the first start, set to false after start and back to true on stop
   this.firstStart = true;
 
@@ -1012,6 +1150,9 @@ var Client = function(service, id, securityOptions) {
 
   // No drain event initially required
   this.drainEventRequired = false;
+
+  // An identifier for the connection
+  this._connectionId = 0;
 
   if (!serviceFunction) {
     serviceList = this.generateServiceList.apply(this, [service]);
@@ -1203,7 +1344,7 @@ Client.prototype.stop = function(callback) {
     throw err;
   }
 
-  //just return if already disconnected or in the process of disconnecting
+  // just return if already stopped or in the process of stopping
   if (client.isStopped()) {
     process.nextTick(function() {
       if (callback) {
@@ -1236,7 +1377,7 @@ Client.prototype.stop = function(callback) {
  *          for chaining of other method calls on the client object.
  */
 var reconnect = function(client) {
-  if (client === undefined || client.constructor !== Client) {
+  if (typeof client === 'undefined' || client.constructor !== Client) {
     logger.entry('Client.reconnect', logger.NO_CLIENT_ID);
     logger.log('parms', logger.NO_CLIENT_ID, 'client:', client);
     logger.exit('Client.reconnect', logger.NO_CLIENT_ID, undefined);
@@ -1246,7 +1387,7 @@ var reconnect = function(client) {
   if (client.state !== STATE_STARTED) {
     if (client.isStopped()) {
       logger.exit('Client.reconnect', client.id, null);
-      return undefined;
+      return;
     } else if (client.state === STATE_RETRYING) {
       logger.exit('Client.reconnect', client.id, client);
       return client;
@@ -1299,7 +1440,7 @@ if (process.env.NODE_ENV === 'unittest') {
 var processQueuedActions = function(err) {
   // this set to the appropriate client via apply call in performConnect
   var client = this;
-  if (client === undefined || client.constructor !== Client) {
+  if (typeof client === 'undefined' || client.constructor !== Client) {
     logger.entry('processQueuedActions', 'client was not set');
     logger.exit('processQueuedActions', 'client not set returning', null);
     return;
@@ -1339,7 +1480,7 @@ var processQueuedActions = function(err) {
       if (rm.noop) {
         // no-op, so just trigger the callback without actually unsubscribing
         if (rm.callback) {
-          rm.callback.apply(client, [undefined, rm.topicPattern, rm.share]);
+          rm.callback.apply(client, [null, rm.topicPattern, rm.share]);
         }
       } else {
         client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
@@ -1374,12 +1515,12 @@ Object.defineProperty(Client, 'id', {
 /**
  * @return {String} The URL of the service to which the client is currently
  * connected (when the client is in 'started' state) - otherwise (for all other
- * client states) undefined is returned.
+ * client states) null is returned.
  */
 Object.defineProperty(Client, 'service', {
   get: function() {
     return this.state === STATE_STARTED ?
-        this.service : undefined;
+        this.service : null;
   }
 });
 
@@ -1449,7 +1590,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
   logger.log('parms', this.id, 'topic:', topic);
   logger.log('parms', this.id, 'data: typeof', typeof data);
-  if (data === undefined) {
+  if (typeof data === 'undefined') {
     err = new TypeError('Cannot send undefined data');
     logger.throw('Client.send', this.id, err);
     throw err;
@@ -1469,8 +1610,8 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
 
   // Validate the options parameter, when specified
-  if (options !== undefined) {
-    if (typeof options == 'object') {
+  if (typeof options !== 'undefined') {
+    if (typeof options === 'object') {
       logger.log('parms', this.id, 'options:', options);
     } else {
       err = new TypeError('options must be an object type not a ' +
@@ -1519,15 +1660,16 @@ Client.prototype.send = function(topic, data, options, callback) {
       throw err;
     }
   } else if (qos === exports.QOS_AT_LEAST_ONCE) {
-    err = new TypeError('callback must be specified when options:qos value ' +
-                        'of 1 (at least once) is specified');
+    err = new InvalidArgumentError('callback must be specified when ' +
+                                   'options:qos value of 1 (at least once) ' +
+                                   'is specified');
     logger.throw('Client.send', this.id, err);
     throw err;
   }
 
   // Ensure we have attempted a connect
   if (this.isStopped()) {
-    err = new Error('not started');
+    err = new StoppedError('not started');
     logger.throw('Client.send', this.id, err);
     throw err;
   }
@@ -1675,7 +1817,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         }
       } catch (e) {
         logger.caught('Client.send.untilSendComplete', client.id, e);
-        //error condition so won't retry send remove from list of unsent
+        // error condition so won't retry send remove from list of unsent
         index = client.outstandingSends.indexOf(localMessageId);
         if (index >= 0) client.outstandingSends.splice(index, 1);
         // an error here could still mean the message made it over
@@ -1691,11 +1833,11 @@ Client.prototype.send = function(topic, data, options, callback) {
         process.nextTick(function() {
           if (sendCallback) {
             if (qos === exports.QOS_AT_MOST_ONCE) {
-              //we don't know if an at most once message made it across
-              //call the callback with undefined to indicate success to
-              //avoid user resending on error.
+              // we don't know if an at most once message made it across
+              // call the callback with an err of null to indicate success to
+              // avoid the user resending on error.
               logger.entry('Client.send.untilSendComplete.callback', client.id);
-              sendCallback.apply(client, [undefined, topic, protonMsg.body,
+              sendCallback.apply(client, [null, topic, protonMsg.body,
                 options]);
               logger.exit('Client.send.untilSendComplete.callback', client.id,
                   null);
@@ -1777,6 +1919,8 @@ Client.prototype.checkForMessages = function() {
     return;
   }
 
+  var err;
+
   try {
     var messages = messenger.receive(50);
     if (messages.length > 0) {
@@ -1785,6 +1929,10 @@ Client.prototype.checkForMessages = function() {
       for (var msg = 0, tot = messages.length; msg < tot; msg++) {
         logger.log('debug', client.id, 'processing message %d', msg);
         var protonMsg = messages[msg];
+
+        Object.defineProperty(protonMsg, 'connectionId', {
+          value: client._connectionId
+        });
 
         // if body is a JSON'ified object, try to parse it back to a js obj
         var data;
@@ -1806,19 +1954,19 @@ Client.prototype.checkForMessages = function() {
         var matchedSubs = client.subscriptions.filter(function(el) {
           // 1 added to length to account for the / we add
           var addressNoService = el.address.slice(client.service.length + 1);
-          //possible to have 2 matches work out whether this is
-          //for a share or private topic
-          if (el.share === undefined &&
+          // possible to have 2 matches work out whether this is
+          // for a share or private topic
+          if (typeof el.share === 'undefined' &&
               protonMsg.linkAddress.indexOf('private:') === 0) {
-            //slice off private: and compare to the no service address
+            // slice off private: and compare to the no service address
             var linkNoPrivShare = protonMsg.linkAddress.slice(8);
             if (addressNoService === linkNoPrivShare) {
               return el;
             }
-          } else if (el.share !== undefined &&
+          } else if (typeof el.share !== 'undefined' &&
                      protonMsg.linkAddress.indexOf('share:') === 0) {
-            //starting after the share: look for the next : denoting the end
-            //of the share name and get everything past that
+            // starting after the share: look for the next : denoting the end
+            // of the share name and get everything past that
             var linkNoShare = protonMsg.linkAddress.slice(
                                   protonMsg.linkAddress.indexOf(':', 7) + 1);
             if (addressNoService === linkNoShare) {
@@ -1826,17 +1974,17 @@ Client.prototype.checkForMessages = function() {
             }
           }
         });
-        //should only ever be one entry in matchedSubs
-        if (matchedSubs[0] !== undefined) {
+        // should only ever be one entry in matchedSubs
+        if (typeof matchedSubs[0] !== 'undefined') {
           qos = matchedSubs[0].qos;
           if (qos === exports.QOS_AT_LEAST_ONCE) {
             autoConfirm = matchedSubs[0].autoConfirm;
           }
           ++matchedSubs[0].unconfirmed;
         } else {
-          //shouldn't get here
-          var err = new Error('No listener matched for this message: ' +
-                              data + ' going to address: ' + protonMsg.address);
+          // shouldn't get here
+          err = new Error('No listener matched for this message: ' +
+                          data + ' going to address: ' + protonMsg.address);
           logger.throwLevel('exit_often', 'checkForMessages', this.id, err);
           throw err;
         }
@@ -1854,8 +2002,22 @@ Client.prototype.checkForMessages = function() {
             } : function() {
               logger.entry('message.confirmDelivery', this.id);
               logger.log('data', this.id, 'delivery:', delivery);
-              var subscription = matchedSubs[0];
+              if (client.isStopped()) {
+                err = new NetworkError('not started');
+                logger.throw('message.confirmDelivery', this.id, err);
+                throw err;
+              }
               if (protonMsg) {
+                // also throw NetworkError if the client has
+                // disconnected at some point since this particular message was
+                // received
+                if (protonMsg.connectionId !== client._connectionId) {
+                  err = new NetworkError('client has reconnected since this ' +
+                                         'message was received');
+                  logger.throw('message.confirmDelivery', this.id, err);
+                  throw err;
+                }
+                var subscription = matchedSubs[0];
                 messenger.settle(protonMsg);
                 --subscription.unconfirmed;
                 ++subscription.confirmed;
@@ -1868,14 +2030,14 @@ Client.prototype.checkForMessages = function() {
                 // Or we have just confirmed everything.
                 var available = subscription.credit - subscription.unconfirmed;
                 if ((available / subscription.confirmed) <= 1.25 ||
-                    (subscription.unconfirmed == 0 &&
+                    (subscription.unconfirmed === 0 &&
                      subscription.confirmed > 0)) {
                   messenger.flow(client.service + '/' + protonMsg.linkAddress,
                                  subscription.confirmed);
                   subscription.confirmed = 0;
                 }
                 protonMsg.destroy();
-                protonMsg = undefined;
+                protonMsg = null;
               }
               logger.exit('message.confirmDelivery', this.id, null);
             }
@@ -1927,7 +2089,7 @@ Client.prototype.checkForMessages = function() {
             client.emit('malformed', protonMsg.body, delivery);
           } else {
             protonMsg.destroy();
-            var err = new Error('No listener for "malformed" event.');
+            err = new Error('No listener for "malformed" event.');
             logger.throwLevel('exit_often', 'checkForMessages', this.id, err);
             throw err;
           }
@@ -1959,7 +2121,7 @@ Client.prototype.checkForMessages = function() {
           // Or we have just confirmed everything.
           var available = matchedSubs[0].credit - matchedSubs[0].unconfirmed;
           if ((available / matchedSubs[0].confirmed <= 1.25) ||
-              (matchedSubs[0].unconfirmed == 0 &&
+              (matchedSubs[0].unconfirmed === 0 &&
                matchedSubs[0].confirmed > 0)) {
             messenger.flow(client.service + '/' + protonMsg.linkAddress,
                            matchedSubs[0].confirmed);
@@ -2084,8 +2246,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   logger.log('parms', this.id, 'share:', share);
 
   // Validate the options parameter, when specified
-  if (options !== undefined) {
-    if (typeof options == 'object') {
+  if (typeof options !== 'undefined') {
+    if (typeof options === 'object') {
       logger.log('parms', this.id, 'options:', options);
     } else {
       err = new TypeError('options must be an object type not a ' +
@@ -2157,7 +2319,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   // Ensure we have attempted a connect
   if (this.isStopped()) {
-    err = new Error('not started');
+    err = new StoppedError('not started');
     logger.throw('Client.subscribe', this.id, err);
     throw err;
   }
@@ -2193,11 +2355,25 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   }
 
   var err;
-  try {
-    messenger.subscribe(address, qos, ttl, credit);
-  } catch (e) {
-    logger.caught('Client.subscribe', client.id, e);
-    err = e;
+
+  // if we already believe this subscription exists, we should reject the
+  // request to subscribe by throwing a SubscribedError
+  for (var i = 0; i < client.subscriptions.length; i++) {
+    if (client.subscriptions[i].address === subscriptionAddress &&
+        client.subscriptions[i].share === originalShareValue) {
+      err = new SubscribedError('client is already subscribed to this address');
+      logger.throw('Client.subscribe', this.id, err);
+      throw err;
+    }
+  }
+
+  if (!err) {
+    try {
+      messenger.subscribe(address, qos, ttl, credit);
+    } catch (e) {
+      logger.caught('Client.subscribe', client.id, e);
+      err = e;
+    }
   }
 
   if (callback) {
@@ -2215,7 +2391,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       logger.log('emit', client.id, 'error', err);
       client.emit('error', err);
     });
-    if (!(err instanceof TypeError)) {
+    if (!(err instanceof TypeError) && !(err instanceof SubscribedError)) {
       logger.log('data', client.id, 'queued subscription and calling ' +
                  'reconnect');
       // error during subscribe so add to list of queued to resub
@@ -2234,18 +2410,10 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       });
     }
   } else {
-    // if no errors, add this to the stored list of subscriptions, replacing
-    // any existing entry
+    // if no errors, add this to the stored list of subscriptions
     var isFirstSub = (client.subscriptions.length === 0);
     logger.log('data', client.id, 'isFirstSub:', isFirstSub);
 
-    for (var i = 0; i < client.subscriptions.length; i++) {
-      if (client.subscriptions[i].address === subscriptionAddress &&
-          client.subscriptions[i].share === originalShareValue) {
-        client.subscriptions.splice(i, 1);
-        break;
-      }
-    }
     client.subscriptions.push({
       address: subscriptionAddress,
       qos: qos,
@@ -2358,8 +2526,8 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   logger.log('parms', this.id, 'share:', share);
 
   // Validate the options parameter, when specified
-  if (options !== undefined) {
-    if (typeof options == 'object') {
+  if (typeof options !== 'undefined') {
+    if (typeof options === 'object') {
       logger.log('parms', this.id, 'options:', options);
     } else {
       err = new TypeError('options must be an object type not a ' +
@@ -2392,7 +2560,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
 
   // Ensure we have attempted a connect
   if (this.isStopped()) {
-    err = new Error('not started');
+    err = new StoppedError('not started');
     logger.throw('Client.unsubscribe', this.id, err);
     throw err;
   }
@@ -2404,7 +2572,8 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
 
   // Check that there is actually a subscription for the pattern and share
   var subscribed = false;
-  for (var i = 0; i < client.subscriptions.length; i++) {
+  var i = 0;
+  for (i = 0; i < client.subscriptions.length; i++) {
     if (client.subscriptions[i].address === subscriptionAddress &&
         client.subscriptions[i].share === originalShareValue) {
       subscribed = true;
@@ -2412,18 +2581,20 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     }
   }
   if (!subscribed) {
-    for (var qs = 0; qs < client.queuedSubscriptions.length; qs++) {
-      if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
-          client.queuedSubscriptions[qs].share === originalShareValue &&
-          !(client.queuedSubscriptions[qs].noop)) {
+    for (i = 0; i < client.queuedSubscriptions.length; i++) {
+      if (client.queuedSubscriptions[i].address === subscriptionAddress &&
+          client.queuedSubscriptions[i].share === originalShareValue &&
+          !(client.queuedSubscriptions[i].noop)) {
         subscribed = true;
         break;
       }
     }
   }
+
+  var err;
+
   if (!subscribed) {
-    // TODO define a proper type for this Error (e.g. StateError)
-    var err = new Error('not subscribed to ' + address);
+    err = new UnsubscribedError('client is not subscribed to this address');
     logger.throw('Client.unsubscribe', this.id, err);
     throw err;
   }
@@ -2470,19 +2641,18 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   }
 
   // unsubscribe using the specified topic pattern and share options
-  var err;
   try {
     messenger.unsubscribe(address, ttl);
 
     if (callback) {
       process.nextTick(function() {
         logger.entry('Client.unsubscribe.callback', client.id);
-        callback.apply(client, [undefined, topicPattern, originalShareValue]);
+        callback.apply(client, [null, topicPattern, originalShareValue]);
         logger.exit('Client.unsubscribe.callback', client.id, null);
       });
     }
     // if no errors, remove this from the stored list of subscriptions
-    for (var i = 0; i < client.subscriptions.length; i++) {
+    for (i = 0; i < client.subscriptions.length; i++) {
       if (client.subscriptions[i].address === subscriptionAddress &&
           client.subscriptions[i].share === originalShareValue) {
         client.subscriptions.splice(i, 1);

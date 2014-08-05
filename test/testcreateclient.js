@@ -152,7 +152,7 @@ module.exports.test_id_types_values = function(test) {
       var opts = {service: 'amqp://localhost', id: testData[i].data};
       mqlight.createClient(opts, function(err, client) {
         test.ok(!err);
-        client.stop((i == testData.length-1) ? test.done : runTest(i+1));
+        client.stop((i == testData.length - 1) ? test.done : runTest(i + 1));
       });
       test.ok(testData[i].valid, "Expected '" + testData[i].data +
           "' to be invalid");
@@ -161,8 +161,9 @@ module.exports.test_id_types_values = function(test) {
         console.log(testData[i]);
         throw _;
       }
-      if (i < (testData.length-1)) {
-        runTest(i+1);
+      test.ok(_ instanceof mqlight.InvalidArgumentError);
+      if (i < (testData.length - 1)) {
+        runTest(i + 1);
       } else {
         test.done();
       }
@@ -213,7 +214,7 @@ module.exports.test_user_password_types_values = function(test) {
 
       mqlight.createClient(opts, function(err, client) {
         test.ok(!err);
-        client.stop((i < testData.length - 1) ? runTests(i+1) : test.done)
+        client.stop((i < testData.length - 1) ? runTests(i + 1) : test.done);
       });
       test.ok(testData[i].valid, "Expected '" + testData[i].user + '/' +
               testData[i].password + "' to be invalid");
@@ -221,8 +222,10 @@ module.exports.test_user_password_types_values = function(test) {
       if (testData[i].valid) {
         console.log(i);
         throw _;
-      } else if (i < testData.length - 1) {
-        runTests(i+1);
+      }
+      test.ok(_ instanceof mqlight.InvalidArgumentError);
+      if (i < testData.length - 1) {
+        runTests(i + 1);
       } else {
         test.done();
       }
@@ -323,7 +326,7 @@ module.exports.test_valid_URIs = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_createClient_too_many_arguments = function(test) {
-  mqlight.createClient({service: 'amqp://host'}, function(){}, 'wallflower');
+  mqlight.createClient({service: 'amqp://host'}, function() {}, 'wallflower');
   test.done();
 };
 

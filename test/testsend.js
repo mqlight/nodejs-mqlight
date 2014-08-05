@@ -244,12 +244,12 @@ module.exports.test_send_callback = function(test) {
 
 /**
  * Tests that client.send(...) throws and error if it is called while the
- * client is in disconnected state.
+ * client is in stopped state.
  * @param {object} test the unittest interface
  */
-module.exports.test_send_fails_if_disconnected = function(test) {
+module.exports.test_send_fails_if_stopped = function(test) {
   var opts = {
-    id: 'test_send_fails_if_disconnected',
+    id: 'test_send_fails_if_stopped',
     service: 'amqp://host'
   };
   var client = mqlight.createClient(opts, function() {
@@ -258,7 +258,7 @@ module.exports.test_send_fails_if_disconnected = function(test) {
           function() {
             client.send('topic', 'message');
           },
-          Error
+          mqlight.StoppedError
       );
       test.done();
     });
@@ -387,7 +387,7 @@ module.exports.test_send_qos_function = function(test) {
             function() {
               client.send('test', 'message', opts, data[i].callback);
             },
-            TypeError,
+            mqlight.InvalidArgumentError,
             'Should have thrown, as qos and callback combination is invalid'
         );
       }

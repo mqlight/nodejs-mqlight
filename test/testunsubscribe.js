@@ -84,20 +84,20 @@ module.exports.test_unsubscribe_callback_must_be_function = function(test) {
   };
   var client = mqlight.createClient(opts, function() {
     test.throws(function() {
-      client.subscribe('/foo', 'share');
-      client.unsubscribe('/foo', 'share', {}, 7);
+      client.subscribe('/foo1', 'share');
+      client.unsubscribe('/foo1', 'share', {}, 7);
     });
     test.doesNotThrow(function() {
-      client.subscribe('/foo');
-      client.unsubscribe('/foo', function() {});
+      client.subscribe('/foo2');
+      client.unsubscribe('/foo2', function() {});
     });
     test.doesNotThrow(function() {
-      client.subscribe('/foo', 'share');
-      client.unsubscribe('/foo', 'share', function() {});
+      client.subscribe('/foo3', 'share');
+      client.unsubscribe('/foo3', 'share', function() {});
     });
     test.doesNotThrow(function() {
-      client.subscribe('/foo', 'share');
-      client.unsubscribe('/foo', 'share', {}, function() {});
+      client.subscribe('/foo4', 'share');
+      client.unsubscribe('/foo4', 'share', {}, function() {});
     });
     client.stop(function() {
       test.done();
@@ -213,14 +213,14 @@ module.exports.test_unsubscribe_ok_callback = function(test) {
     client.subscribe('/foo');
     client.unsubscribe('/foo', function() {
       test.equals(arguments.length, 3);
-      test.deepEqual(arguments[0], undefined);  // error argument
+      test.deepEqual(arguments[0], null);       // error argument
       test.deepEqual(arguments[1], '/foo');     // topic pattern argument
       test.deepEqual(arguments[2], undefined);  // share argument
       test.ok(this === client);
       client.subscribe('/foo2', 'share');
       client.unsubscribe('/foo2', 'share', function() {
         test.equals(arguments.length, 3);
-        test.deepEqual(arguments[0], undefined);  // error argument
+        test.deepEqual(arguments[0], null);       // error argument
         test.deepEqual(arguments[1], '/foo2');    // topic pattern argument
         test.deepEqual(arguments[2], 'share');    // share argument
         test.ok(this === client);
