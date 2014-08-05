@@ -293,7 +293,7 @@ util.inherits(UnsubscribedError, Error);
  * <p>
  * See README.md for more details.
  *
- * @param {Object}   options - (optional) properties that define the
+ * @param {Object}   options - properties that define the
  *                             characteristics of the client.
  * @param {Function} callback - (optional) callback, invoked when the client has
  *                              attained 'started' or 'stopped' state.
@@ -305,7 +305,7 @@ exports.createClient = function(options, callback) {
 
   var err;
 
-  if (!options) {
+  if (!options || (typeof options !== 'object')) {
     err = new TypeError('options object missing');
     logger.throw('createClient', logger.NO_CLIENT_ID, err);
     throw err;
