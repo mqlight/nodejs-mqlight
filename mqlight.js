@@ -80,10 +80,6 @@ exports.QOS_AT_MOST_ONCE = 0;
 exports.QOS_AT_LEAST_ONCE = 1;
 
 
-/** @const {number} */
-exports.QOS_EXACTLY_ONCE = 2;
-
-
 /** Proton Messenger status values (returned from ProtonMessenger.Status()) */
 
 
