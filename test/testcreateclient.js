@@ -109,6 +109,26 @@ module.exports.test_createClient_must_have_a_value = function(test) {
 
 
 /**
+ * Test that only a function() is accepted as the callback argument on
+ * createClient
+ *
+ * @param {object} test - test case.
+ */
+module.exports.test_createClient_callback_must_be_function = function(test) {
+  test.throws(function() {
+    mqlight.createClient({}, 1);
+  }, function(err) {
+    if ((err instanceof TypeError) &&
+        /Callback argument must be a function/.test(err)) {
+      return true;
+    }
+  }, 'only a function can be passed to createClient(...) as a callback');
+
+  test.done();
+};
+
+
+/**
  * Test that omitting the 'service' property from createClient causes an error.
  * @param {object} test - test case.
  */
@@ -131,7 +151,7 @@ module.exports.test_createClient_must_have_service_value = function(test) {
  * @param {object} test - test case.
  */
 module.exports.test_createClient_ignores_unknown_properties = function(test) {
-  var oddOpts = function() {};  // for added craziness: not an object...
+  var oddOpts = {};
   oddOpts.service = 'amqp://localhost';
   oddOpts.fruit = 'avocado';
   oddOpts.size = 3;
@@ -347,24 +367,24 @@ module.exports.test_createClient_too_many_arguments = function(test) {
  */
 module.exports.test_bad_ssl_options = function(test) {
   var testData = [{sslTrustCertificate: 1, sslVerifyName: true},
-                  {sslTrustCertificate: {a:1}, sslVerifyName: true},
+                  {sslTrustCertificate: {a: 1}, sslVerifyName: true},
                   {sslTrustCertificate: true, sslVerifyName: true},
-                  {sslTrustCertificate:'ValidCertificate', sslVerifyName:'a'},
-                  {sslTrustCertificate:'ValidCertificate', sslVerifyName: 1},
-                  {sslTrustCertificate:'ValidCertificate',
-                    sslVerifyName:{a:1}},
-                  {sslTrustCertificate:'MissingCertificate',
-                    sslVerifyName:true},
-                  {sslTrustCertificate:'dirCertificate',
-                    sslVerifyName:true}];
+                  {sslTrustCertificate: 'ValidCertificate', sslVerifyName: 'a'},
+                  {sslTrustCertificate: 'ValidCertificate', sslVerifyName: 1},
+                  {sslTrustCertificate: 'ValidCertificate',
+                    sslVerifyName: {a: 1}},
+                  {sslTrustCertificate: 'MissingCertificate',
+                    sslVerifyName: true},
+                  {sslTrustCertificate: 'dirCertificate',
+                    sslVerifyName: true}];
   fs.mkdirSync('dirCertificate');
   test.expect(testData.length);
   for (var i = 0; i < testData.length; i++) {
     test.throws(function() {
       var opts = {
         service: 'amqp://host',
-        sslTrustCertificate : testData[i].sslTrustCertificate,
-        sslVerifyName : testData[i].sslVerifyName,
+        sslTrustCertificate: testData[i].sslTrustCertificate,
+        sslVerifyName: testData[i].sslVerifyName,
         id: 'test_bad_ssl_options'
       };
       mqlight.createClient(opts);
@@ -385,23 +405,32 @@ module.exports.test_bad_ssl_options = function(test) {
  * @param {object} test - test case.
  */
 module.exports.test_valid_ssl_options = function(test) {
-  var testData = [{sslTrustCertificate:'ValidCertificate', sslVerifyName:true},
-                  {sslTrustCertificate:'ValidCertificate', sslVerifyName:true},
-                  {sslTrustCertificate:'BadVerify', sslVerifyName: false}];
+  var testData = [{
+    sslTrustCertificate: 'ValidCertificate',
+    sslVerifyName: true
+  },
+  {
+    sslTrustCertificate: 'ValidCertificate',
+    sslVerifyName: true
+  },
+  {
+    sslTrustCertificate: 'BadVerify',
+    sslVerifyName: false
+  }];
   var validCertificateFd = fs.openSync('ValidCertificate', 'w');
   var badVerifyFd = fs.openSync('BadVerify', 'w');
   var count = 0;
   var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
     var opts = {
       service: 'amqp://host',
-      sslTrustCertificate : testData[count].sslTrustCertificate,
-      sslVerifyName : testData[count].sslVerifyName,
+      sslTrustCertificate: testData[count].sslTrustCertificate,
+      sslVerifyName: testData[count].sslVerifyName,
       id: 'test_valid_ssl_options'
     };
     var client = mqlight.createClient(opts);
     client.on('error', function(err) {
       client.stop();
-      test.ok(!err,'unexpected error event: '+err);
+      test.ok(!err, 'unexpected error event: ' + err);
       test.done();
       fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
       fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
@@ -431,17 +460,17 @@ module.exports.test_valid_ssl_options = function(test) {
  * @param {object} test - test case.
  */
 module.exports.test_invalid_ssl_options = function(test) {
-  var testData = [{sslTrustCertificate:'BadCertificate', sslVerifyName:true},
-                  {sslTrustCertificate:'BadCertificate', sslVerifyName:false},
-                  {sslTrustCertificate:'BadVerify', sslVerifyName: true}];
+  var testData = [{sslTrustCertificate: 'BadCertificate', sslVerifyName: true},
+                  {sslTrustCertificate: 'BadCertificate', sslVerifyName: false},
+                  {sslTrustCertificate: 'BadVerify', sslVerifyName: true}];
   var badCertificateFd = fs.openSync('BadCertificate', 'w');
   var badVerifyFd = fs.openSync('BadVerify', 'w');
   var count = 0;
   var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
     var opts = {
       service: 'amqp://host',
-      sslTrustCertificate : testData[count].sslTrustCertificate,
-      sslVerifyName : testData[count].sslVerifyName,
+      sslTrustCertificate: testData[count].sslTrustCertificate,
+      sslVerifyName: testData[count].sslVerifyName,
       id: 'test_invalid_ssl_options'
     };
     var client = mqlight.createClient(opts);
@@ -460,7 +489,7 @@ module.exports.test_invalid_ssl_options = function(test) {
     });
     client.on('started', function(err) {
       client.stop();
-      test.ok(!err,'unexpected started event');
+      test.ok(!err, 'unexpected started event');
       test.done();
       fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
       fs.close(badVerifyFd); fs.unlinkSync('BadVerify');

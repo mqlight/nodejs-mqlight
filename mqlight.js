@@ -313,7 +313,7 @@ exports.createClient = function(options, callback) {
 
   if (callback && (typeof callback !== 'function')) {
     err = new TypeError('Callback argument must be a function');
-    logger.throw('Client.createClient', logger.NO_CLIENT_ID, err);
+    logger.throw('createClient', logger.NO_CLIENT_ID, err);
     throw err;
   }
 
