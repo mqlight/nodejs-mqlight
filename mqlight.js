@@ -155,15 +155,17 @@ var STATE_STOPPING = 'stopping';
  *          message - Human-readable description of the error
  */
 function setupError(obj, name, message) {
-  Error.call(obj);
-  Object.defineProperty(obj, 'name', {
-    value: name,
-    enumerable: false
-  });
-  Object.defineProperty(obj, 'message', {
-    value: message,
-    enumerable: false
-  });
+  if (obj) {
+    Error.call(obj);
+    Object.defineProperty(obj, 'name', {
+      value: name,
+      enumerable: false
+    });
+    Object.defineProperty(obj, 'message', {
+      value: message,
+      enumerable: false
+    });
+  }
 }
 
 
@@ -1998,11 +2000,14 @@ Client.prototype.checkForMessages = function() {
           }
           ++matchedSubs[0].unconfirmed;
         } else {
-          // shouldn't get here
-          err = new Error('No listener matched for this message: ' +
-                          data + ' going to address: ' + protonMsg.address);
-          logger.throwLevel('exit_often', 'checkForMessages', this.id, err);
-          throw err;
+          // ideally we shouldn't get here, but it can happen in a timing
+          // window if we had received a message from a subscription we've
+          // subsequently unsubscribed from
+          logger.log('debug', client.id, 'No subscription matched message: ' +
+                     data + ' going to address: ' + protonMsg.address);
+          protonMsg.destroy();
+          protonMsg = null;
+          continue;
         }
 
         var delivery = {
