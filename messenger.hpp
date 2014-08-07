@@ -64,6 +64,7 @@ class ProtonMessenger : public node::ObjectWrap
   static v8::Handle<v8::Value> Unsubscribe(const v8::Arguments& args);
   static v8::Handle<v8::Value> Receive(const v8::Arguments& args);
   static v8::Handle<v8::Value> Status(const v8::Arguments& args);
+  static v8::Handle<v8::Value> StatusError(const v8::Arguments& args);
   static v8::Handle<v8::Value> Accept(const v8::Arguments& args);
   static v8::Handle<v8::Value> Settle(const v8::Arguments& args);
   static v8::Handle<v8::Value> GetLastErrorText(const v8::Arguments& args);

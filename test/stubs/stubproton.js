@@ -93,6 +93,10 @@ module.exports.createProtonStub = function() {
                                sendStatus);
         return sendStatus;
       },
+      statusError: function() {
+        if (DEBUG) console.log('stub statusError function called');
+        return '';
+      },
       accept: function() {
         if (DEBUG) console.log('stub accept function called');
       },

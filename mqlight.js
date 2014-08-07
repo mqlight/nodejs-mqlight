@@ -1642,8 +1642,8 @@ Client.prototype.send = function(topic, data, options, callback) {
       } else if (options.qos === exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
-        err = new TypeError("options:qos value '" + options.qos +
-                            "' is invalid must evaluate to 0 or 1");
+        err = new RangeError("options:qos value '" + options.qos +
+                             "' is invalid must evaluate to 0 or 1");
         logger.throw('Client.send', this.id, err);
         throw err;
       }
@@ -1652,7 +1652,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     if ('ttl' in options) {
       ttl = Number(options.ttl);
       if (Number.isNaN(ttl) || !Number.isFinite(ttl) || ttl <= 0) {
-        err = new TypeError("options:ttl value '" +
+        err = new RangeError("options:ttl value '" +
             options.ttl +
             "' is invalid, must be an unsigned non-zero integer number");
         logger.throw('Client.send', this.id, err);
@@ -1756,7 +1756,11 @@ Client.prototype.send = function(topic, data, options, callback) {
               break;
             case PN_STATUS_REJECTED:
               complete = true;
-              err = new Error('send failed - message was rejected');
+              var rejectMsg = messenger.statusError(protonMsg);
+              if (!rejectMsg || rejectMsg === '') {
+                rejectMsg = 'send failed - message was rejected';
+              }
+              err = new RangeError(rejectMsg);
               break;
             case PN_STATUS_RELEASED:
               complete = true;
@@ -2280,8 +2284,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       } else if (options.qos === exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
-        err = new TypeError("options:qos value '" + options.qos +
-                            "' is invalid must evaluate to 0 or 1");
+        err = new RangeError("options:qos value '" + options.qos +
+                             "' is invalid must evaluate to 0 or 1");
         logger.throw('Client.subscribe', this.id, err);
         throw err;
       }
@@ -2302,9 +2306,10 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     if ('ttl' in options) {
       ttl = Number(options.ttl);
       if (Number.isNaN(ttl) || !Number.isFinite(ttl) || ttl < 0) {
-        err = new TypeError("options:ttl value '" +
-                            options.ttl +
-                            "' is invalid, must be an unsigned integer number");
+        err = new RangeError("options:ttl value '" +
+                             options.ttl +
+                             "' is invalid, must be an unsigned integer " +
+                             'number');
         logger.throw('Client.subscribe', this.id, err);
         throw err;
       }
@@ -2314,9 +2319,10 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       credit = Number(options.credit);
       if (Number.isNaN(credit) || !Number.isFinite(credit) || credit < 0 ||
           credit > 4294967295) {
-        err = new TypeError("options:credit value '" +
-                            options.credit +
-                            "' is invalid, must be an unsigned integer number");
+        err = new RangeError("options:credit value '" +
+                             options.credit +
+                             "' is invalid, must be an unsigned integer " +
+                             'number');
         logger.throw('Client.subscribe', this.id, err);
         throw err;
       }
@@ -2559,10 +2565,10 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     if ('ttl' in options) {
       ttl = Number(options.ttl);
       if (Number.isNaN(ttl) || ttl !== 0) {
-        err = new TypeError("options:ttl value '" +
-                            options.ttl +
-                            "' is invalid, only 0 is a supported value for " +
-                            ' an unsubscribe request');
+        err = new RangeError("options:ttl value '" +
+                             options.ttl +
+                             "' is invalid, only 0 is a supported value for " +
+                             ' an unsubscribe request');
         logger.throw('Client.unsubscribe', this.id, err);
         throw err;
       }

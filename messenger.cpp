@@ -93,6 +93,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "unsubscribe", Unsubscribe);
   NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
   NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "statusError", StatusError);
   NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
   NODE_SET_PROTOTYPE_METHOD(constructor, "getLastErrorText", GetLastErrorText);
   NODE_SET_PROTOTYPE_METHOD(
@@ -1047,4 +1048,44 @@ Handle<Value> ProtonMessenger::Flow(const Arguments& args)
 
   Proton::Exit("ProtonMessenger::Flow", name, 0);
   return scope.Close(Undefined());
+}
+
+Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::StatusError", name);
+
+  // throw exception if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
+      args[0]->IsUndefined()) {
+    THROW_EXCEPTION(
+        "Missing required message argument.", "ProtonMessenger::StatusError", name);
+  }
+
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+
+  // throw exception if not connected
+  if (!obj->messenger) {
+    THROW_EXCEPTION("Not connected", "ProtonMessenger::StatusError", name);
+  }
+
+  pn_delivery_t *delivery = pn_messenger_delivery(obj->messenger, msg->tracker);
+  pn_disposition_t *disposition = NULL;
+  pn_condition_t *condition = NULL;
+  const char *description = "";
+  if (delivery != NULL) {
+    disposition = pn_delivery_remote(delivery);
+  }
+  if (disposition != NULL) {
+    condition = pn_disposition_condition(disposition);
+  }
+  if (condition != NULL) {
+    description = pn_condition_get_description(condition);
+  }
+
+  Proton::Exit("ProtonMessenger::StatusError", name, description);
+  return scope.Close(String::New(description));
 }

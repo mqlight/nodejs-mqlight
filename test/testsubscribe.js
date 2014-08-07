@@ -437,7 +437,7 @@ module.exports.test_subscribe_qos = function(test) {
       } else {
         test.throws(function() {
           client.subscribe('testpattern' + i, opts);
-        }, TypeError, 'qos should have been rejected: ' + data[i].qos);
+        }, RangeError, 'qos should have been rejected: ' + data[i].qos);
       }
     }
     client.stop(function() {
@@ -530,7 +530,7 @@ module.exports.test_subscribe_ttl_validity = function(test) {
       } else {
         test.throws(function() {
           client.subscribe('testpattern' + i, opts);
-        }, TypeError, 'ttl should have been rejected: ' + data[i].ttl);
+        }, RangeError, 'ttl should have been rejected: ' + data[i].ttl);
       }
     }
     client.stop(function() {

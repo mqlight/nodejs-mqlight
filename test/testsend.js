@@ -350,7 +350,7 @@ module.exports.test_send_qos = function(test) {
             function() {
               client.send('test', 'message', opts);
             },
-            TypeError,
+            RangeError,
             'qos value should have been rejected: ' + data[i].qos
         );
       }
@@ -491,7 +491,7 @@ module.exports.test_send_ttl = function(test) {
       } else {
         test.throws(function() {
           client.send('topic', 'data', opts);
-        }, TypeError, 'ttl should have been rejected: ' + data[i].ttl);
+        }, RangeError, 'ttl should have been rejected: ' + data[i].ttl);
       }
     }
     client.stop(function() {
@@ -534,5 +534,47 @@ module.exports.test_send_drain_event = function(test) {
     }
 
     test.ok(drainExpected, 'send always returned true');
+  });
+};
+
+
+/**
+ * Tests that the client correctly handles the server rejecting messages,
+ * by invoking the callback function supplied to send (if any).
+ * @param {object} test the unittest interface
+ */
+module.exports.test_message_rejected = function(test) {
+  var savedStatusMethod = mqlight.proton.messenger.status;
+  var savedStatusErrorMethod = mqlight.proton.messenger.statusError;
+  var rejectErrorMessage = 'get away from me!';
+  mqlight.proton.messenger.status = function() {
+    return 3; // PN_STATUS_REJECTED
+  };
+  mqlight.proton.messenger.statusError = function() {
+    return rejectErrorMessage;
+  };
+  var client = mqlight.createClient({
+    id: 'test_message_rejected', 
+    service: 'amqp://host'});
+
+  client.on('started', function() {
+
+    test.doesNotThrow(function() {
+      // Test that a message being rejected does not affect the operation
+      // of client.send(...)
+      client.send('topic', 'data');
+
+      // Test that a message being rejected result in the send(...) method's
+      // callback being run.
+      client.send('topic', 'data', function(err) {
+        test.ok(err);
+        test.equals(err.message, rejectErrorMessage);
+        test.ok(err.name == 'RangeError');
+
+        mqlight.proton.messenger.status = savedStatusMethod;
+        mqlight.proton.messenger.statusError = savedStatusErrorMethod;
+        test.done();
+      });
+    });
   });
 };

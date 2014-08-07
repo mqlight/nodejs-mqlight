@@ -451,7 +451,7 @@ module.exports.test_unsubscribe_ttl_validity = function(test) {
       } else {
         test.throws(function() {
           client.unsubscribe('testpattern', opts);
-        }, TypeError, 'ttl should have been rejected: ' + data[i].ttl);
+        }, RangeError, 'ttl should have been rejected: ' + data[i].ttl);
       }
     }
     client.stop(function() {
