@@ -38,6 +38,7 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <string>
 
 #ifdef _WIN32
 typedef __int32 int32_t;
@@ -83,6 +84,13 @@ using namespace v8;
 /* throw an exception of the default type (TypeError) at a specific log lvl */
 #define THROW_EXCEPTION_LEVEL(msg, lvl, fnc, id) \
   THROW_EXCEPTION_LEVEL_TYPE(Exception::TypeError, msg, lvl, fnc, id)
+
+/* parse an error message from messenger and map it to an error type */
+const char* GetErrorName(const char* text)
+{
+  return (strstr(text, "sasl ") || strstr(text, "SSL ")) ? "SecurityError"
+                                                         : "NetworkError";
+}
 
 Persistent<FunctionTemplate> ProtonMessenger::constructor;
 
@@ -229,7 +237,6 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
 {
   HandleScope scope;
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  ;
   ProtonMessage* msg;
   const char* name = obj->name.c_str();
 
@@ -281,8 +288,7 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
   Proton::Exit("pn_messenger_put", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Put", name)
   }
 
@@ -313,8 +319,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   Proton::Exit("pn_messenger_send", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Send", name)
   }
 
@@ -324,8 +329,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   Proton::Exit("pn_messenger_work", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Send", name)
   }
 
@@ -505,12 +509,13 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   error = pn_messenger_start(obj->messenger);
   Proton::Exit("pn_messenger_start", name, error);
   if (error) {
-    std::string text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text.c_str(), " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+    const char* err = GetErrorName(text);
+    // clonse to std::string before free'ing messenger
+    std::string msg = text;
     pn_messenger_free(obj->messenger);
     obj->messenger = NULL;
-    THROW_NAMED_EXCEPTION(err, text.c_str(), "ProtonMessenger::Connect", name)
+    THROW_NAMED_EXCEPTION(err, msg.c_str(), "ProtonMessenger::Connect", name)
   }
 
   Proton::Exit("ProtonMessenger::Connect", name, 0);
@@ -636,8 +641,7 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   Proton::Exit("pn_messenger_recv", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Subscribe", name)
   }
 
@@ -663,8 +667,7 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
     Proton::Exit("pn_messenger_work", name, error);
     if (error) {
       const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-      const char* err =
-          (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+      const char* err = GetErrorName(text);
       THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Subscribe", name)
     }
   }
@@ -742,8 +745,7 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
   Proton::Exit("pn_messenger_work", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Unsubscribe", name);
   }
   Proton::Exit("ProtonMessenger::Unsubscribe", name, true);
@@ -787,8 +789,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
   Proton::Exit("exit_often", "pn_messenger_recv", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION_LEVEL(
         err, text, "exit_often", "ProtonMessenger::Receive", name);
   }
@@ -799,8 +800,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
   Proton::Exit("exit_often", "pn_messenger_work", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION_LEVEL(
         err, text, "exit_often", "ProtonMessenger::Receive", name);
   }
@@ -820,8 +820,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
       continue;
     if (error) {
       const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-      const char* err =
-          (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+      const char* err = GetErrorName(text);
       THROW_NAMED_EXCEPTION_LEVEL(
           err, text, "exit_often", "ProtonMessenger::Receive", name);
     }
@@ -900,8 +899,7 @@ Handle<Value> ProtonMessenger::Accept(const Arguments& args)
   int status = pn_messenger_accept(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Accept", name);
   } else if (status != 0) {
     THROW_NAMED_EXCEPTION(
@@ -938,8 +936,7 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
   int status = pn_messenger_settle(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err =
-        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    const char* err = GetErrorName(text);
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Settle", name);
   } else if (status != 0) {
     THROW_NAMED_EXCEPTION(
@@ -1076,8 +1073,9 @@ Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
   // throw exception if not enough args
   if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
       args[0]->IsUndefined()) {
-    THROW_EXCEPTION(
-        "Missing required message argument.", "ProtonMessenger::StatusError", name);
+    THROW_EXCEPTION("Missing required message argument.",
+                    "ProtonMessenger::StatusError",
+                    name);
   }
 
   ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
