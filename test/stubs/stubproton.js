@@ -107,37 +107,27 @@ module.exports.createProtonStub = function() {
         if (DEBUG) console.log('stub connect function called for service: ' +
                                service, sslTrustCertificate, sslVerifyName);
         if (!this.stopped) throw new Error('already connected');
-        var result;
         var href = service.href;
+        var err = null;
         if (href.indexOf('bad') != -1) {
-          result = -2;
-          this.lastErrorText = 'bad service ' + href;
-          if (DEBUG) console.log('connect will fail, error: ' +
-                                 this.lastErrorText);
+          err = new TypeError('bad service ' + href);
         } else if (sslTrustCertificate === 'BadCertificate') {
-          result = -1;
-          this.lastErrorText = 'Bad Certificate';
-          if (DEBUG) console.log('connect will fail, error: ' +
-              this.lastErrorText);
+          err = new Error('Bad Certificate');
+          err.name = 'SecurityError';
         } else if (sslTrustCertificate === 'BadVerify' && sslVerifyName) {
-          result = -1;
-          this.lastErrorText = 'Bad verify name';
-          if (DEBUG) console.log('connect will fail, error: ' +
-              this.lastErrorText);
+          err = new Error('Bad verify name');
+          err.name = 'SecurityError';
         } else {
           if (connectStatus !== 0) {
-            this.lastErrorText = 'connect error: ' + connectStatus;
-            if (DEBUG) console.log('connect will fail, error: ' +
-                                   this.lastErrorText);
+            err = new Error('connect error: ' + connectStatus);
+            err.name = 'NetworkError';
           } else {
-            this.lastErrorText = '';
+            err = null;
             this.stopped = false;
             if (DEBUG) console.log('successfully connected');
           }
-          result = connectStatus;
         }
-        if (DEBUG) console.log('stub connect function returning ' + result);
-        return result;
+        if (err) throw err;
       },
       receive: function() {
         // Commented - as generates a lot of output...
@@ -149,7 +139,7 @@ module.exports.createProtonStub = function() {
         if (DEBUG) console.log('stub stop function called');
         if (!this.stopped) {
           this.stopCount--;
-          if (this.stopCount == 0) {
+          if (this.stopCount === 0) {
             this.stopped = true;
             this.stopCount = 2;
           }
@@ -171,12 +161,6 @@ module.exports.createProtonStub = function() {
       unsubscribe: function() {
         if (DEBUG) console.log('stub unsubscribe function called');
       },
-      lastErrorText: '',
-      getLastErrorText: function() {
-        if (DEBUG) console.log('stub getLastErrorText function called, ' +
-                               'returning: ' + this.lastErrorText);
-        return this.lastErrorText;
-      },
       getRemoteIdleTimeout: function(address) {
         if (DEBUG) console.log('stub getRemoteIdleTimeout function called, ' +
                                'returning: ' + remoteIdleTimeout);
@@ -197,7 +181,6 @@ module.exports.createProtonStub = function() {
     createMessenger: function() {
       if (DEBUG) console.log('stub createMessenger function called');
       connectStatus = 0;
-      this.messenger.lastErrorText = '';
       this.messenger.stopped = true;
       return this.messenger;
     },

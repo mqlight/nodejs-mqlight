@@ -169,6 +169,43 @@ function setupError(obj, name, message) {
 }
 
 
+/**
+ * Generic helper method to map a named Error object into the correct
+ * sub-type so that instanceof checking works as expected.
+ *
+ * @param {Object}
+ *          obj - the Error object to remap.
+ * @return {Object} a sub-typed Error object.
+ */
+function getNamedError(obj) {
+  if (obj && obj instanceof Error && 'name' in obj) {
+    var Constructor = exports[obj.name];
+    if (typeof Constructor === 'function') {
+      var res = new Constructor(obj.message);
+      if (res) {
+        res.stack = obj.stack;
+        return res;
+      }
+    }
+  }
+  return;
+}
+
+
+/**
+ * Generic helper method to determine if we should automatically reconnect
+ * for the given type of error.
+ *
+ * @param {Object}
+ *          err - the Error object to check.
+ * @return {Object} true if we should reconnect, false otherwise.
+ */
+function shouldReconnect(err) {
+  // TODO: exclude all programming errors
+  return (!(err instanceof TypeError) && !(err instanceof SubscribedError));
+}
+
+
 
 /**
  * A subtype of Error defined by the MQ Light client. It is considered a
@@ -951,19 +988,19 @@ var Client = function(service, id, securityOptions) {
             connectUrl.href = connectUrl.href.substr(0, hrefLength);
             connectUrl.pathname = connectUrl.path = null;
           }
-          var rc = client.messenger.connect(connectUrl,
-                                            securityOptions.sslTrustCertificate,
-                                            securityOptions.sslVerifyName);
-          if (rc) {
-            error = new Error(client.messenger.getLastErrorText());
-            logger.log('data', client.id, 'failed to connect to: ' + logUrl +
-                       ' due to error: ' + error);
-          } else {
+          try {
+            client.messenger.connect(connectUrl,
+                                     securityOptions.sslTrustCertificate,
+                                     securityOptions.sslVerifyName);
             logger.log('data', client.id, 'successfully connected to: ' +
                 logUrl);
             client.service = serviceList[i];
             connected = true;
             break;
+          } catch (err) {
+            error = getNamedError(err);
+            logger.log('data', client.id, 'failed to connect to: ' + logUrl +
+                       ' due to error: ' + error);
           }
         } catch (err) {
           // should never get here, as it means that messenger.connect has been
@@ -1060,8 +1097,10 @@ var Client = function(service, id, securityOptions) {
       logger.log('data', client.id, 'trying to connect again ' +
                  'after ' + interval / 1000 + ' seconds');
       setTimeout(retry, interval);
-      logger.log('emit', client.id, 'error', error);
-      client.emit('error', error);
+      if (error) {
+        logger.log('emit', client.id, 'error', error);
+        client.emit('error', error);
+      }
     }
 
     logger.exit('Client.connectToService', client.id, null);
@@ -1834,7 +1873,8 @@ Client.prototype.send = function(topic, data, options, callback) {
           return;
         }
       } catch (e) {
-        logger.caught('Client.send.untilSendComplete', client.id, e);
+        var error = getNamedError(e);
+        logger.caught('Client.send.untilSendComplete', client.id, error);
         // error condition so won't retry send remove from list of unsent
         index = client.outstandingSends.indexOf(localMessageId);
         if (index >= 0) client.outstandingSends.splice(index, 1);
@@ -1861,10 +1901,10 @@ Client.prototype.send = function(topic, data, options, callback) {
                   null);
             }
           }
-          if (e) {
-            logger.log('emit', client.id, 'error', e);
-            client.emit('error', e);
-            if (!(e instanceof TypeError)) {
+          if (error) {
+            logger.log('emit', client.id, 'error', error);
+            client.emit('error', error);
+            if (shouldReconnect(error)) {
               reconnect(client);
             }
           }
@@ -1908,7 +1948,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       }
       logger.log('emit', client.id, 'error', err);
       client.emit('error', err);
-      if (!(err instanceof TypeError)) {
+      if (shouldReconnect(err)) {
         reconnect(client);
       }
     });
@@ -2163,7 +2203,7 @@ Client.prototype.checkForMessages = function() {
     process.nextTick(function() {
       logger.log('emit', client.id, 'error', err);
       client.emit('error', err);
-      if (!(err instanceof TypeError)) {
+      if (shouldReconnect(err)) {
         reconnect(client);
       }
     });
@@ -2425,7 +2465,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       logger.log('emit', client.id, 'error', err);
       client.emit('error', err);
     });
-    if (!(err instanceof TypeError) && !(err instanceof SubscribedError)) {
+    if (shouldReconnect(err)) {
       logger.log('data', client.id, 'queued subscription and calling ' +
                  'reconnect');
       // error during subscribe so add to list of queued to resub
@@ -2699,7 +2739,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
       logger.log('emit', client.id, 'error', err);
       client.emit('error', err);
     });
-    if (!(err instanceof TypeError)) {
+    if (shouldReconnect(err)) {
       logger.log('data', client.id, 'client error "' + err + '" during ' +
                  'messenger.unsubscribe call so queueing the unsubscribe ' +
                  'request');

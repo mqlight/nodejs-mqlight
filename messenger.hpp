@@ -67,7 +67,6 @@ class ProtonMessenger : public node::ObjectWrap
   static v8::Handle<v8::Value> StatusError(const v8::Arguments& args);
   static v8::Handle<v8::Value> Accept(const v8::Arguments& args);
   static v8::Handle<v8::Value> Settle(const v8::Arguments& args);
-  static v8::Handle<v8::Value> GetLastErrorText(const v8::Arguments& args);
   static v8::Handle<v8::Value> GetRemoteIdleTimeout(const v8::Arguments& args);
   static v8::Handle<v8::Value> Work(const v8::Arguments& args);
   static v8::Handle<v8::Value> Flow(const v8::Arguments& args);
@@ -97,14 +96,6 @@ class ProtonMessenger : public node::ObjectWrap
    * called and unset when stop is called.
    */
   pn_messenger_t* messenger;
-
-  /**
-   * The error message text for the last connect error. This is used by the
-   * GetLastErrorText method when we do not have
-   * a connection, as the error text comes from the proton messenger, which we
-   * free up on a connection error.
-   */
-  std::string lastConnectErrorText;
 };
 
 #endif /* MESSENGER_HPP */

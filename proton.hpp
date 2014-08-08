@@ -70,6 +70,8 @@ class Proton
                     const char* name,
                     const char* id,
                     const char* err);
+  static v8::Handle<v8::Object> NewNamedError(const char* name,
+                                              const char* msg);
 };
 
 #endif /* PROTON_HPP */

@@ -52,6 +52,18 @@ typedef unsigned __int32 uint32_t;
 
 using namespace v8;
 
+/* throw an exception of a particular named type at the default log lvl */
+#define THROW_NAMED_EXCEPTION(name, msg, fnc, id)                             \
+  Proton::Throw((fnc), (id), msg);                                            \
+  ThrowException(Proton::NewNamedError(name, msg));                           \
+  return scope.Close(Undefined());
+
+/* throw an exception of a particular named type at a specific log lvl */
+#define THROW_NAMED_EXCEPTION_LEVEL(name, msg, lvl, fnc, id)                  \
+  Proton::Throw((lvl), (fnc), (id), msg);                                     \
+  ThrowException(Proton::NewNamedError(name, msg));                           \
+  return scope.Close(Undefined());
+
 /* throw an exception of a particular type at the default log lvl */
 #define THROW_EXCEPTION_TYPE(type, msg, fnc, id)                              \
   Proton::Throw((fnc), (id), msg);                                            \
@@ -95,7 +107,6 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
   NODE_SET_PROTOTYPE_METHOD(constructor, "statusError", StatusError);
   NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "getLastErrorText", GetLastErrorText);
   NODE_SET_PROTOTYPE_METHOD(
       constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
   NODE_SET_PROTOTYPE_METHOD(constructor, "work", Work);
@@ -238,7 +249,8 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Put", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Put", name)
   }
 
   /* Set the required QoS, by setting the sender settler mode to settled (QoS =
@@ -253,7 +265,10 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
     pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
     pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
   } else {
-    THROW_EXCEPTION("Invalid qos argument.", "ProtonMessenger::Put", name);
+    THROW_EXCEPTION_TYPE(Exception::RangeError,
+                         "qos argument is invalid must evaluate to 0 or 1",
+                         "ProtonMessenger::Put",
+                         name);
   }
 
   /*
@@ -266,7 +281,9 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
   Proton::Exit("pn_messenger_put", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Put", name)
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Put", name)
   }
 
   pn_tracker_t tracker = pn_messenger_outgoing_tracker(obj->messenger);
@@ -286,8 +303,8 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
 
   // throw Error if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION_TYPE(
-        Exception::Error, "Not connected", "ProtonMessenger::Send", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Send", name)
   }
 
   Proton::Entry("pn_messenger_send", name);
@@ -296,8 +313,9 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   Proton::Exit("pn_messenger_send", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    // throw Error if error from messenger
-    THROW_EXCEPTION_TYPE(Exception::Error, text, "ProtonMessenger::Send", name)
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Send", name)
   }
 
   Proton::Entry("pn_messenger_work", name);
@@ -306,8 +324,9 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   Proton::Exit("pn_messenger_work", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    // throw Error if error from messenger
-    THROW_EXCEPTION_TYPE(Exception::Error, text, "ProtonMessenger::Send", name)
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Send", name)
   }
 
   Proton::Exit("ProtonMessenger::Send", name, true);
@@ -351,11 +370,11 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
     // (note that we don't throw an exception as this an expected/user error)
     std::ifstream sslTrustCertificateFile(sslTrustCertificate.c_str());
     if (!sslTrustCertificateFile.good()) {
-      obj->lastConnectErrorText =
-          "The file specified for sslTrustCertificate '" + sslTrustCertificate +
-          "' does not exist or is not accessible";
-      Proton::Exit("ProtonMessenger::Connect", name, -1);
-      return scope.Close(Integer::New(-1));
+      std::string msg = "The file specified for sslTrustCertificate '" +
+                        sslTrustCertificate +
+                        "' does not exist or is not accessible";
+      THROW_NAMED_EXCEPTION(
+          "SecurityError", msg.c_str(), "ProtonMessenger::Connect", name);
     }
   } else {
     sslTrustCertificate = "";
@@ -397,10 +416,8 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
 
   // throw Error if already connected
   if (obj->messenger) {
-    THROW_EXCEPTION_TYPE(Exception::Error,
-                         "Already connected",
-                         "ProtonMessenger::Connect",
-                         name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Already connected", "ProtonMessenger::Connect", name)
   }
 
   // Create the messenger object and update the name in case messenger has
@@ -426,10 +443,11 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
     if (error) {
       pn_messenger_free(obj->messenger);
       obj->messenger = NULL;
-      // throw TypeError if unable to set certificates
-      THROW_EXCEPTION("Failed to set trusted certificates",
-                      "ProtonMessenger::Connect",
-                      name);
+      // throw SecurityError if unable to set certificates
+      THROW_NAMED_EXCEPTION("SecurityError",
+                            "Failed to set trusted certificates",
+                            "ProtonMessenger::Connect",
+                            name);
     }
   }
   if (sslMode != PN_SSL_VERIFY_NULL) {
@@ -441,9 +459,10 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
       pn_messenger_free(obj->messenger);
       obj->messenger = NULL;
       // throw TypeError if unable to set certificates
-      THROW_EXCEPTION("Failed to set SSL peer authentication mode",
-                      "ProtonMessenger::Connect",
-                      name);
+      THROW_NAMED_EXCEPTION("SecurityError",
+                            "Failed to set SSL peer authentication mode",
+                            "ProtonMessenger::Connect",
+                            name);
     }
   }
 
@@ -486,16 +505,16 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   error = pn_messenger_start(obj->messenger);
   Proton::Exit("pn_messenger_start", name, error);
   if (error) {
-    obj->lastConnectErrorText =
-        pn_error_text(pn_messenger_error(obj->messenger));
+    std::string text = pn_error_text(pn_messenger_error(obj->messenger));
+    const char* err =
+        (strstr(text.c_str(), " sasl ")) ? "SecurityError" : "NetworkError";
     pn_messenger_free(obj->messenger);
     obj->messenger = NULL;
-  } else {
-    obj->lastConnectErrorText = "";
+    THROW_NAMED_EXCEPTION(err, text.c_str(), "ProtonMessenger::Connect", name)
   }
 
-  Proton::Exit("ProtonMessenger::Connect", name, error);
-  return scope.Close(Integer::New(error));
+  Proton::Exit("ProtonMessenger::Connect", name, 0);
+  return scope.Close(Undefined());
 }
 
 Handle<Value> ProtonMessenger::Stop(const Arguments& args)
@@ -583,8 +602,8 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
 
   // throw Error if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION_TYPE(
-        Exception::Error, "Not connected", "ProtonMessenger::Subscribe", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Subscribe", name);
   }
 
   /* Set the required QoS, by setting the sender settler mode to settled (QoS =
@@ -600,9 +619,11 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
     pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
     pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
   } else {
-    // throw TypeError if bad qos arg
-    THROW_EXCEPTION(
-        "Invalid qos argument.", "ProtonMessenger::Subscribe", name);
+    // throw RangeError if bad qos arg
+    THROW_EXCEPTION_TYPE(Exception::RangeError,
+                         "qos argument is invalid must evaluate to 0 or 1",
+                         "ProtonMessenger::Subscribe",
+                         name);
   }
 
   Proton::Entry("pn_messenger_subscribe_ttl", name);
@@ -614,11 +635,10 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_recv", name, error);
   if (error) {
-    // throw Error if error from messenger
-    THROW_EXCEPTION_TYPE(Exception::Error,
-                         pn_error_text(pn_messenger_error(obj->messenger)),
-                         "ProtonMessenger::Subscribe",
-                         name)
+    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Subscribe", name)
   }
 
   pn_link_t* link =
@@ -643,9 +663,9 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
     Proton::Exit("pn_messenger_work", name, error);
     if (error) {
       const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-      // throw Error if error from messenger
-      THROW_EXCEPTION_TYPE(
-          Exception::Error, text, "ProtonMessenger::Subscribe", name)
+      const char* err =
+          (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+      THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Subscribe", name)
     }
   }
 
@@ -685,8 +705,8 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
 
   // throw Error if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION_TYPE(
-        Exception::Error, "Not connected", "ProtonMessenger::Unsubscribe", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Unsubscribe", name);
   }
 
   // find link based on address
@@ -722,9 +742,9 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
   Proton::Exit("pn_messenger_work", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    // throw Error if error from messenger
-    THROW_EXCEPTION_TYPE(
-        Exception::Error, text, "ProtonMessenger::Unsubscribe", name)
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Unsubscribe", name);
   }
   Proton::Exit("ProtonMessenger::Unsubscribe", name, true);
   return scope.Close(Boolean::New(true));
@@ -754,11 +774,11 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
 
   // throw Error if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION_LEVEL_TYPE(Exception::Error,
-                               "Not connected",
-                               "exit_often",
-                               "ProtonMessenger::Receive",
-                               name);
+    THROW_NAMED_EXCEPTION_LEVEL("NetworkError",
+                                "Not connected",
+                                "exit_often",
+                                "ProtonMessenger::Receive",
+                                name);
   }
 
   Proton::Entry("entry_often", "pn_messenger_recv", name);
@@ -766,13 +786,11 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
   int error = pn_messenger_errno(obj->messenger);
   Proton::Exit("exit_often", "pn_messenger_recv", name, error);
   if (error) {
-    // throw Error if error from messenger
-    THROW_EXCEPTION_LEVEL_TYPE(
-        Exception::Error,
-        pn_error_text(pn_messenger_error(obj->messenger)),
-        "exit_often",
-        "ProtonMessenger::Receive",
-        name)
+    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION_LEVEL(
+        err, text, "exit_often", "ProtonMessenger::Receive", name);
   }
 
   Proton::Entry("entry_often", "pn_messenger_work", name);
@@ -781,9 +799,10 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
   Proton::Exit("exit_often", "pn_messenger_work", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    // throw Error if error from messenger
-    THROW_EXCEPTION_LEVEL_TYPE(
-        Exception::Error, text, "exit_often", "ProtonMessenger::Receive", name)
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION_LEVEL(
+        err, text, "exit_often", "ProtonMessenger::Receive", name);
   }
 
   std::vector<Local<Object> > vector;
@@ -801,12 +820,10 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
       continue;
     if (error) {
       const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-      // throw Error if error from messenger
-      THROW_EXCEPTION_LEVEL_TYPE(Exception::Error,
-                                 text,
-                                 "exit_often",
-                                 "ProtonMessenger::Receive",
-                                 name)
+      const char* err =
+          (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+      THROW_NAMED_EXCEPTION_LEVEL(
+          err, text, "exit_often", "ProtonMessenger::Receive", name);
     }
 
     vector.push_back(msgObj);
@@ -847,7 +864,8 @@ Handle<Value> ProtonMessenger::Status(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Status", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Status", name);
   }
 
   int status = pn_messenger_status(obj->messenger, msg->tracker);
@@ -875,15 +893,19 @@ Handle<Value> ProtonMessenger::Accept(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Accept", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Accept", name);
   }
 
   int status = pn_messenger_accept(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Accept", name);
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Accept", name);
   } else if (status != 0) {
-    THROW_EXCEPTION("Failed to accept.", "ProtonMessenger::Accept", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Failed to accept", "ProtonMessenger::Accept", name);
   }
 
   Proton::Exit("ProtonMessenger::Accept", name, true);
@@ -909,38 +931,23 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Settle", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Settle", name);
   }
 
   int status = pn_messenger_settle(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    THROW_EXCEPTION(text, "ProtonMessenger::Settle", name);
+    const char* err =
+        (strstr(text, " sasl ")) ? "SecurityError" : "NetworkError";
+    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Settle", name);
   } else if (status != 0) {
-    THROW_EXCEPTION("Failed to settle.", "ProtonMessenger::Settle", name);
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Failed to settle", "ProtonMessenger::Settle", name);
   }
 
   Proton::Exit("ProtonMessenger::Settle", name, true);
   return scope.Close(Boolean::New(true));
-}
-
-Handle<Value> ProtonMessenger::GetLastErrorText(const Arguments& args)
-{
-  HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
-  const char* name = obj->name.c_str();
-
-  Proton::Entry("ProtonMessenger::GetLastErrorText", name);
-
-  const char* errorText;
-  if (obj->messenger) {
-    errorText = pn_error_text(pn_messenger_error(obj->messenger));
-  } else {
-    errorText = obj->lastConnectErrorText.c_str();
-  }
-
-  Proton::Exit("ProtonMessenger::GetLastErrorText", name, errorText);
-  return scope.Close(String::New(errorText));
 }
 
 Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args)
@@ -965,8 +972,10 @@ Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION(
-        "Not connected", "ProtonMessenger::GetRemoteIdleTimeout", name);
+    THROW_NAMED_EXCEPTION("NetworkError",
+                          "Not connected",
+                          "ProtonMessenger::GetRemoteIdleTimeout",
+                          name);
   }
 
   const int remoteIdleTimeout =
@@ -998,7 +1007,10 @@ Handle<Value> ProtonMessenger::Work(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Work", name);
+    THROW_NAMED_EXCEPTION("NetworkError",
+                          "Not connected",
+                          "ProtonMessenger::Work",
+                          name);
   }
 
   int status = pn_messenger_work(obj->messenger, timeout);
@@ -1034,7 +1046,10 @@ Handle<Value> ProtonMessenger::Flow(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::Flow", name);
+    THROW_NAMED_EXCEPTION("NetworkError",
+                          "Not connected",
+                          "ProtonMessenger::Flow",
+                          name);
   }
 
   // Find link based on address, and flow link credit.
@@ -1069,7 +1084,10 @@ Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
 
   // throw exception if not connected
   if (!obj->messenger) {
-    THROW_EXCEPTION("Not connected", "ProtonMessenger::StatusError", name);
+    THROW_NAMED_EXCEPTION("NetworkError",
+                          "Not connected",
+                          "ProtonMessenger::StatusError",
+                          name);
   }
 
   pn_delivery_t *delivery = pn_messenger_delivery(obj->messenger, msg->tracker);

@@ -175,7 +175,7 @@ client.on('started', function() {
       if (parsed['message-ttl'] !== undefined) {
         options.ttl = Number(parsed['message-ttl']) * 1000;
       }
-      if (parsed['sequence'] && !parsed.file) {
+      if (parsed.sequence && !parsed.file) {
         body = (++sequenceNum) + ': ' + body;
       }
 
@@ -199,7 +199,7 @@ client.on('started', function() {
 client.on('error', function(error) {
   console.error('*** error ***');
   if (error) {
-    if (error.message) console.error('message: %s', error.message);
+    if (error.message) console.error('message: %s', error.toString());
     else if (error.stack) console.error(error.stack);
   }
   console.error('Exiting.');

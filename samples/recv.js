@@ -184,7 +184,7 @@ client.on('started', function() {
 client.on('error', function(error) {
   console.error('*** error ***');
   if (error) {
-    if (error.message) console.error('message: %s', error.message);
+    if (error.message) console.error('message: %s', error.toString());
     else if (error.stack) console.error(error.stack);
   }
   console.error('Exiting.');

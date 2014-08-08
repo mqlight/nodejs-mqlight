@@ -170,6 +170,16 @@ void Proton::Throw(const char* lvl,
   scope.Close(Undefined());
 }
 
+Handle<Object> Proton::NewNamedError(const char* name, const char* msg)
+{
+  HandleScope scope;
+  Handle<Object> error =
+      Exception::Error(String::New((msg == NULL) ? "unknown error" : (msg)))
+          ->ToObject();
+  error->Set(String::New("name"), String::New(name));
+  return scope.Close(error);
+}
+
 Handle<Value> CreateMessage(const Arguments& args)
 {
   HandleScope scope;
