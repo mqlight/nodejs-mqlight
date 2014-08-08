@@ -88,8 +88,9 @@ using namespace v8;
 /* parse an error message from messenger and map it to an error type */
 const char* GetErrorName(const char* text)
 {
-  return (strstr(text, "sasl ") || strstr(text, "SSL ")) ? "SecurityError"
-                                                         : "NetworkError";
+  return (strstr(text, "sasl ") || strstr(text, "SSL "))
+             ? "SecurityError"
+             : (strstr(text, "_Takeover")) ? "ReplacedError" : "NetworkError";
 }
 
 Persistent<FunctionTemplate> ProtonMessenger::constructor;

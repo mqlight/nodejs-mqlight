@@ -248,6 +248,26 @@ util.inherits(NetworkError, Error);
 
 /**
  * This is a subtype of Error defined by the MQ Light client. It is considered
+ * an operational error. ReplacedError is thrown to signify that an instance of
+ * the client has been replaced by another instance that connected specifying
+ * the exact same client id.
+ *
+ * @param {String}
+ *          message - Human-readable description of the error
+ *
+ * @constructor
+ */
+exports.ReplacedError = function(message) {
+  Error.captureStackTrace(this, this.constructor);
+  setupError(this, 'ReplacedError', message);
+};
+var ReplacedError = exports.ReplacedError;
+util.inherits(ReplacedError, Error);
+
+
+
+/**
+ * This is a subtype of Error defined by the MQ Light client. It is considered
  * an operational error. SecurityError is thrown when an operation fails due to
  * a security related problem.
  *
