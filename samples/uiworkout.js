@@ -138,10 +138,14 @@ function startClient(topic, share) {
   if (parsed.service) opts.service = parsed.service;
   if (parsed['trust-certificate']) {
     opts['sslTrustCertificate'] = parsed['trust-certificate'];
-    if(opts.service.indexOf('amqps', 0) !== 0) {
-      console.error("Error: the service URL must start 'amqps://' when using " +
-                    'a trust certificate.');
-      process.exit(1);
+    if (parsed.service) {
+      if(opts.service.indexOf('amqps', 0) !== 0) {
+        console.error("Error: the service URL must start 'amqps://' when " +
+                      'using a trust certificate.');
+        process.exit(1);
+      }
+    } else {
+      opts['service'] = 'amqps://localhost';
     }
   }
 

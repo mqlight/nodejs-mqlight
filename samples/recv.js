@@ -109,12 +109,16 @@ var opts = {
 };
 if (parsed['trust-certificate']) {
   opts['sslTrustCertificate'] = parsed['trust-certificate'];
-  if(service.indexOf('amqps', 0) !== 0) {
-    console.error('*** error ***');
-    console.error("The service URL must start 'amqps://' when using a trust " +
-                  'certificate.');
-    console.error('Exiting.');
-    process.exit(1);
+  if (parsed.service) {
+    if (service.indexOf('amqps', 0) !== 0) {
+      console.error('*** error ***');
+      console.error("The service URL must start 'amqps://' when using a " +
+                    'trust certificate.');
+      console.error('Exiting.');
+      process.exit(1);
+    }
+  } else {
+    opts['service'] = 'amqps://localhost';
   }
 }
 var client = mqlight.createClient(opts);
