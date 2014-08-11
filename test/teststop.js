@@ -115,12 +115,19 @@ module.exports.test_stop_method_returns_client = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_stop_when_already_stopped = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
-  client.stop(function(err) {
-    test.ok(!err);
-    test.done();
-    client.on('stopped', function() {
-      test.ok(false, "shouldn't receive stopped event if already stopped");
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_stop_when_already_stopped'
+  }).stop();
+  client.once('stopped', function() {
+    setImmediate(function() {
+      client.on('stopped', function() {
+        test.ok(false, "shouldn't receive stopped event if already stopped");
+      });
+      client.stop(function(err) {
+        test.ok(!err);
+        test.done();
+      });
     });
   });
 };
