@@ -43,7 +43,7 @@ var testCase = require('nodeunit').testCase;
  */
 module.exports.test_successful_start_stop = function(test) {
   test.expect(9);
-  var client = 
+  var client =
       mqlight.createClient({service: 'amqp://host'}, function(err, c) {
     test.equals('started', client.state);
     test.ok(this === client);
@@ -979,7 +979,7 @@ module.exports.test_start_user_password_options = function(test) {
                          'underlying proton messenger');
             }
           }
-          this.stop(function() {;
+          this.stop(function() {
             runtest(++i);
           });
         });
@@ -994,4 +994,5 @@ module.exports.test_start_user_password_options = function(test) {
 
   runtest(0);
 };
+
 

@@ -188,7 +188,7 @@ function getNamedError(obj) {
       }
     }
   }
-  return;
+  return obj;
 }
 
 
@@ -1944,7 +1944,8 @@ Client.prototype.send = function(topic, data, options, callback) {
     } else {
       client.drainEventRequired = true;
     }
-  } catch (err) {
+  } catch (exception) {
+    err = getNamedError(exception);
     logger.caught('Client.send', client.id, err);
     // error condition so won't retry send need to remove it from list of
     // unsent
@@ -1962,7 +1963,10 @@ Client.prototype.send = function(topic, data, options, callback) {
       if (callback) {
         if (qos === exports.QOS_AT_MOST_ONCE) {
           logger.entry('Client.send.callback', client.id);
-          callback(err, topic, protonMsg.body, options);
+          logger.log('parms', client.id, 'err:', err, ', topic:',
+                     topic, ', protonMsg.body:', protonMsg.body, ', options:',
+                     options);
+          callback.apply(client, [err, topic, protonMsg.body, options]);
           logger.exit('Client.send.callback', client.id, null);
         }
       }
@@ -2466,7 +2470,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       messenger.subscribe(address, qos, ttl, credit);
     } catch (e) {
       logger.caught('Client.subscribe', client.id, e);
-      err = e;
+      err = getNamedError(e);
     }
   }
 

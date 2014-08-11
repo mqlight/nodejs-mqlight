@@ -644,3 +644,42 @@ module.exports.test_subscribe_credit_values = function(test) {
     });
   });
 };
+
+
+/**
+ * This is a simple test to confirm that a client that attempts to subscribe,
+ * but which has been replaced by another client with the same id, gets the
+ * ReplacedError
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_client_replaced = function(test) {
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_client_replaced'
+  });
+
+  var savedSubscribeFunction = mqlight.proton.messenger.subscribe;
+  mqlight.proton.messenger.subscribe = function() {
+    var err = new Error('CONNECTION ERROR (ServerContext_Takeover)');
+    err.name = 'ReplacedError';
+    throw err;
+  };
+  client.on('error', function() {});
+
+  client.once('started', function() {
+    test.ok(this === client);
+    test.equals(arguments.length, 0);
+    test.equals(client.state, 'started');
+    test.equals(client.messenger.stopped, false);
+
+    client.subscribe('topic', 'share', function(err) {
+      test.ok(err instanceof Error);
+      test.ok(err instanceof mqlight.ReplacedError);
+      test.ok(/ReplacedError: /.test(err.toString()));
+      mqlight.proton.messenger.subscribe = savedSubscribeFunction;
+      test.done();
+    });
+  });
+};
+
