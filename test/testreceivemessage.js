@@ -479,7 +479,7 @@ module.exports.test_subscribe_credit_confirm = function(test) {
   
   var client = mqlight.createClient({service: 'amqp://host'});
   var deliveryArray = [];
-  var interval = undefined;
+  var interval = null;
   var confirmBatch = 0;
 
   client.start(function(err) {
@@ -519,6 +519,47 @@ module.exports.test_subscribe_credit_confirm = function(test) {
 
   client.on('error', function(err) {
     test.ok(false, 'error event should not be emitted');
+  });
+};
+
+
+/**
+ * This is a simple test to confirm that a client that is receiving messages
+ * but which has been replaced by another client with the same id, gets the
+ * ReplacedError
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_client_replaced = function(test) {
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_client_replaced'
+  });
+
+  var savedReceiveMethod = mqlight.proton.messenger.receive;
+  mqlight.proton.messenger.receive = function() {
+    var err = new Error('CONNECTION ERROR (ServerContext_Takeover)');
+    err.name = 'ReplacedError';
+    throw err;
+  };
+  client.on('message', function() {});
+  client.on('error', function(err) {
+    test.ok(err instanceof Error);
+    test.ok(err instanceof mqlight.ReplacedError);
+    test.ok(/ReplacedError: /.test(err.toString()));
+    mqlight.proton.messenger.receive = savedReceiveMethod;
+    client.stop();
+    test.done();
+  });
+
+  client.once('started', function() {
+    test.ok(this === client);
+    test.equals(arguments.length, 0);
+    test.equals(client.state, 'started');
+    test.equals(client.messenger.stopped, false);
+    client.subscribe('topic', 'share', function(err) {
+      test.ifError(err);
+    });
   });
 };
 

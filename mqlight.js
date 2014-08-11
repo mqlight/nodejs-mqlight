@@ -2222,7 +2222,8 @@ Client.prototype.checkForMessages = function() {
         }
       }
     }
-  } catch (err) {
+  } catch (e) {
+    err = getNamedError(e);
     logger.caughtLevel('entry_often', 'checkForMessages', client.id, err);
     process.nextTick(function() {
       logger.log('emit', client.id, 'error', err);
@@ -2757,7 +2758,8 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
         break;
       }
     }
-  } catch (err) {
+  } catch (e) {
+    err = getNamedError(e);
     logger.caught('Client.unsubscribe', client.id, err);
     setImmediate(function() {
       logger.log('emit', client.id, 'error', err);
