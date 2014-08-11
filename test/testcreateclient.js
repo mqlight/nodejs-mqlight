@@ -175,6 +175,7 @@ module.exports.test_id_types_values = function(test) {
                   {data: ':1234', valid: false},
                   {data: '1234:', valid: false},
                   {data: '12:34', valid: false},
+                  {data: new Array(50).join('x'), valid: false},
                   {data: '%._', valid: true}];
 
   var runTest = function(i) {
