@@ -25,8 +25,8 @@ subscribing client.
      When set to `false`, application code is responsible for confirming the
      delivery of messages using the `confirmDelivery` method, passed via
      the `delivery` argument of the listener registered for `message` events.
-     `autoConfirm` is only applicable when the `qos` property (see below)
-     is set to 1.
+     `autoConfirm` is only applicable when the `qos` property is set to 1. The
+     `qos` property is described later.
   *  **credit**, (Number) The maximum number of unconfirmed messages a client
      can have before the server will stop sending new messages to the client and
      require that it confirms some of the outstanding message deliveries in
