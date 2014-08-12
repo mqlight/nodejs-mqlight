@@ -201,8 +201,14 @@ function getNamedError(obj) {
  * @return {Object} true if we should reconnect, false otherwise.
  */
 function shouldReconnect(err) {
-  // TODO: exclude all programming errors
-  return (!(err instanceof TypeError) && !(err instanceof SubscribedError));
+  // exclude all programming errors
+  return (!(err instanceof TypeError) &&
+          !(err instanceof InvalidArgumentError) &&
+          !(err instanceof ReplacedError) &&
+          !(err instanceof StoppedError) &&
+          !(err instanceof SubscribedError) &&
+          !(err instanceof UnsubscribedError)
+         );
 }
 
 
@@ -572,10 +578,10 @@ var getHttpServiceFunction = function(serviceUrl) {
                         null);
           }
         } else {
-          var err = new Error();
-          err.message = 'http request to ' + serviceUrl + ' failed with a ' +
+          var message = 'http request to ' + serviceUrl + ' failed with a ' +
                         'status code of ' + res.statusCode;
-          if (data) err.message += ': ' + data;
+          if (data) message += ': ' + data;
+          err = new NetworkError(message);
           logger.log('error', logger.NO_CLIENT_ID, err);
           logger.entry('httpServiceFunction.callback', logger.NO_CLIENT_ID);
           logger.log('parms', logger.NO_CLIENT_ID, 'err:', err);
@@ -591,6 +597,8 @@ var getHttpServiceFunction = function(serviceUrl) {
     }).on('error', function(err) {
       err.message = 'http request to ' + serviceUrl + ' failed ' +
                     'with an error: ' + err.message;
+      err.name = 'NetworkError';
+      err = getNamedError(err);
       logger.log('error', logger.NO_CLIENT_ID, err);
       logger.entry('httpServiceFunction.callback', logger.NO_CLIENT_ID);
       logger.log('parms', logger.NO_CLIENT_ID, 'err:', err);
@@ -598,8 +606,9 @@ var getHttpServiceFunction = function(serviceUrl) {
       logger.exit('httpServiceFunction.callback', logger.NO_CLIENT_ID, null);
     });
     req.setTimeout(5000, function() {
-      var err = new Error('http request to ' + serviceUrl + ' timed out ' +
-          'after 5000 milliseconds');
+      var message = 'http request to ' + serviceUrl + ' timed out ' +
+                    'after 5000 milliseconds';
+      var err = new NetworkError(message);
       logger.log('error', logger.NO_CLIENT_ID, err);
       logger.entry('httpServiceFunction.callback', logger.NO_CLIENT_ID);
       logger.log('parms', logger.NO_CLIENT_ID, 'err:', err);
@@ -668,7 +677,7 @@ var Client = function(service, id, securityOptions) {
       if (serviceUrl.host.length > 0 && serviceUrl.host !== 'localhost') {
         msg = 'service contains unsupported file URI of ' + service +
             ', only file:///path or file://localhost/path are supported.';
-        err = new Error(msg);
+        err = new InvalidArgumentError(msg);
         logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
         throw err;
       }
@@ -690,7 +699,7 @@ var Client = function(service, id, securityOptions) {
     // Ensure the service is an Array
     var inputServiceList = [];
     if (!service) {
-      err = new Error('service is undefined');
+      err = new TypeError('service is undefined');
       logger.throw('generateServiceList', client.id, err);
       throw err;
     } else if (service instanceof Function) {
@@ -699,7 +708,7 @@ var Client = function(service, id, securityOptions) {
       throw err;
     } else if (service instanceof Array) {
       if (service.length === 0) {
-        err = new Error('service array is empty');
+        err = new TypeError('service array is empty');
         logger.throw('generateServiceList', client.id, err);
         throw err;
       }
@@ -737,7 +746,7 @@ var Client = function(service, id, securityOptions) {
         } else {
           msg = "URLs supplied via the 'service' property must specify both a" +
                 ' user name and a password value, or omit both values';
-          err = new Error(msg);
+          err = new InvalidArgumentError(msg);
           logger.throw('generateServiceList', client.id, err);
           throw err;
         }
@@ -747,7 +756,7 @@ var Client = function(service, id, securityOptions) {
                 securityOptions.propertyUser + ') does not match user name ' +
                 "supplied via a URL passed via the 'service' property (" +
                 authUser + ')';
-          err = new Error(msg);
+          err = new InvalidArgumentError(msg);
           logger.throw('generateServiceList', client.id, err);
           throw err;
         }
@@ -755,7 +764,7 @@ var Client = function(service, id, securityOptions) {
             (securityOptions.propertyPassword !== authPassword)) {
           msg = "Password supplied as 'password' property does not match a " +
                 "password supplied via a URL passed via the 'service' property";
-          err = new Error(msg);
+          err = new InvalidArgumentError(msg);
           logger.throw('generateServiceList', client.id, err);
           throw err;
         }
@@ -772,13 +781,13 @@ var Client = function(service, id, securityOptions) {
         if (securityOptions.urlUser !== authUser) {
           msg = "URLs supplied via the 'service' property contain " +
                 'inconsistent user names';
-          err = new Error(msg);
+          err = new InvalidArgumentError(msg);
           logger.throw('generateServiceList', client.id, err);
           throw err;
         } else if (securityOptions.urlPassword !== authPassword) {
           msg = "URLs supplied via the 'service' property contain " +
                 'inconsistent password values';
-          err = new Error(msg);
+          err = new InvalidArgumentError(msg);
           logger.throw('generateServiceList', client.id, err);
           throw err;
         }
@@ -789,7 +798,7 @@ var Client = function(service, id, securityOptions) {
         msg = "Unsupported URL '" + inputServiceList[i] +
               "' specified for service. Only the amqp or amqps protocol are " +
               'supported.';
-        err = new Error(msg);
+        err = new InvalidArgumentError(msg);
         logger.throw('generateServiceList', client.id, err);
         throw err;
       }
@@ -798,7 +807,7 @@ var Client = function(service, id, securityOptions) {
       if (!host || !serviceUrl.hostname) {
         msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
               'service. Must supply a hostname.';
-        err = new Error(msg);
+        err = new InvalidArgumentError(msg);
         logger.throw('generateServiceList', client.id, err);
         throw err;
       }
@@ -812,7 +821,7 @@ var Client = function(service, id, securityOptions) {
       if (path && path !== '/') {
         msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
               " ) can't be part of a service URL.";
-        err = new Error(msg);
+        err = new InvalidArgumentError(msg);
         logger.throw('generateServiceList', client.id, err);
         throw err;
       }
@@ -1363,7 +1372,7 @@ Client.prototype.stop = function(callback) {
           process.nextTick(function() {
             logger.entry('Client.stop.performDisconnect.' +
                 'stopProcessing.queuedSendCallback', client.id);
-            msg.callback(new Error('send aborted due to disconnect'));
+            msg.callback(new StoppedError('send aborted due to client stop'));
             logger.exit('Client.stop.performDisconnect.' +
                 'stopProcessing.queuedSendCallback', client.id, null);
           });
@@ -1881,7 +1890,8 @@ Client.prototype.send = function(topic, data, options, callback) {
           index = client.outstandingSends.indexOf(localMessageId);
           if (index >= 0) client.outstandingSends.splice(index, 1);
           if (sendCallback) {
-            err = new Error('send may have not completed due to disconnect');
+            err = new StoppedError('send may not have completed due to ' +
+                                   'client stop');
             logger.entry('Client.send.untilSendComplete.callback', client.id);
             sendCallback.apply(client, [err, topic, protonMsg.body, options]);
             logger.exit('Client.send.untilSendComplete.callback',
@@ -2326,8 +2336,9 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   if (share) {
     share = String(share);
     if (share.indexOf(':') >= 0) {
-      err = new Error("share argument value '" + share + "' is invalid " +
-                      "because it contains a colon (\':\') character");
+      err = new InvalidArgumentError("share argument value '" + share +
+                                     "' is invalid because it contains a " +
+                                     "colon (\':\') character");
       logger.throw('Client.subscribe', this.id, err);
       throw err;
     }
@@ -2613,8 +2624,9 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   if (share) {
     share = String(share);
     if (share.indexOf(':') >= 0) {
-      err = new Error("share argument value '" + share + "' is invalid " +
-                      "because it contains a colon (\':\') character");
+      err = new InvalidArgumentError("share argument value '" + share +
+                                     "' is invalid because it contains a " +
+                                     "colon (\':\') character");
       logger.throw('Client.unsubscribe', this.id, err);
       throw err;
     }
