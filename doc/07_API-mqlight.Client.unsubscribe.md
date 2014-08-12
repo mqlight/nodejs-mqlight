@@ -19,5 +19,14 @@ subscribed to by other clients instances.
      specified) is not to change the destination's time to live. When specified
      the only valid value for this property is 0.
 * `callback` - (Function) (optional) callback to be notified when the
-  unsubscribe operation completes.
-
+  unsubscribe operation completes. The `callback` function is passed the
+  following arguments:
+  *  **error**, (Error) an error object if the callback is being invoked to
+     indicate that the unsubscribe call failed. If the unsubscribe call
+     completes successfully then the value `undefined` is supplied for this
+     argument.
+  *  **topicPattern**, (String) the `topicPattern` argument supplied to the 
+     corresponding unsubscribe method call.
+  *  **share**, (String) the `share` argument supplied to the corresponding
+     unsubscribe method call (or `undefined` if this parameter was not
+     specified).

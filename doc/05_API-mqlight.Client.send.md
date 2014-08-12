@@ -21,8 +21,8 @@ received.
   operation completes. The `callback` function is passed the following
   arguments:
   *  **error**, (Error) an error object if the callback is being invoked to
-     indicate that the send call failed. If the send call completes then a
-     value of `undefined` is supplied for this argument.
+     indicate that the send call failed. If the send call completes successfully
+     then the value `undefined` is supplied for this argument.
   *  **topic**, (String) the `topic` argument supplied to the corresponding
      send method call.
   *  **data**, (Object) the `data` argument supplied to the corresponding
