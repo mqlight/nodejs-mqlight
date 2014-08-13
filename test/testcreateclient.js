@@ -426,7 +426,7 @@ module.exports.test_valid_ssl_options = function(test) {
       service: 'amqp://host',
       sslTrustCertificate: testData[count].sslTrustCertificate,
       sslVerifyName: testData[count].sslVerifyName,
-      id: 'test_valid_ssl_options'
+      id: 'test_valid_ssl_options'+count
     };
     var client = mqlight.createClient(opts);
     client.on('error', function(err) {
@@ -519,56 +519,38 @@ module.exports.test_createClient_multiple_with_same_id = function(test) {
     clientB1.on('stopped', function(err) {
       test.equal(undefined, err);
       clientB1Stopped = true;
-    });  
+    });
+    var firstTime = true;
     clientB1.on('started', function(err) {
+      if (!firstTime) return;
+      firstTime = false;
       test.equal(undefined, err);
       var clientB2 = mqlight.createClient(optsB);
       clientB2.on('started', function(err) {
         test.equal(undefined, err);
         test.ok(clientB1Stopped);
         test.equal('started', clientA.state);
-        test.equal('replaced', clientB1.state);
-        test.throws(function() {
-          clientB1.stop();
-        }, function(err) {
-          if (err instanceof mqlight.ReplacedError) {
-            return true;
-          }
-        }, 'stop failed because clientB1 has been replaced');
-        test.throws(function() {
-          clientB1.start();
-        }, function(err) {
-          if (err instanceof mqlight.ReplacedError) {
-            return true;
-          }
-        }, 'start failed because clientB1 has been replaced');
-        test.throws(function() {
-          clientB1.send('topic','message');
-        }, function(err) {
-          if (err instanceof mqlight.ReplacedError) {
-            return true;
-          }
-        }, 'send failed because clientB1 has been replaced');
-        test.throws(function() {
-          clientB1.subscribe('pattern');
-        }, function(err) {
-          if (err instanceof mqlight.ReplacedError) {
-            return true;
-          }
-        }, 'subscribe failed because clientB1 has been replaced');
-        test.throws(function() {
-          clientB1.unsubscribe('pattern');
-        }, function(err) {
-          if (err instanceof mqlight.ReplacedError) {
-            return true;
-          }
-        }, 'unsubscribe failed because clientB1 has been replaced');
-
-        clientA.stop(function() {
-          clientB2.stop(function() {
-            test.done();
+        test.equal('stopped', clientB1.state);
+        test.equal('started', clientB2.state);
+        
+        clientB1.start(function(err) {
+          test.equal(undefined, err);
+          test.equal('started', clientA.state);
+          test.equal('started', clientB1.state);
+          test.equal('stopped', clientB2.state);
+          
+          clientA.stop(function() {
+            clientB1.stop(function() {
+              test.done();
+            });
           });
         });
+      });
+      clientB1.on('error', function(err) {
+        test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
+      });
+      clientB2.on('error', function(err) {
+        test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
       });
     });
   });
