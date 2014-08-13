@@ -72,6 +72,40 @@ var validClientIdChars =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%/._';
 
 
+var HashMap = require('hashmap').HashMap;
+
+
+/**
+ * List of active clients to prevent duplicates, in the started state, with
+ * the same id existing.
+ */
+var activeClientList = {
+  clients: new HashMap(),
+  add: function(client) {
+    logger.entry('activeClientList.add', client.id);
+    this.clients.set(client.id, client);
+    logger.exit('activeClientList.add', client.id);
+  },
+  remove: function(id) {
+    logger.entry('activeClientList.remove', id);
+    this.clients.remove(id);
+    logger.exit('activeClientList.remove', id);
+  },
+  get: function(id) {
+    logger.entry('activeClientList.get', id);
+    var client = this.clients.get(id);
+    logger.exit('activeClientList.get', id, client);
+    return client;
+  },
+  has: function(id) {
+    logger.entry('activeClientList.has', id);
+    var found = this.clients.has(id);
+    logger.exit('activeClientList.has', id, found);
+    return found;
+  }
+};
+
+
 /** @const {number} */
 exports.QOS_AT_MOST_ONCE = 0;
 
@@ -142,6 +176,14 @@ var STATE_STOPPED = 'stopped';
 
 /** Client state: in the process of transitioning to STATE_STOPPED */
 var STATE_STOPPING = 'stopping';
+
+
+/**
+ * Client state: client instance replaced by a new instance being created
+ * with the same id. Clients in this state are no longer functional and calls
+ * to any of their API functions will result in a ReplacedError being thrown.
+ */
+var STATE_REPLACED = 'replaced';
 
 
 /**
@@ -269,6 +311,21 @@ exports.ReplacedError = function(message) {
 };
 var ReplacedError = exports.ReplacedError;
 util.inherits(ReplacedError, Error);
+
+
+
+/**
+ * Special type of ReplacedError thrown by an invalidated Client instance. An
+ * invaildated Client instance is one where the application has created another
+ * Client instance with the same id, which replaces it.
+ *
+ *  @constructor
+ */
+var LocalReplacedError = function() {
+  ReplacedError.apply(this, ['Client is Invalid. Application has created a ' +
+                             'second Client instance with the same id']);
+};
+util.inherits(LocalReplacedError, ReplacedError);
 
 
 
@@ -420,11 +477,28 @@ exports.createClient = function(options, callback) {
     logger.exit('createClient.on.exit', logger.NO_CLIENT_ID, null);
   });
 
-  process.nextTick(function() {
-    client.performConnect(function(err) {
-      if (callback) callback.apply(client, [err, client]);
-    }, true);
-  });
+  // Check that the id for this instance is not already in use. If it is then
+  // we need to replace the previous instance and set its state to 'replaced'
+  if (activeClientList.has(client.id)) {
+    var previousClient = activeClientList.get(client.id);
+    activeClientList.add(client);
+    previousClient.stop(function() {
+      previousClient.state = STATE_REPLACED;
+      logger.log('data', client.id, 'Previous client instance replaced');
+      process.nextTick(function() {
+        client.performConnect(function(err) {
+          if (callback) callback.apply(client, [err, client]);
+        }, true);
+      });
+    });
+  } else {
+    activeClientList.add(client);
+    process.nextTick(function() {
+      client.performConnect(function(err) {
+        if (callback) callback.apply(client, [err, client]);
+      }, true);
+    });
+  }
 
   logger.exit('createClient', client.id, client);
   return client;
@@ -846,6 +920,21 @@ var Client = function(service, id, securityOptions) {
     var client = this;
     logger.entry('Client.connect.performConnect', client.id, newClient);
 
+    // If client has been replaced then exit function now
+    if (client.state === STATE_REPLACED) {
+      var err = new LocalReplacedError();
+      if (callback) {
+        process.nextTick(function() {
+          logger.entry('Client.connect.performConnect.callback', client.id);
+          callback.apply(client, [err]);
+          logger.exit('Client.connect.performConnect.callback', client.id,
+              null);
+        });
+      }
+      logger.exit('Client.connect.performConnect', client.id, null);
+      return;
+    }
+
     if (!newClient) {
       var currentState = client.state;
       // if we are not stopped or stopping state return with the client object
@@ -908,6 +997,7 @@ var Client = function(service, id, securityOptions) {
     if (client.serviceFunction instanceof Function) {
       client.serviceFunction(function(err, service) {
         if (err) {
+          activeClientList.remove(client.id);
           logger.entry('Client.connect.performConnect.serviceFunction.callback',
                        client.id);
           callback.apply(client, [err]);
@@ -919,6 +1009,7 @@ var Client = function(service, id, securityOptions) {
                 client.generateServiceList.apply(client, [service]);
             client.connectToService(serviceList, callback);
           } catch (err) {
+            activeClientList.remove(client.id);
             var name = 'Client.connect.performConnect.serviceFunction.callback';
             logger.entry(name, client.id);
             callback.apply(client, [err]);
@@ -931,6 +1022,7 @@ var Client = function(service, id, securityOptions) {
         serviceList = client.generateServiceList.apply(client, [service]);
         client.connectToService(serviceList, callback);
       } catch (err) {
+        activeClientList.remove(client.id);
         if (callback) {
           process.nextTick(function() {
             logger.entry('Client.connect.performConnect.callback', client.id);
@@ -1269,6 +1361,19 @@ Client.prototype.start = function(callback) {
 
   var client = this;
 
+  // If client has been replaced then throw a ReplacedError.
+  // Otherwise declare this client as active
+  var activeClient = activeClientList.get(client.id);
+  if (this.state === STATE_REPLACED ||
+      (activeClient !== undefined && this !== activeClient)) {
+    this.state = STATE_REPLACED;
+    var err = new LocalReplacedError();
+    logger.throw('Client.start', this.id, err);
+    throw err;
+  } else {
+    activeClientList.add(client);
+  }
+
   process.nextTick(function() {
     client.performConnect(callback, false);
   });
@@ -1349,6 +1454,13 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
 Client.prototype.stop = function(callback) {
   logger.entry('Client.stop', this.id);
 
+  // If client has been replaced then throw a ReplacedError
+  if (this.state === STATE_REPLACED) {
+    var err = new LocalReplacedError();
+    logger.throw('Client.stop', this.id, err);
+    throw err;
+  }
+
   var client = this;
 
   // Performs the disconnect
@@ -1386,6 +1498,11 @@ Client.prototype.stop = function(callback) {
 
         // Indicate that we've disconnected
         client.state = STATE_STOPPED;
+
+        // Remove ourself from the active client list
+        var activeClient = activeClientList.get(client.id);
+        if (client === activeClient) activeClientList.remove(client.id);
+
         process.nextTick(function() {
           logger.log('emit', client.id, STATE_STOPPED);
           client.firstStart = true;
@@ -1659,6 +1776,14 @@ Client.prototype.isStopped = function() {
  */
 Client.prototype.send = function(topic, data, options, callback) {
   logger.entry('Client.send', this.id);
+
+  // If client has been replaced then throw a ReplacedError
+  if (this.state === STATE_REPLACED) {
+    var err = new LocalReplacedError();
+    logger.throw('Client.send', this.id, err);
+    throw err;
+  }
+
   var err;
   var nextMessage = false;
 
@@ -2288,6 +2413,13 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   logger.entry('Client.subscribe', this.id);
   logger.log('parms', this.id, 'topicPattern:', topicPattern);
 
+  // If client has been replaced then throw a ReplacedError
+  if (this.state === STATE_REPLACED) {
+    var err = new LocalReplacedError();
+    logger.throw('Client.subscribe', this.id, err);
+    throw err;
+  }
+
   // Must accept at least one option - and first option is always a
   // topicPattern.
   if (arguments.length === 0) {
@@ -2575,6 +2707,13 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
                                {
   logger.entry('Client.unsubscribe', this.id);
   logger.log('parms', this.id, 'topicPattern:', topicPattern);
+
+  // If client has been replaced then throw a ReplacedError
+  if (this.state === STATE_REPLACED) {
+    var err = new LocalReplacedError();
+    logger.throw('Client.unsubscribe', this.id, err);
+    throw err;
+  }
 
   // Must accept at least one option - and first option is always a
   // topicPattern.
