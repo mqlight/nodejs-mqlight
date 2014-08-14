@@ -124,7 +124,7 @@ for (var i = privateTopics.length - 1; i >= 0; i--) {
   startClient(privateTopics[i]);
 }
 
-// Checks to see if the application is running in Bluemix. If it is, tries
+// Checks to see if the application is running in IBM Bluemix. If it is, tries
 // to retrieve connection details from the environent and populates the
 // options object passed as an argument.
 function bluemixServiceLookup(options, verbose) {
@@ -142,8 +142,8 @@ function bluemixServiceLookup(options, verbose) {
         console.log('LookupURI: ' + options.service);
       }
     } else {
-      throw new Error('Running in Bluemix but not bound to an instance of ' +
-                      "the 'mqlight' service.");
+      throw new Error('Running in IBM Bluemix but not bound to an instance ' +
+                      "of the 'mqlight' service.");
     }
     result = true;
   } else if (verbose) {
