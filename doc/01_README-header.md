@@ -27,15 +27,8 @@ The following are the currently supported platform architectures:
 
 You will receive an error if you attempt to use any other combination.
 
-Before using MQ Light on Linux, you will also need the 0.9.8 version of an
-OpenSSL package. This version of the package is not installed by default, so to
-use the module you will need to install it. For example:
-
-* To install the package on Ubuntu, run: ``sudo apt-get install libssl0.9.8``
-* To install the package on RedHat, run: ``sudo yum install openssl098e``
-
-Additionally, you will also need to make sure you have the libuuid package
-installed. For example:
+Before using MQ Light on Linux, you will also need to make sure you have the
+libuuid package installed. For example:
 
 * To check whether you have the package on Ubuntu, run: ``dpkg -l libuuid1``
 * To check whether you have the package on RedHat, run: ``rpm -qa | grep
