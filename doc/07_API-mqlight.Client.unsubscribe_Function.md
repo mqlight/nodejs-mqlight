@@ -34,3 +34,4 @@ otherwise this method will throw a `TypeError`.
   *  **share**, (String) the `share` argument supplied to the corresponding
      unsubscribe method call (or `undefined` if this parameter was not
      specified).
+
