@@ -12,17 +12,23 @@ received.
   Supported options are:
   *  **qos**, (Number) (optional) The quality of service to use when sending the
      message. 0 is used to denote at most once (the default) and 1 is used for
-     at least once.
+     at least once. If a value which is not 0 and not 1 is specified then this
+     method will throw a `RangeError`
   *  **ttl**, (Number) (optional) A time to live value for the message in
      milliseconds. MQ Light will endeavour to discard, without delivering, any
      copy of the message that has not been delivered within its time to live
      period. The default time to live is 604800000 milliseconds (7 days).
-* `callback` - (Function) (optional) callback to be notified when the send
-  operation completes. The `callback` function is passed the following
+     The value supplied for this argument must be greater than zero and finite,
+     otherwise a `RangeError` will be thrown when this method is called.
+* `callback` - (Function) The callback argument is optional if the qos property
+  of the options argument is omitted or set to 0 (at most once). If the qos
+  property is set to 1 (at least once) then the callback argument is required
+  and a `InvalidArgumentError` is thrown if it is omitted. The callback will be
+  notified when the send operation completes and is passed the following
   arguments:
   *  **error**, (Error) an error object if the callback is being invoked to
      indicate that the send call failed. If the send call completes successfully
-     then the value `undefined` is supplied for this argument.
+     then the value `null` is supplied for this argument.
   *  **topic**, (String) the `topic` argument supplied to the corresponding
      send method call.
   *  **data**, (Object) the `data` argument supplied to the corresponding

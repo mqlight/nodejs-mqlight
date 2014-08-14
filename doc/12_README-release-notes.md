@@ -17,7 +17,7 @@ that goes to stderr when you run your application.
 ### 9.9.9999999999
 
 * Third beta release
-* ...
+* Necessary OpenSSL libraries built into the client.
 * ...
 
 ### 0.1.2014062301
