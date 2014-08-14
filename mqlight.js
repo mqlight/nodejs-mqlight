@@ -2264,14 +2264,13 @@ Client.prototype.checkForMessages = function() {
           }
         };
         var linkAddress = protonMsg.linkAddress;
-        if (linkAddress) {
-          delivery.destination = {};
-          var split = linkAddress.split(':', 3);
-          if (linkAddress.indexOf('share:') === 0) {
-            delivery.destination.share = split[1];
-            delivery.destination.topicPattern = split[2];
+        if (linkAddress) {          delivery.destination = {};
+        if (linkAddress.indexOf('share:') === 0) {
+            var linkAddressWithoutShare = linkAddress.substring(6,linkAddress.length);
+            delivery.destination.share = linkAddressWithoutShare.substring(0,linkAddressWithoutShare.indexOf(":"));
+            delivery.destination.topicPattern = linkAddressWithoutShare.substring(linkAddressWithoutShare.indexOf(":")+1,linkAddressWithoutShare.length);
           } else {
-            delivery.destination.topicPattern = split[1];
+            delivery.destination.topicPattern = linkAddress.substring(linkAddress.indexOf(":")+1,linkAddress.length);
           }
         }
         if (protonMsg.ttl > 0) {
