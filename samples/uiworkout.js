@@ -124,6 +124,34 @@ for (var i = privateTopics.length - 1; i >= 0; i--) {
   startClient(privateTopics[i]);
 }
 
+// Checks to see if the application is running in Bluemix. If it is, tries
+// to retrieve connection details from the environent and populates the
+// options object passed as an argument.
+function bluemixServiceLookup(options, verbose) {
+  var result = false;
+  if (process.env.VCAP_SERVICES) {
+    if (verbose) console.log('VCAP_SERVICES variable present in environment');
+    var services = JSON.parse(process.env.VCAP_SERVICES);
+    if (services.mqlight) {
+      options.user = services.mqlight[0].credentials.username;
+      options.password = services.mqlight[0].credentials.password;
+      options.service = services.mqlight[0].credentials.connectionLookupURI;
+      if (verbose) {
+        console.log('Username:  ' + options.user);
+        console.log('Password:  ' + options.user);
+        console.log('LookupURI: ' + options.service);
+      }
+    } else {
+      throw new Error('Running in Bluemix but not bound to an instance of ' +
+                      "the 'mqlight' service.");
+    }
+    result = true;
+  } else if (verbose) {
+    console.log('VCAP_SERVICES variable not present in environment');
+  }
+  return result;
+}
+
 // Creates a client.  The client will subscribe to 'topic'.  If the
 // 'share' argument is undefined the destination will be private to the
 // client.  If the 'share' argument is not undefined, it will be used
@@ -131,11 +159,12 @@ for (var i = privateTopics.length - 1; i >= 0; i--) {
 // The client is also used to periodically publish a message to a
 // randomly chosen topic.
 function startClient(topic, share) {
-  var opts = {
-    service: 'amqp://localhost',
-    id: 'CLIENT_' + uuid.v4().substring(0, 7)
-  };
-  if (parsed.service) opts.service = parsed.service;
+  var opts = {id: 'CLIENT_' + uuid.v4().substring(0, 7)};
+  if (parsed.service) {
+    opts.service = parsed.service;
+  } else if (!bluemixServiceLookup(opts, false)) {
+    opts.service = 'amqp://localhost';
+  }
   if (parsed['trust-certificate']) {
     opts['sslTrustCertificate'] = parsed['trust-certificate'];
     if (parsed.service) {
