@@ -363,7 +363,7 @@ Handle<Value> ProtonMessage::GetLinkAddress(Local<String> property,
 //
 // Note:
 // As we only care about a subset of possible delivery annotations - this
-// method only retuns annotations that have a symbol as a key and have a value
+// method only returns annotations that have a symbol as a key and have a value
 // which is of one of the following types: symbol, string, or 32-bit signed
 // integer.
 Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
@@ -380,15 +380,15 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
     pn_data_t* da = pn_message_instructions(
         msg->message);  // instructions === delivery annotations
 
-    // Count the numner of delivery annotations that we are interested in
+    // Count the number of delivery annotations that we are interested in
     // returning
     bool lval = pn_data_next(da);  // Move to Map
     int elements = 0;
-    if (lval && pn_data_type(da) == PN_MAP) {  // Check it actuall is a Map
+    if (lval && pn_data_type(da) == PN_MAP) {  // Check it actually is a Map
       if (lval)
         lval = pn_data_enter(da);  // Enter the Map
       if (lval)
-        lval = pn_data_next(da);  // Poisition on first map key
+        lval = pn_data_next(da);  // Position on first map key
       if (lval) {
         while (true) {
           if (pn_data_type(da) == PN_SYMBOL) {
@@ -420,7 +420,7 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
 
     pn_data_next(da);   // Move to Map
     pn_data_enter(da);  // Enter the Map
-    pn_data_next(da);   // Poisition on first map key
+    pn_data_next(da);   // Position on first map key
 
     // Build an array of objects, where each object has the following four
     // properties:
