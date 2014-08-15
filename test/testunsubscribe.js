@@ -41,7 +41,7 @@ module.exports.test_unsubscribe_too_few_arguments = function(test) {
   var client = mqlight.createClient(opts, function() {
     test.throws(function() {
       client.unsubscribe();
-    });
+    }, TypeError);
     client.stop(function() {
       test.done();
     });
@@ -86,7 +86,7 @@ module.exports.test_unsubscribe_callback_must_be_function = function(test) {
     test.throws(function() {
       client.subscribe('/foo1', 'share');
       client.unsubscribe('/foo1', 'share', {}, 7);
-    });
+    }, TypeError);
     test.doesNotThrow(function() {
       client.subscribe('/foo2');
       client.unsubscribe('/foo2', function() {});
@@ -245,7 +245,7 @@ module.exports.test_unsubscribe_when_stopped = function(test) {
   client.on('stopped', function() {
     test.throws(function() {
       client.unsubscribe('/foo');
-    }, Error);
+    }, mqlight.StoppedError);
     test.done();
   });
 };
@@ -263,7 +263,8 @@ module.exports.test_unsubscribe_when_not_subscribed = function(test) {
     service : 'amqp://host'});
   client.on('started', function() {
     client.subscribe('/bar');
-    test.throws(function() { client.unsubscribe('/foo'); }, Error);
+    test.throws(function() { client.unsubscribe('/foo'); },
+                mqlight.UnsubscribedError);
     client.stop(test.done);
   });
 };
@@ -354,7 +355,7 @@ module.exports.test_unsubscribe_share_names = function(test) {
       } else {
         test.throws(function() {
           client.unsubscribe('/foo', data[i].share);
-        }, Error, i);
+        }, mqlight.InvalidArgumentError, i);
       }
     }
     client.stop(function() {
@@ -408,7 +409,7 @@ module.exports.test_unsubscribe_options = function(test) {
         );
       }
     }
-    client.stop(function() {;
+    client.stop(function() {
       test.done();
     });
   });

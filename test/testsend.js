@@ -35,19 +35,17 @@ var mqlight = require('../mqlight');
  * @param {object} test the unittest interface
  */
 module.exports.test_send_too_few_arguments = function(test) {
-  var client = mqlight.createClient({id: 'test_send_too_few_arguments',
-    service: 'amqp://host'});
+  var client = mqlight.createClient({
+    id: 'test_send_too_few_arguments',
+    service: 'amqp://host'
+  });
   client.on('started', function() {
-    test.throws(
-        function() {
-          client.send();
-        }
-    );
-    test.throws(
-        function() {
-          client.send('topic');
-        }
-    );
+    test.throws(function() {
+      client.send();
+    }, TypeError);
+    test.throws(function() {
+      client.send('topic');
+    }, TypeError);
     client.stop(function() {
       test.done();
     });
@@ -307,7 +305,7 @@ module.exports.test_send_options = function(test) {
         );
       }
     }
-    client.stop(function() {;
+    client.stop(function() {
       test.done();
     });
   });

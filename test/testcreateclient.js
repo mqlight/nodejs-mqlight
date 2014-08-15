@@ -136,7 +136,7 @@ module.exports.test_createClient_must_have_service_value = function(test) {
   test.throws(function() {
     mqlight.createClient({id: 'test_createClient_must_have_service_value'});
   }, function(err) {
-    if ((err instanceof Error) && /service is undefined/.test(err)) {
+    if ((err instanceof TypeError) && /service is undefined/.test(err)) {
       return true;
     }
   }, 'service property must be specified to createClient(...)');
@@ -306,7 +306,7 @@ module.exports.test_invalid_URIs = function(test) {
       };
       mqlight.createClient(opts);
     }, function(err) {
-      if (err instanceof Error) {
+      if (err instanceof mqlight.InvalidArgumentError) {
         return true;
       }
     }, 'invalid URI test (' + i + '): ' + invalidUris[i]);

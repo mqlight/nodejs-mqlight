@@ -39,7 +39,7 @@ module.exports.test_subscribe_too_few_arguments = function(test) {
   client.on('started', function() {
     test.throws(function() {
       client.subscribe();
-    });
+    }, TypeError);
     client.stop();
     test.done();
   });
@@ -75,7 +75,7 @@ module.exports.test_subscribe_callback_must_be_function = function(test) {
   client.on('started', function() {
     test.throws(function() {
       client.subscribe('/foo1', 'share', {}, 7);
-    });
+    }, TypeError);
     test.doesNotThrow(function() {
       client.subscribe('/foo2', function() {});
     });
@@ -260,9 +260,9 @@ module.exports.test_subscribe_when_stopped = function(test) {
     client.stop(function() {
       test.throws(function() {
         client.subscribe('/foo');
-      }, Error);
+      }, mqlight.StoppedError);
       test.done();
-    })
+    });
   });
 };
 
@@ -345,7 +345,7 @@ module.exports.test_subscribe_share_names = function(test) {
       } else {
         test.throws(function() {
           client.subscribe('/foo', data[i].share);
-        }, Error, i);
+        }, mqlight.InvalidArgumentError, i);
       }
     }
     client.stop(function() {
@@ -626,7 +626,7 @@ module.exports.test_subscribe_credit_values = function(test) {
     for (var i = 0; i < data.length; ++i) {
       if (data[i].expected !== undefined) {
         test.doesNotThrow(function() {
-          client.subscribe('testpattern' + i, 
+          client.subscribe('testpattern' + i,
                            data[i].credit !== undefined ? data[i] : {});
         }, undefined, 'test data index: ' + i);
         test.deepEqual(subscribedCredit, data[i].expected,
@@ -635,7 +635,7 @@ module.exports.test_subscribe_credit_values = function(test) {
       } else {
         test.throws(function() {
           client.subscribe('testpattern', data[i]);
-        }, undefined, 'test data index: ' + i);
+        }, RangeError, 'test data index: ' + i);
       }
     }
     mqlight.proton.messenger.subscribe = savedSubscribe;
