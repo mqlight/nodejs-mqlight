@@ -35,8 +35,8 @@ subscribing client.
      can have before the server will stop sending new messages to the client
      and require that it confirms some of the outstanding message deliveries in
      order to receive more messages.  The default for this property is 1024. If
-     specified the value will be coerced to a `Number` and must be finite and
-     >= 0, otherwise a `RangeError` will be thrown. 
+     specified the value will be coerced to a `Number` and must be finite
+     and >= 0, otherwise a `RangeError` will be thrown.
   *  **qos**, (Number) The quality of service to use for delivering messages to
      the subscription.  Valid values are: 0 to denote at most once (the
      default), and 1 for at least once. A `RangeError` will be thrown for other
@@ -59,7 +59,7 @@ subscribing client.
   *  **error**, (Error) an error object if the callback is being invoked to
      indicate that the subscribe call failed. If the subscribe call completes
      successfully then the value `null` is supplied for this argument.
-  *  **topicPattern**, (String) the `topicPattern` argument supplied to the 
+  *  **topicPattern**, (String) the `topicPattern` argument supplied to the
      corresponding subscribe method call.
   *  **share**, (String) the `share` argument supplied to the corresponding
      subscribe method call (or `undefined` if this parameter was not specified).
