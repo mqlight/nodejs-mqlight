@@ -921,6 +921,8 @@ var Client = function(service, id, securityOptions) {
     var client = this;
     logger.entry('Client.connect.performConnect', client.id, newClient);
 
+    var err = null;
+
     // If there is no active client (i.e. we've been stopped) then add
     // ourselves back to the active list. Otherwise if there is another
     // active client (that's replaced us) then exit function now
@@ -933,7 +935,7 @@ var Client = function(service, id, securityOptions) {
       logger.log('debug', client.id,
           'Not connecting because client has been replaced');
       if (callback) {
-        var err = new LocalReplacedError(client.id);
+        err = new LocalReplacedError(client.id);
         process.nextTick(function() {
           logger.entry('Client.connect.performConnect.callback', client.id);
           callback.apply(client, [err]);
@@ -992,7 +994,7 @@ var Client = function(service, id, securityOptions) {
 
       // If the messenger is not already stopped then something has gone wrong
       if (client.messenger && !client.messenger.stopped) {
-        var err = new Error('messenger is not stopped');
+        err = new Error('messenger is not stopped');
         logger.ffdc('Client.connect.performConnect', 'ffdc002', client.id, err);
         logger.throw('Client.connect.performConnect', client.id, err);
         throw err;
@@ -1371,7 +1373,7 @@ Client.prototype.start = function(callback) {
   // Check that the id for this instance is not already in use. If it is then
   // we need to stop the active instance before starting
   var previousActiveClient = activeClientList.get(client.id);
-  if (previousActiveClient != undefined && previousActiveClient !== client) {
+  if (previousActiveClient !== undefined && previousActiveClient !== client) {
     logger.log('debug', client.id,
         'stopping previously active client with same client id');
     activeClientList.add(client);
@@ -2264,14 +2266,18 @@ Client.prototype.checkForMessages = function() {
           }
         };
         var linkAddress = protonMsg.linkAddress;
-        if (linkAddress) {          delivery.destination = {};
-        if (linkAddress.indexOf('share:') === 0) {
-            var linkAddressWithoutShare = linkAddress.substring(6,linkAddress.length);
-            delivery.destination.share = linkAddressWithoutShare.substring(0,linkAddressWithoutShare.indexOf(":"));
-            delivery.destination.topicPattern = linkAddressWithoutShare.substring(linkAddressWithoutShare.indexOf(":")+1,linkAddressWithoutShare.length);
-          } else {
-            delivery.destination.topicPattern = linkAddress.substring(linkAddress.indexOf(":")+1,linkAddress.length);
+        if (linkAddress) {
+          delivery.destination = {};
+          var link = linkAddress;
+          if (link.indexOf('share:') === 0) {
+            // remove 'share:' prefix from link name
+            link = link.substring(6, linkAddress.length);
+            // extract share name and add to delivery information
+            delivery.destination.share = link.substring(0, link.indexOf(':'));
           }
+          // extract topicPattern and add to delivery information
+          delivery.destination.topicPattern =
+            link.substring(link.indexOf(':') + 1, link.length);
         }
         if (protonMsg.ttl > 0) {
           delivery.message.ttl = protonMsg.ttl;
