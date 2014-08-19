@@ -43,7 +43,8 @@ var showUsage = function(rc) {
   console.log('Command:');
   console.log('  -e CMD, --eval=CMD    evaluate command CMD');
   console.log('  -f,     --ffdc        cause an FFDC to be generated');
-  console.log('  -l LVL, --log=LVL     set the log level to LVL');
+  console.log('  -l LVL, --level=LVL     set the logging level to LVL');
+  console.log('  -s STREAM --stream=STREAM  set the logger stream to STREAM')
   console.log('');
   process.exit(rc);
 };
@@ -56,9 +57,10 @@ var knownOpts = {
   ffdc: Boolean,
   help: Boolean,
   host: String,
-  log: String,
+  level: String,
   pid: Number,
-  port: Number
+  port: Number,
+  stream: String
 };
 
 /*
@@ -69,9 +71,10 @@ var shortHands = {
   f: ['--ffdc'],
   h: ['--help'],
   i: ['--pid'],
-  l: ['--log'],
+  l: ['--level'],
   n: ['--host'],
-  p: ['--port']
+  p: ['--port'],
+  s: ['--stream']
 };
 
 /*
@@ -94,8 +97,10 @@ if (parsed.eval) {
   command = parsed.eval;
 } else if (parsed.ffdc) {
   command = 'logger.ffdc()';
-} else if (parsed.log) {
-  command = 'logger.setLevel(\'' + parsed.log + '\')';
+} else if (parsed.level) {
+  command = 'logger.setLevel(\'' + parsed.level + '\')';
+} else if (parsed.stream) {
+  command = 'logger.setStream(\'' + parsed.stream + '\')';
 } else {
   logger.log('error', logger.NO_CLIENT_ID, 'No command specified');
   showUsage(1);
