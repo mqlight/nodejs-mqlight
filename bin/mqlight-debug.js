@@ -22,6 +22,7 @@
 var logger = require('../mqlight-log');
 var nopt = require('nopt');
 var debug = require('_debugger');
+var os = require('os');
 
 var port = process.debugPort;
 var host = 'localhost';
@@ -36,9 +37,9 @@ var showUsage = function(rc) {
   console.log('');
   console.log('Options:');
   console.log('  -h, --help            show this help message and exit');
-  console.log('  -i PID, --pid PID     the process identifier to debug');
+  console.log('  -d PORT, --port PORT  the port running the debugger');
   console.log('  -n HOST, --host HOST  the host running the debugger');
-  console.log('  -p PORT, --port PORT  the port running the debugger');
+  console.log('  -p PID, --pid PID     the process identifier to debug');
   console.log('');
   console.log('Command:');
   console.log('  -e CMD, --eval=CMD    evaluate command CMD');
@@ -67,13 +68,13 @@ var knownOpts = {
  * The list of command line option short hands.
  */
 var shortHands = {
+  d: ['--port'],
   e: ['--eval'],
   f: ['--ffdc'],
   h: ['--help'],
-  i: ['--pid'],
   l: ['--level'],
   n: ['--host'],
-  p: ['--port'],
+  p: ['--pid'],
   s: ['--stream']
 };
 
@@ -131,11 +132,17 @@ logger.log('debug', logger.NO_CLIENT_ID, 'port:', port);
  */
 if (parsed.pid) {
   try {
+    if(os.platform() !== 'win32')
+    {
+      /* On Unix use a SIGUSR1 signal to kick start the debugger. */
+      logger.entry('process.kill', logger.NO_CLIENT_ID);
+      process.kill(parsed.pid, 'SIGUSR1');
+      logger.exit('process.kill', logger.NO_CLIENT_ID, null);
+    }
+
     logger.entry('process._debugProcess', logger.NO_CLIENT_ID);
     logger.log('parms', logger.NO_CLIENT_ID, 'parsed.pid:', parsed.pid);
-
     process._debugProcess(parsed.pid);
-
     logger.exit('process._debugProcess', logger.NO_CLIENT_ID, null);
   } catch (err) {
     logger.log('error', logger.NO_CLIENT_ID, err);
