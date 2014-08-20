@@ -2277,7 +2277,7 @@ Client.prototype.checkForMessages = function() {
           }
           // extract topicPattern and add to delivery information
           delivery.destination.topicPattern =
-            link.substring(link.indexOf(':') + 1, link.length);
+              link.substring(link.indexOf(':') + 1, link.length);
         }
         if (protonMsg.ttl > 0) {
           delivery.message.ttl = protonMsg.ttl;
