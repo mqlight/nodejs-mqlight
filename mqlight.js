@@ -1489,7 +1489,7 @@ Client.prototype.stop = function(callback) {
 
         // clear queuedSends as we are disconnecting
         while (client.queuedSends.length > 0) {
-          var msg = client.queuedSends.pop();
+          var msg = client.queuedSends.shift();
           // call the callback in error as we have disconnected
           process.nextTick(function() {
             logger.entry('Client.stop.performDisconnect.' +
@@ -1503,7 +1503,7 @@ Client.prototype.stop = function(callback) {
         logger.log('data', client.id, 'client.subscriptions:',
                    client.subscriptions);
         while (client.subscriptions.length > 0) {
-          client.subscriptions.pop();
+          client.subscriptions.shift();
         }
 
         // Indicate that we've disconnected
@@ -1611,11 +1611,11 @@ var reconnect = function(client) {
     logger.log('data', client.id, 'client.subscriptions:',
                client.subscriptions);
     while (client.subscriptions.length > 0) {
-      client.queuedSubscriptions.push(client.subscriptions.pop());
+      client.queuedSubscriptions.push(client.subscriptions.shift());
     }
     // also clear any left over outstanding sends
     while (client.outstandingSends.length > 0) {
-      client.outstandingSends.pop();
+      client.outstandingSends.shift();
     }
     client.performConnect.apply(client, [processQueuedActions, false]);
 
@@ -1658,7 +1658,7 @@ var processQueuedActions = function(err) {
                client.queuedSubscriptions);
     while (client.queuedSubscriptions.length > 0 &&
             client.state === STATE_STARTED) {
-      var sub = client.queuedSubscriptions.pop();
+      var sub = client.queuedSubscriptions.shift();
       if (sub.noop) {
         // no-op, so just trigger the callback without actually subscribing
         if (sub.callback) {
@@ -1680,7 +1680,7 @@ var processQueuedActions = function(err) {
                client.queuedUnsubscribes);
     while (client.queuedUnsubscribes.length > 0 &&
             client.state === STATE_STARTED) {
-      var rm = client.queuedUnsubscribes.pop();
+      var rm = client.queuedUnsubscribes.shift();
       if (rm.noop) {
         // no-op, so just trigger the callback without actually unsubscribing
         if (rm.callback) {
@@ -1694,7 +1694,7 @@ var processQueuedActions = function(err) {
                client.queuedSends);
     while (client.queuedSends.length > 0 &&
             client.state === STATE_STARTED) {
-      var msg = client.queuedSends.pop();
+      var msg = client.queuedSends.shift();
       client.send(msg.topic, msg.data, msg.options, msg.callback);
     }
   }

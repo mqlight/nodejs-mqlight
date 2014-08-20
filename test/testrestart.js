@@ -300,7 +300,8 @@ module.exports.test_single_queued_send = function(test) {
 
 /**
  * Test that when in a retrying state that any attempted
- * sends are queued and then go through following a restart event.
+ * sends are queued and then go through following a restart event
+ * in the expected order.
  *
  * @param {object} test the unittest interface.
  */
@@ -310,40 +311,44 @@ module.exports.test_queue_sends_retrying = function(test) {
         'amqp://host'});
   var callbacksCalled = 0;
   var callbacksCalledInError = 0;
+  var sentMessages = [];
 
   client.on('stopped', function() {
-    test.equal(client.queuedSends.length, 0, 'queued sends drained');
-    test.equal(callbacksCalled, 3, '3 callbacks called with success');
-    test.equal(callbacksCalledInError, 0, '0 callback in error');
+    test.equal(client.queuedSends.length, 0, 'expected empty queued sends');
+    test.equal(callbacksCalled, 4, 'expected 4 callbacks called with success');
+    test.equal(callbacksCalledInError, 0, 'expected 0 callbacks in error');
+    test.equal(sentMessages.length, 4, 'expected 4 successfully sent messages');
+    for (var i = 0; i < sentMessages.length; i++) {
+      test.equal(sentMessages[i], 'message ' + i, 'message sent out of order');
+    }
     test.done();
   });
 
   client.start(function(err) {
     stubproton.setConnectStatus(1);
     mqlight.reconnect(client);
-    // these 3 sends should get queued
-    for ( var i = 0; i < 3; i++ ) {
-      client.send('topic ' + i, 'message ' + i , function(err) {
-        if (err){
+    // these 4 sends should get queued
+    for ( var i = 0; i < 4; i++ ) {
+      client.send('topic ' + i, 'message ' + i , function(err, topic, body) {
+        if (err) {
           callbacksCalledInError++;
           process.nextTick(function() {
             client.stop();
           });
         } else {
           callbacksCalled++;
+          sentMessages.push(body);
           process.nextTick(function() {
-            if (callbacksCalled >= 3) {
+            if (callbacksCalled >= 4) {
               client.stop();
             }
           });
         }
       });
     }
-    test.equal(client.queuedSends.length, 3, 'Expected 3 queued ' +
+    test.equal(client.queuedSends.length, 4, 'Expected 4 queued ' +
                'sends. Found: ' + util.inspect(client.queuedSends));
     stubproton.setConnectStatus(0);
-    mqlight.reconnect(client);
-    mqlight.reconnect(client);
     mqlight.reconnect(client);
   });
 };
