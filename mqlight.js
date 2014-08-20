@@ -2213,9 +2213,6 @@ Client.prototype.checkForMessages = function() {
 
         var delivery = {
           message: {
-            properties: {
-              contentType: protonMsg.contentType
-            },
             topic: topic,
             confirmDelivery: autoConfirm ? function() {
               logger.entry('message.confirmDelivery.auto', this.id);

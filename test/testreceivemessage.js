@@ -123,9 +123,6 @@ module.exports.test_receive_topic_pattern = function(test) {
     test.deepEqual(data, 'Hello World!');
     test.ok(delivery.message !== undefined,
             "delivery object should have 'message' property");
-    test.ok(delivery.message.properties !== undefined,
-            "message object should have 'properties' property");
-    test.deepEqual(delivery.message.properties.contentType, 'text/plain');
     test.deepEqual(delivery.message.topic, '/kittens/boots');
     test.ok(delivery.destination !== undefined,
             "delivery object should have 'destination' property");
@@ -246,9 +243,6 @@ module.exports.test_malformed_message = function(test) {
     test.deepEqual(data, 'Hello World!');
     test.ok(delivery.message !== undefined,
             "delivery object should have 'message' property");
-    test.ok(delivery.message.properties !== undefined,
-            "message object should have 'properties' property");
-    test.deepEqual(delivery.message.properties.contentType, 'text/plain');
     test.deepEqual(delivery.message.topic, '/kittens/fang');
     test.ok(delivery.destination !== undefined,
             "delivery object should have 'destination' property");
