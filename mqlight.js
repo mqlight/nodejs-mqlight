@@ -2213,55 +2213,55 @@ Client.prototype.checkForMessages = function() {
 
         var delivery = {
           message: {
-            topic: topic,
-            confirmDelivery: autoConfirm ? function() {
-              logger.entry('message.confirmDelivery.auto', this.id);
-              logger.log('data', this.id, 'delivery:', delivery);
-              logger.exit('message.confirmDelivery.auto', this.id, null);
-            } : function() {
-              logger.entry('message.confirmDelivery', this.id);
-              logger.log('data', this.id, 'delivery:', delivery);
-              if (client.isStopped()) {
-                err = new NetworkError('not started');
+            topic: topic
+          }
+        };
+
+        if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
+          delivery.message.confirmDelivery = function() {
+            logger.entry('message.confirmDelivery', this.id);
+            logger.log('data', this.id, 'delivery:', delivery);
+            if (client.isStopped()) {
+              err = new NetworkError('not started');
+              logger.throw('message.confirmDelivery', this.id, err);
+              throw err;
+            }
+            if (protonMsg) {
+              // also throw NetworkError if the client has
+              // disconnected at some point since this particular message was
+              // received
+              if (protonMsg.connectionId !== client._connectionId) {
+                err = new NetworkError('client has reconnected since this ' +
+                                       'message was received');
                 logger.throw('message.confirmDelivery', this.id, err);
                 throw err;
               }
-              if (protonMsg) {
-                // also throw NetworkError if the client has
-                // disconnected at some point since this particular message was
-                // received
-                if (protonMsg.connectionId !== client._connectionId) {
-                  err = new NetworkError('client has reconnected since this ' +
-                                         'message was received');
-                  logger.throw('message.confirmDelivery', this.id, err);
-                  throw err;
-                }
-                var subscription = matchedSubs[0];
-                messenger.settle(protonMsg);
-                --subscription.unconfirmed;
-                ++subscription.confirmed;
-                logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
-                           '[' + subscription.credit + ',' +
-                           subscription.unconfirmed + ',' +
-                           subscription.confirmed + ']');
-                // Ask to flow more messages if >= 80% of available credit
-                // (e.g. not including unconfirmed messages) has been used.
-                // Or we have just confirmed everything.
-                var available = subscription.credit - subscription.unconfirmed;
-                if ((available / subscription.confirmed) <= 1.25 ||
-                    (subscription.unconfirmed === 0 &&
-                     subscription.confirmed > 0)) {
-                  messenger.flow(client.service + '/' + protonMsg.linkAddress,
-                                 subscription.confirmed);
-                  subscription.confirmed = 0;
-                }
-                protonMsg.destroy();
-                protonMsg = null;
+              var subscription = matchedSubs[0];
+              messenger.settle(protonMsg);
+              --subscription.unconfirmed;
+              ++subscription.confirmed;
+              logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
+                         '[' + subscription.credit + ',' +
+                         subscription.unconfirmed + ',' +
+                         subscription.confirmed + ']');
+              // Ask to flow more messages if >= 80% of available credit
+              // (e.g. not including unconfirmed messages) has been used.
+              // Or we have just confirmed everything.
+              var available = subscription.credit - subscription.unconfirmed;
+              if ((available / subscription.confirmed) <= 1.25 ||
+                  (subscription.unconfirmed === 0 &&
+                   subscription.confirmed > 0)) {
+                messenger.flow(client.service + '/' + protonMsg.linkAddress,
+                               subscription.confirmed);
+                subscription.confirmed = 0;
               }
-              logger.exit('message.confirmDelivery', this.id, null);
+              protonMsg.destroy();
+              protonMsg = null;
             }
-          }
-        };
+            logger.exit('message.confirmDelivery', this.id, null);
+          };
+        }
+
         var linkAddress = protonMsg.linkAddress;
         if (linkAddress) {
           delivery.destination = {};

@@ -128,8 +128,10 @@ module.exports.test_receive_topic_pattern = function(test) {
             "delivery object should have 'destination' property");
     test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
 
-    // Ensure that the confirmDelivery() method is available to be called
-    delivery.message.confirmDelivery();
+    // Since the defaults for subscribe are qos:0 and autoConfirm:true
+    // check that there is no confirmDelivery method
+    test.ok(delivery.message.confirmDelivery == undefined,
+            'confirmDelivery() method should not be present');
 
     test.done();
     client.stop();
@@ -501,6 +503,8 @@ module.exports.test_subscribe_credit_confirm = function(test) {
       test.ok(deliveryArray.length, maxCredit);
       while(deliveryArray.length > 0) {
         var delivery = deliveryArray.pop();
+        test.ok(delivery.message.confirmDelivery !== undefined,
+                'confirmDelivery method should be present');
         delivery.message.confirmDelivery();
       }
 
@@ -557,3 +561,72 @@ module.exports.test_client_replaced = function(test) {
   });
 };
 
+
+/**
+ * Tests that the confirmDelivery() method is passed to the 'message' event when
+ * a message is received as a result of subscribing using 
+ * {qos: 1, autoConfirm: false} options on the client.subscribe() method
+ * <p>
+ * Also check that the confirmDelivery() method is not passed to the 'message'
+ * event when the delivery cannot be confirmed (e.g. qos: 0 OR 
+ * autoConfirm: true).
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_presence_of_confirmDelivery_method = function(test) {
+  var testData = [
+    {options: undefined, methodPresent: false},
+    {options: {autoConfirm: false}, methodPresent: false},
+    {options: {autoConfirm: true}, methodPresent: false},
+    {options: {qos: 0}, methodPresent: false},
+    {options: {qos: 1}, methodPresent: false},
+    {options: {qos: 0, autoConfirm: true}, methodPresent: false},
+    {options: {qos: 0, autoConfirm: false}, methodPresent: false},
+    {options: {qos: 1, autoConfirm: false}, methodPresent: true},
+    {options: {qos: 1, autoConfirm: true}, methodPresent: false}
+  ];
+
+  var testCase = 0;
+  var originalReceiveMethod = mqlight.proton.messenger.receive;
+  var messages = [];
+  mqlight.proton.messenger.receive = function() {
+    var result = messages;
+    messages = [];
+    return result;
+  };
+
+  var client = mqlight.createClient({service: 'amqp://host'}, function() {
+    client.subscribe('/kittens/#', testData[testCase].options);
+    messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
+  });
+
+  client.on('message', function(data, delivery) {
+    if (testData[testCase].methodPresent) {
+      test.ok(delivery.message.confirmDelivery !== undefined,
+              'confirmDelivery() should be present - test case #'+testCase);
+      delivery.message.confirmDelivery();
+    } else {
+      test.ok(delivery.message.confirmDelivery == undefined,
+              'confirmDelivery() should not be present - test case #'+testCase);
+    }
+    client.unsubscribe('/kittens/#');
+    ++testCase;
+    if (testCase < testData.length) {
+      client.subscribe('/kittens/#', testData[testCase].options);
+      messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
+    } else {
+      test.done();
+      client.stop();
+      mqlight.proton.messenger.receive = originalReceiveMethod;
+    }
+  });
+
+  client.on('malformed', function() {
+    test.ok(false, 'malformed event should not be emitted');
+  });
+
+  client.on('error', function(err) {
+    console.log(err, 'error event should not be emitted');
+    test.ok(false);
+  });
+};
