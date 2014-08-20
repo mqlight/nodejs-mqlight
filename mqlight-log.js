@@ -2,12 +2,12 @@
 /*
  * <copyright
  * notice="lm-source-program"
- * pids="5755-P60"
+ * pids="5725-P60"
  * years="2014"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
- * 5755-P60
+ * 5725-P60
  *
  * (C) Copyright IBM Corp. 2014
  *

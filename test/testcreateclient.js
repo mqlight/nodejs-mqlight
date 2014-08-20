@@ -2,12 +2,12 @@
 /*
  * <copyright
  * notice="lm-source-program"
- * pids="5755-P60"
+ * pids="5725-P60"
  * years="2013,2014"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
- * 5755-P60
+ * 5725-P60
  *
  * (C) Copyright IBM Corp. 2014
  *
@@ -513,7 +513,7 @@ module.exports.test_createClient_multiple_with_same_id = function(test) {
   var optsB = { service: 'amqp://localhost', id: 'Bname' };
 
   var clientA = mqlight.createClient(optsA);
-  clientA.on('started', function(err) {  
+  clientA.on('started', function(err) {
     var clientB1 = mqlight.createClient(optsB);
     var clientB1Stopped = false;
     clientB1.on('stopped', function(err) {
@@ -532,13 +532,13 @@ module.exports.test_createClient_multiple_with_same_id = function(test) {
         test.equal('started', clientA.state);
         test.equal('stopped', clientB1.state);
         test.equal('started', clientB2.state);
-        
+
         clientB1.start(function(err) {
           test.equal(undefined, err);
           test.equal('started', clientA.state);
           test.equal('started', clientB1.state);
           test.equal('stopped', clientB2.state);
-          
+
           clientA.stop(function() {
             clientB1.stop(function() {
               test.done();

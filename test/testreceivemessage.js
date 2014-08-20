@@ -2,12 +2,12 @@
 /*
  * <copyright
  * notice="lm-source-program"
- * pids="5755-P60"
+ * pids="5725-P60"
  * years="2013,2014"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
- * 5755-P60
+ * 5725-P60
  *
  * (C) Copyright IBM Corp. 2014
  *
@@ -157,7 +157,7 @@ module.exports.test_receive_topic_pattern = function(test) {
  */
 module.exports.test_bad_listener = function(test) {
   var originalReceiveMethod = mqlight.proton.messenger.receive;
-  var messages = [testMessage('/public', '/public'), 
+  var messages = [testMessage('/public', '/public'),
                   testMessage('/public', '/public')];
   mqlight.proton.messenger.receive = function() {
     var result = messages;
@@ -290,7 +290,7 @@ module.exports.test_receive_ttl = function(test) {
     result.ttl = ttl;
     return result;
   };
-  var messages = [testMessageWithTtl('/public', '/public', 0), 
+  var messages = [testMessageWithTtl('/public', '/public', 0),
                   testMessageWithTtl('/public', '/public', 1000),
                   testMessageWithTtl('/public', '/public', Number.MAX_VALUE)
                  ];
@@ -325,7 +325,7 @@ module.exports.test_receive_ttl = function(test) {
  * Parametrises a test case for checking that the credit value supplied
  * on a client.subscribe(...) call does not cause the client to stall
  * due to a logic error in when new messages are requested.
- *  
+ *
  * @param {object} test - the unittest interface
  * @param {Number} credit - the credit value to supply to client.subscribe(...)
  * @param {Number} qos - the qos level to use for the test
@@ -335,7 +335,7 @@ function run_receiver_credit_testcase(test, credit, qos, numMessages) {
 
   var savedReceiveMethod = mqlight.proton.messenger.receive;
   var savedFlowMethod = mqlight.proton.messenger.flow;
-  
+
   var maxCredit = credit;
   var currentCredit = maxCredit;
   mqlight.proton.messenger.receive = function() {
@@ -349,16 +349,16 @@ function run_receiver_credit_testcase(test, credit, qos, numMessages) {
   };
   mqlight.proton.messenger.flow = function(linkAddress, credit) {
     currentCredit += credit;
-    test.ok(currentCredit <= maxCredit, 
+    test.ok(currentCredit <= maxCredit,
             'maximum credit for link should never be exceeded');
   };
-  
+
   var client = mqlight.createClient({service: 'amqp://host'});
 
   client.start(function(err) {
     var receiveCount = 0;
     test.ifError(err);
-    
+
     client.on('message', function(data, delivery) {
       if (++receiveCount >= numMessages) {
         client.stop();
@@ -367,7 +367,7 @@ function run_receiver_credit_testcase(test, credit, qos, numMessages) {
         test.done();
       }
     });
-    
+
     client.subscribe('/kittens/#', {qos: qos, credit: maxCredit});
   });
 
@@ -384,7 +384,7 @@ function run_receiver_credit_testcase(test, credit, qos, numMessages) {
 /**
  * Tests that a qos 0 subscription with a modest amount of credit
  * does not stall due to a problem requesting more credit.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit10_qos0 = function(test) {
@@ -395,7 +395,7 @@ module.exports.test_subscribe_credit10_qos0 = function(test) {
 /**
  * Tests that a qos 0 subscription with a large amount of credit
  * does not stall due to a problem requesting more credit.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit5000_qos0 = function(test) {
@@ -406,7 +406,7 @@ module.exports.test_subscribe_credit5000_qos0 = function(test) {
 /**
  * Tests that a qos 0 subscription with the smallest amount of credit
  * does not stall due to a problem requesting more credit.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit1_qos0 = function(test) {
@@ -417,7 +417,7 @@ module.exports.test_subscribe_credit1_qos0 = function(test) {
 /**
  * Tests that a qos 1 subscription with a modest amount of credit
  * does not stall due to a problem requesting more credit.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit10_qos1 = function(test) {
@@ -428,7 +428,7 @@ module.exports.test_subscribe_credit10_qos1 = function(test) {
 /**
  * Tests that a qos 1 subscription with a large amount of credit
  * does not stall due to a problem requesting more credit.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit5000_qos1 = function(test) {
@@ -439,7 +439,7 @@ module.exports.test_subscribe_credit5000_qos1 = function(test) {
 /**
  * Tests that a qos 1 subscription with the smallest amount of credit
  * does not stall due to a problem requesting more credit.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit1_qos1 = function(test) {
@@ -451,13 +451,13 @@ module.exports.test_subscribe_credit1_qos1 = function(test) {
  * Tests that a qos 1 subscription using manual message confirmation does
  * not stall due to a problem requesting more credit.  The test sets a small
  * credit limit when subscribing and receives / confirms messages in batches.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit_confirm = function(test) {
   var savedReceiveMethod = mqlight.proton.messenger.receive;
   var savedFlowMethod = mqlight.proton.messenger.flow;
-  
+
   var maxCredit = 10;
   var currentCredit = maxCredit;
   mqlight.proton.messenger.receive = function() {
@@ -470,13 +470,13 @@ module.exports.test_subscribe_credit_confirm = function(test) {
     }
   };
   mqlight.proton.messenger.flow = function(linkAddress, credit) {
-    test.ok((currentCredit + credit) <= maxCredit, 
+    test.ok((currentCredit + credit) <= maxCredit,
             'maximum credit for link should never be exceeded,'+
             ' current: ' + currentCredit + ' flowed: ' + credit +
             ' max: ' + maxCredit);
     currentCredit += credit;
   };
-  
+
   var client = mqlight.createClient({service: 'amqp://host'});
   var deliveryArray = [];
   var interval = null;
@@ -485,7 +485,7 @@ module.exports.test_subscribe_credit_confirm = function(test) {
   client.start(function(err) {
     var receiveCount = 0;
     test.ifError(err);
-    
+
     client.on('message', function(data, delivery) {
       deliveryArray.push(delivery);
       if (++receiveCount >= 50) {
@@ -497,10 +497,10 @@ module.exports.test_subscribe_credit_confirm = function(test) {
         test.done();
       }
     });
-    
-    client.subscribe('/kittens/#', 
+
+    client.subscribe('/kittens/#',
                      {qos: 1, credit: maxCredit, autoConfirm: false});
-    
+
 
     interval = setInterval(function() {
       ++confirmBatch;
@@ -509,7 +509,7 @@ module.exports.test_subscribe_credit_confirm = function(test) {
         var delivery = deliveryArray.pop();
         delivery.message.confirmDelivery();
       }
-      
+
     }, 250);
   });
 

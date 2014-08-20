@@ -2,12 +2,12 @@
 /*
  * <copyright
  * notice="lm-source-program"
- * pids="5755-P60"
+ * pids="5725-P60"
  * years="2013,2014"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
- * 5755-P60
+ * 5725-P60
  *
  * (C) Copyright IBM Corp. 2014
  *
@@ -586,7 +586,7 @@ module.exports.test_subscribe_ttl_rounding = function(test) {
  * Tests that passing a variety of credit values to the subscribe method
  * results in invalid values being rejected and valid values being passed
  * through to the Proton Messenger mock.
- * 
+ *
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit_values = function(test) {

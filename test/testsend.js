@@ -2,12 +2,12 @@
 /*
  * <copyright
  * notice="lm-source-program"
- * pids="5755-P60"
+ * pids="5725-P60"
  * years="2013,2014"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
- * 5755-P60
+ * 5725-P60
  *
  * (C) Copyright IBM Corp. 2014
  *
@@ -552,7 +552,7 @@ module.exports.test_message_rejected = function(test) {
     return rejectErrorMessage;
   };
   var client = mqlight.createClient({
-    id: 'test_message_rejected', 
+    id: 'test_message_rejected',
     service: 'amqp://host'});
 
   client.on('started', function() {
@@ -580,7 +580,7 @@ module.exports.test_message_rejected = function(test) {
 
 /**
  * This is a simple test to confirm that a client that attempts to send, but
- * which has been replaced by another client with the same id, gets the 
+ * which has been replaced by another client with the same id, gets the
  * ReplacedError
  *
  * @param {object} test the unittest interface
