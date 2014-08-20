@@ -11,7 +11,9 @@ client's subscriptions.
     *  **topic**, (Object) the topic that the message was sent to.
     *  **confirmDelivery**, (Function) A method that can be used to confirm
        (settle) the delivery of a at least once quality of service (qos:1)
-       message. This method does not expect any arguments.
+       message. This method does not expect any arguments. This property will
+       only be present if the message was delivered due to a subscribe call
+       that specified both `qos: 1` and `autoConfirm: false` options.
     *  **ttl**, (Number) the remaining time to live period for this message in
        milliseconds. This is calculated by subtracting the time the message
        spends at an MQ Light destination from the time to live value specified
