@@ -136,7 +136,7 @@ module.exports.test_subscribe_parameters = function(test) {
     if (data[i].callback) ++expectedCallbackInvocations;
   }
 
-  // Replace the messeneger subscribe method with our own implementation
+  // Replace the messenger subscribe method with our own implementation
   // that simply records the address that mqlight.js tries to subscribe to.
   var lastSubscribedAddress;
   var savedSubscribe = mqlight.proton.messenger.subscribe;
@@ -215,7 +215,7 @@ module.exports.test_subscribe_fail_callback = function(test) {
     service: 'amqp://host'});
   var count = 0;
 
-  // Replace the messeneger subscribe method with our own implementation.
+  // Replace the messenger subscribe method with our own implementation.
   var savedSubscribe = mqlight.proton.messenger.subscribe;
   mqlight.proton.messenger.subscribe = function(address) {
     throw new TypeError('topic space on fire');
@@ -609,7 +609,7 @@ module.exports.test_subscribe_credit_values = function(test) {
     {credit: '1', expected: 1},
     {credit: '-1'},
     {credit: "Credit is a system whereby a person who can't pay, gets " +
-          "another person who can't pay to guarentee that he can pay"},
+          "another person who can't pay to guarantee that he can pay"},
     {credit: function() {}},
     {credit: true, expected: 1},
     {credit: false, expected: 0}
