@@ -934,6 +934,7 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
         "NetworkError", "Not connected", "ProtonMessenger::Settle", name);
   }
 
+  pn_delivery_t* d = pn_messenger_delivery(obj->messenger, msg->tracker);
   int status = pn_messenger_settle(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
@@ -942,6 +943,39 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
   } else if (status != 0) {
     THROW_NAMED_EXCEPTION(
         "NetworkError", "Failed to settle", "ProtonMessenger::Settle", name);
+  }
+
+  // XXX: for incoming messages, block for a while until either we believe the
+  // settlement disposition has been communicated over the network, or we're
+  // giving up waiting. We detect that by determining when the delivery tag has
+  // been NULL'ed out.
+  // (as per other comments, ideally we should wrap this in a callback...)
+  if (d != NULL) {
+    pn_link_t* link = pn_delivery_link(d);
+    Proton::Entry("pn_link_is_receiver", name);
+    if (pn_link_is_receiver(link)) {
+      Proton::Exit("pn_link_is_receiver", name, true);
+      for (int i = 0; pn_delivery_tag(d).size > 0 && i < 10; i++) {
+        Proton::Entry("pn_messenger_work", name);
+        pn_messenger_work(obj->messenger, 50);
+        int error = pn_messenger_errno(obj->messenger);
+        Proton::Exit("pn_messenger_work", name, error);
+        if (error) {
+          const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+          const char* err = GetErrorName(text);
+          THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Settle", name)
+        }
+      }
+      // set result to false if settlement
+      if (pn_delivery_tag(d).size != 0) {
+        THROW_EXCEPTION_TYPE(Exception::Error,
+                             "unable to communicate settlement within timeout",
+                             "ProtonMessenger::Settle",
+                             name)
+      }
+    } else {
+      Proton::Exit("pn_link_is_receiver", name, false);
+    }
   }
 
   Proton::Exit("ProtonMessenger::Settle", name, true);
