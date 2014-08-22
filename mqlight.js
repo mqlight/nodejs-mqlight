@@ -995,7 +995,7 @@ var Client = function(service, id, securityOptions) {
       // If the messenger is not already stopped then something has gone wrong
       if (client.messenger && !client.messenger.stopped) {
         err = new Error('messenger is not stopped');
-        logger.ffdc('Client.connect.performConnect', 'ffdc002', client.id, err);
+        logger.ffdc('Client.connect.performConnect', 'ffdc001', client.id, err);
         logger.throw('Client.connect.performConnect', client.id, err);
         throw err;
       }
@@ -1137,7 +1137,7 @@ var Client = function(service, id, securityOptions) {
           // called in an invalid way, so FFDC
           error = err;
           logger.caught('Client.connectToService', client.id, err);
-          logger.ffdc('Client.connectToService', 'ffdc001', client.id, err);
+          logger.ffdc('Client.connectToService', 'ffdc002', client.id, err);
           logger.throw('Client.connectToService', client.id, err);
           throw err;
         }
@@ -2194,12 +2194,19 @@ Client.prototype.checkForMessages = function() {
           }
         });
         // should only ever be one entry in matchedSubs
-        if (typeof matchedSubs[0] !== 'undefined') {
-          qos = matchedSubs[0].qos;
+        if (matchedSubs.length > 1) {
+          err = new Error('received message matched more than one ' +
+                          'subscription');
+          logger.ffdc('Client.connect.performConnect', 'ffdc003', client.id,
+                      err);
+        }
+        var subscription = matchedSubs[0];
+        if (typeof subscription !== 'undefined') {
+          qos = subscription.qos;
           if (qos === exports.QOS_AT_LEAST_ONCE) {
-            autoConfirm = matchedSubs[0].autoConfirm;
+            autoConfirm = subscription.autoConfirm;
           }
-          ++matchedSubs[0].unconfirmed;
+          ++subscription.unconfirmed;
         } else {
           // ideally we shouldn't get here, but it can happen in a timing
           // window if we had received a message from a subscription we've
@@ -2236,7 +2243,6 @@ Client.prototype.checkForMessages = function() {
                 logger.throw('message.confirmDelivery', this.id, err);
                 throw err;
               }
-              var subscription = matchedSubs[0];
               messenger.settle(protonMsg);
               --subscription.unconfirmed;
               ++subscription.confirmed;
@@ -2337,22 +2343,22 @@ Client.prototype.checkForMessages = function() {
           }
           if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
             messenger.settle(protonMsg);
-            --matchedSubs[0].unconfirmed;
-            ++matchedSubs[0].confirmed;
+            --subscription.unconfirmed;
+            ++subscription.confirmed;
             logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
-                       '[' + matchedSubs[0].credit + ',' +
-                       matchedSubs[0].unconfirmed + ',' +
-                       matchedSubs[0].confirmed + ']');
+                       '[' + subscription.credit + ',' +
+                       subscription.unconfirmed + ',' +
+                       subscription.confirmed + ']');
             // Ask to flow more messages if >= 80% of available credit
             // (e.g. not including unconfirmed messages) has been used.
             // Or we have just confirmed everything.
-            var available = matchedSubs[0].credit - matchedSubs[0].unconfirmed;
-            if ((available / matchedSubs[0].confirmed <= 1.25) ||
-                (matchedSubs[0].unconfirmed === 0 &&
-                 matchedSubs[0].confirmed > 0)) {
+            var available = subscription.credit - subscription.unconfirmed;
+            if ((available / subscription.confirmed <= 1.25) ||
+                (subscription.unconfirmed === 0 &&
+                 subscription.confirmed > 0)) {
               messenger.flow(client.service + '/' + protonMsg.linkAddress,
-                             matchedSubs[0].confirmed);
-              matchedSubs[0].confirmed = 0;
+                             subscription.confirmed);
+              subscription.confirmed = 0;
             }
             protonMsg.destroy();
           }
