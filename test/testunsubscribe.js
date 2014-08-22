@@ -338,7 +338,7 @@ module.exports.test_unsubscribe_share_names = function(test) {
   var data = [{valid: true, share: 'abc'},
               {valid: true, share: 7},
               {valid: false, share: ':'},
-              {vaild: false, share: 'a:'},
+              {valid: false, share: 'a:'},
               {valid: false, share: ':a'}];
 
   var client = mqlight.createClient({
