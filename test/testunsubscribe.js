@@ -150,7 +150,7 @@ module.exports.test_unsubscribe_parameters = function(test) {
     if (data[i].callback) ++expectedCallbackInvocations;
   }
 
-  // Replace the messeneger unsubscribe method with our own implementation
+  // Replace the messenger unsubscribe method with our own implementation
   // that simply records the address that mqlight.js tries to unsubscribe from.
   var lastUnsubscribedAddress;
   var savedUnsubscribe = mqlight.proton.messenger.unsubscribe;
