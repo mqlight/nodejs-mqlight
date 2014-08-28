@@ -261,18 +261,7 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
         "NetworkError", "Not connected", "ProtonMessenger::Put", name)
   }
 
-  /* Set the required QoS, by setting the sender settler mode to settled (QoS =
-   * AMO) or unsettled (QoS = ALO).
-   * Note that the receiver settler mode is always set to first, as the MQ Light
-   * listener will negotiate down any receiver settler mode to first.
-   */
-  if (qos == 0) {
-    pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
-    pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
-  } else if (qos == 1) {
-    pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
-    pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
-  } else {
+  if (qos != 0 && qos != 1) {
     THROW_EXCEPTION_TYPE(Exception::RangeError,
                          "qos argument is invalid must evaluate to 0 or 1",
                          "ProtonMessenger::Put",
@@ -283,10 +272,10 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
    * XXX: for now, we're using the simplified messenger api, but long term we
    * may need to use the underlying engine directly here, or modify proton
    */
-  Proton::Entry("pn_messenger_put", name);
-  pn_messenger_put(obj->messenger, msg->message);
+  Proton::Entry("pn_messenger_put2", name);
+  pn_messenger_put2(obj->messenger, msg->message, qos == 0);
   int error = pn_messenger_errno(obj->messenger);
-  Proton::Exit("pn_messenger_put", name, error);
+  Proton::Exit("pn_messenger_put2", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
     const char* err = GetErrorName(text);

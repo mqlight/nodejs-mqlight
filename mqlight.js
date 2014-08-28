@@ -1944,33 +1944,37 @@ Client.prototype.send = function(topic, data, options, callback) {
         var complete = false;
         var err, index;
         if (!messenger.stopped) { // if still connected
-          var status = messenger.status(protonMsg);
-          switch (status) {
-            case PN_STATUS_ACCEPTED:
-            case PN_STATUS_SETTLED:
-              messenger.settle(protonMsg);
-              complete = true;
-              break;
-            case PN_STATUS_REJECTED:
-              complete = true;
-              var rejectMsg = messenger.statusError(protonMsg);
-              if (!rejectMsg || rejectMsg === '') {
-                rejectMsg = 'send failed - message was rejected';
-              }
-              err = new RangeError(rejectMsg);
-              break;
-            case PN_STATUS_RELEASED:
-              complete = true;
-              err = new Error('send failed - message was released');
-              break;
-            case PN_STATUS_MODIFIED:
-              complete = true;
-              err = new Error('send failed - message was modified');
-              break;
-            case PN_STATUS_ABORTED:
-              complete = true;
-              err = new Error('send failed - message was aborted');
-              break;
+          if (qos === exports.QOS_AT_MOST_ONCE) {
+            complete = true;
+          } else {
+            var status = messenger.status(protonMsg);
+            switch (status) {
+              case PN_STATUS_ACCEPTED:
+              case PN_STATUS_SETTLED:
+                messenger.settle(protonMsg);
+                complete = true;
+                break;
+              case PN_STATUS_REJECTED:
+                complete = true;
+                var rejectMsg = messenger.statusError(protonMsg);
+                if (!rejectMsg || rejectMsg === '') {
+                  rejectMsg = 'send failed - message was rejected';
+                }
+                err = new RangeError(rejectMsg);
+                break;
+              case PN_STATUS_RELEASED:
+                complete = true;
+                err = new Error('send failed - message was released');
+                break;
+              case PN_STATUS_MODIFIED:
+                complete = true;
+                err = new Error('send failed - message was modified');
+                break;
+              case PN_STATUS_ABORTED:
+                complete = true;
+                err = new Error('send failed - message was aborted');
+                break;
+            }
           }
 
           // If complete then do final processing of this message.

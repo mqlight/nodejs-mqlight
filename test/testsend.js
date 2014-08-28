@@ -560,11 +560,11 @@ module.exports.test_message_rejected = function(test) {
     test.doesNotThrow(function() {
       // Test that a message being rejected does not affect the operation
       // of client.send(...)
-      client.send('topic', 'data');
+      client.send('topic', 'data', {qos: 0});
 
       // Test that a message being rejected result in the send(...) method's
       // callback being run.
-      client.send('topic', 'data', function(err) {
+      client.send('topic', 'data', {qos: 1}, function(err) {
         test.ok(err);
         test.equals(err.message, rejectErrorMessage);
         test.ok(err.name == 'RangeError');
