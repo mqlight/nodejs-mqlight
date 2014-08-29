@@ -175,6 +175,11 @@ module.exports.createProtonStub = function() {
       flow: function(linkAddress, credit) {
         if (DEBUG) console.log('stub flow function called with link address: ' +
                                linkAddress + ' and credit: ' + credit);
+      },
+      pendingOutbound: function(address) {
+        if (DEBUG) console.log('pendingOutbound function called with address ' +
+                               address);
+        return 0;
       }
     },
 

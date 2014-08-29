@@ -121,6 +121,7 @@ void ProtonMessenger::Init(Handle<Object> target)
       constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
   NODE_SET_PROTOTYPE_METHOD(constructor, "work", Work);
   NODE_SET_PROTOTYPE_METHOD(constructor, "flow", Flow);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "pendingOutbound", PendingOutbound);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
 
@@ -1096,4 +1097,37 @@ Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
 
   Proton::Exit("ProtonMessenger::StatusError", name, description);
   return scope.Close(String::New(description));
+}
+
+Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::PendingOutbound", name);
+
+  // throw exception if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
+      args[0]->IsUndefined() || args[1].IsEmpty()) {
+    THROW_EXCEPTION(
+        "Missing required argument", "ProtonMessenger::PendingOutbound", name);
+  }
+
+  String::Utf8Value param(args[0]->ToString());
+  std::string address = std::string(*param);
+  Proton::Log("parms", name, "address:", address.c_str());
+
+  int result = 0;
+  if (!obj->messenger) {
+    result = -1;  // return -1 if not connected
+  } else {
+    ssize_t pending = 
+      pn_messenger_pending_outbound(obj->messenger, address.c_str());
+    if (pending < 0) result = -1;
+    else if (pending > 0) result = 1;
+  }
+
+  Proton::Exit("ProtonMessenger::PendingOutbound", name, result);
+  return scope.Close(Number::New(result));
 }

@@ -70,6 +70,7 @@ class ProtonMessenger : public node::ObjectWrap
   static v8::Handle<v8::Value> GetRemoteIdleTimeout(const v8::Arguments& args);
   static v8::Handle<v8::Value> Work(const v8::Arguments& args);
   static v8::Handle<v8::Value> Flow(const v8::Arguments& args);
+  static v8::Handle<v8::Value> PendingOutbound(const v8::Arguments& args);
   static void Tracer(pn_transport_t* transport, const char* message);
 
   /**

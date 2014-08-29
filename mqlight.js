@@ -1945,7 +1945,8 @@ Client.prototype.send = function(topic, data, options, callback) {
         var err, index;
         if (!messenger.stopped) { // if still connected
           if (qos === exports.QOS_AT_MOST_ONCE) {
-            complete = true;
+            var address = client.service + '/' + protonMsg.linkAddress;
+            complete = messenger.pendingOutbound(address) <= 0;
           } else {
             var status = messenger.status(protonMsg);
             switch (status) {
