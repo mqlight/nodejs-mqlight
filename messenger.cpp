@@ -122,6 +122,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "work", Work);
   NODE_SET_PROTOTYPE_METHOD(constructor, "flow", Flow);
   NODE_SET_PROTOTYPE_METHOD(constructor, "pendingOutbound", PendingOutbound);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "buffered", Buffered);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
 
@@ -1130,4 +1131,33 @@ Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
 
   Proton::Exit("ProtonMessenger::PendingOutbound", name, result);
   return scope.Close(Number::New(result));
+}
+
+Handle<Value> ProtonMessenger::Buffered(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::Buffered", name);
+
+  // throw exception if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
+      args[0]->IsUndefined()) {
+    THROW_EXCEPTION(
+        "Missing required message argument.", "ProtonMessenger::Buffered", name);
+  }
+
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+
+  // throw exception if not connected
+  if (!obj->messenger) {
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Buffered", name);
+  }
+
+  bool status = pn_messenger_buffered(obj->messenger, msg->tracker);
+
+  Proton::Exit("ProtonMessenger::Buffered", name, status);
+  return scope.Close(Boolean::New(status));
 }

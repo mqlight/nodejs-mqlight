@@ -180,6 +180,11 @@ module.exports.createProtonStub = function() {
         if (DEBUG) console.log('pendingOutbound function called with address ' +
                                address);
         return 0;
+      },
+      buffered: function(message) {
+        if (DEBUG) console.log('buffered function called with message ' +
+                               message);
+        return false;
       }
     },
 
