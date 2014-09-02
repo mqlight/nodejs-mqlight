@@ -1946,14 +1946,6 @@ Client.prototype.send = function(topic, data, options, callback) {
         if (!messenger.stopped) { // if still connected
           var status = messenger.status(protonMsg);
           switch (status) {
-            case PN_STATUS_PENDING:
-              if (qos == exports.QOS_AT_MOST_ONCE) {
-                if (!messenger.buffered(protonMsg)) {
-                  var address = client.service + '/' + protonMsg.linkAddress;
-                  complete = messenger.pendingOutbound(address) <= 0;
-                }
-              }
-              break;
             case PN_STATUS_ACCEPTED:
             case PN_STATUS_SETTLED:
               messenger.settle(protonMsg);
