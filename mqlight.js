@@ -2156,221 +2156,7 @@ Client.prototype.checkForMessages = function() {
       for (var msg = 0, tot = messages.length; msg < tot; msg++) {
         logger.log('debug', client.id, 'processing message %d', msg);
         var protonMsg = messages[msg];
-
-        Object.defineProperty(protonMsg, 'connectionId', {
-          value: client._connectionId
-        });
-
-        // if body is a JSON'ified object, try to parse it back to a js obj
-        var data;
-        if (protonMsg.contentType === 'application/json') {
-          try {
-            data = JSON.parse(protonMsg.body);
-          } catch (_) {
-            logger.caughtLevel('entry_often', 'checkForMessages', client.id, _);
-            console.warn(_);
-          }
-        } else {
-          data = protonMsg.body;
-        }
-
-        var topic =
-            decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
-        var autoConfirm = true;
-        var qos = exports.QOS_AT_MOST_ONCE;
-        var matchedSubs = client.subscriptions.filter(function(el) {
-          // 1 added to length to account for the / we add
-          var addressNoService = el.address.slice(client.service.length + 1);
-          // possible to have 2 matches work out whether this is
-          // for a share or private topic
-          if (typeof el.share === 'undefined' &&
-              protonMsg.linkAddress.indexOf('private:') === 0) {
-            // slice off private: and compare to the no service address
-            var linkNoPrivShare = protonMsg.linkAddress.slice(8);
-            if (addressNoService === linkNoPrivShare) {
-              return el;
-            }
-          } else if (typeof el.share !== 'undefined' &&
-                     protonMsg.linkAddress.indexOf('share:') === 0) {
-            // starting after the share: look for the next : denoting the end
-            // of the share name and get everything past that
-            var linkNoShare = protonMsg.linkAddress.slice(
-                                  protonMsg.linkAddress.indexOf(':', 7) + 1);
-            if (addressNoService === linkNoShare) {
-              return el;
-            }
-          }
-        });
-        // should only ever be one entry in matchedSubs
-        if (matchedSubs.length > 1) {
-          err = new Error('received message matched more than one ' +
-                          'subscription');
-          logger.ffdc('Client.connect.performConnect', 'ffdc003', client.id,
-                      err);
-        }
-        var subscription = matchedSubs[0];
-        if (typeof subscription !== 'undefined') {
-          qos = subscription.qos;
-          if (qos === exports.QOS_AT_LEAST_ONCE) {
-            autoConfirm = subscription.autoConfirm;
-          }
-          ++subscription.unconfirmed;
-        } else {
-          // ideally we shouldn't get here, but it can happen in a timing
-          // window if we had received a message from a subscription we've
-          // subsequently unsubscribed from
-          logger.log('debug', client.id, 'No subscription matched message: ' +
-                     data + ' going to address: ' + protonMsg.address);
-          protonMsg.destroy();
-          protonMsg = null;
-          continue;
-        }
-
-        var delivery = {
-          message: {
-            topic: topic
-          }
-        };
-
-        if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
-          delivery.message.confirmDelivery = function() {
-            logger.entry('message.confirmDelivery', this.id);
-            logger.log('data', this.id, 'delivery:', delivery);
-            if (client.isStopped()) {
-              err = new NetworkError('not started');
-              logger.throw('message.confirmDelivery', this.id, err);
-              throw err;
-            }
-            if (protonMsg) {
-              // also throw NetworkError if the client has
-              // disconnected at some point since this particular message was
-              // received
-              if (protonMsg.connectionId !== client._connectionId) {
-                err = new NetworkError('client has reconnected since this ' +
-                                       'message was received');
-                logger.throw('message.confirmDelivery', this.id, err);
-                throw err;
-              }
-              messenger.settle(protonMsg);
-              --subscription.unconfirmed;
-              ++subscription.confirmed;
-              logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
-                         '[' + subscription.credit + ',' +
-                         subscription.unconfirmed + ',' +
-                         subscription.confirmed + ']');
-              // Ask to flow more messages if >= 80% of available credit
-              // (e.g. not including unconfirmed messages) has been used.
-              // Or we have just confirmed everything.
-              var available = subscription.credit - subscription.unconfirmed;
-              if ((available / subscription.confirmed) <= 1.25 ||
-                  (subscription.unconfirmed === 0 &&
-                   subscription.confirmed > 0)) {
-                messenger.flow(client.service + '/' + protonMsg.linkAddress,
-                               subscription.confirmed);
-                subscription.confirmed = 0;
-              }
-              protonMsg.destroy();
-              protonMsg = null;
-            }
-            logger.exit('message.confirmDelivery', this.id, null);
-          };
-        }
-
-        var linkAddress = protonMsg.linkAddress;
-        if (linkAddress) {
-          delivery.destination = {};
-          var link = linkAddress;
-          if (link.indexOf('share:') === 0) {
-            // remove 'share:' prefix from link name
-            link = link.substring(6, linkAddress.length);
-            // extract share name and add to delivery information
-            delivery.destination.share = link.substring(0, link.indexOf(':'));
-          }
-          // extract topicPattern and add to delivery information
-          delivery.destination.topicPattern =
-              link.substring(link.indexOf(':') + 1, link.length);
-        }
-        if (protonMsg.ttl > 0) {
-          delivery.message.ttl = protonMsg.ttl;
-        }
-
-        var da = protonMsg.deliveryAnnotations;
-        var malformed = {};
-        malformed.MQMD = {};
-        for (var an = 0; da && (an < da.length); ++an) {
-          if (da[an] && da[an].key) {
-            switch (da[an].key) {
-              case 'x-opt-message-malformed-condition':
-                malformed.condition = da[an].value;
-                break;
-              case 'x-opt-message-malformed-description':
-                malformed.description = da[an].value;
-                break;
-              case 'x-opt-message-malformed-MQMD.CodedCharSetId':
-                malformed.MQMD.CodedCharSetId = Number(da[an].value);
-                break;
-              case 'x-opt-message-malformed-MQMD.Format':
-                malformed.MQMD.Format = da[an].value;
-                break;
-              default:
-                break;
-            }
-          }
-        }
-        if (malformed.condition) {
-          if (client.listeners('malformed').length > 0) {
-            delivery.malformed = malformed;
-            logger.log('emit', client.id,
-                       'malformed', protonMsg.body, delivery);
-            client.emit('malformed', protonMsg.body, delivery);
-          } else {
-            protonMsg.destroy();
-            err = new Error('No listener for "malformed" event.');
-            logger.throwLevel('exit_often', 'checkForMessages', this.id, err);
-            throw err;
-          }
-        } else {
-          logger.log('emit', client.id, 'message', delivery);
-          try {
-            client.emit('message', data, delivery);
-          } catch (err) {
-            logger.caughtLevel('entry_often', 'checkForMessages',
-                               client.id, err);
-            logger.log('emit', client.id, 'error', err);
-            client.emit('error', err);
-          }
-        }
-
-        if (client.isStopped()) {
-          logger.log('debug', client.id,
-              'client is stopped so not accepting or settling message');
-          protonMsg.destroy();
-        } else {
-          if (qos === exports.QOS_AT_MOST_ONCE) {
-            messenger.accept(protonMsg);
-          }
-          if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
-            messenger.settle(protonMsg);
-            --subscription.unconfirmed;
-            ++subscription.confirmed;
-            logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
-                       '[' + subscription.credit + ',' +
-                       subscription.unconfirmed + ',' +
-                       subscription.confirmed + ']');
-            // Ask to flow more messages if >= 80% of available credit
-            // (e.g. not including unconfirmed messages) has been used.
-            // Or we have just confirmed everything.
-            var available = subscription.credit - subscription.unconfirmed;
-            if ((available / subscription.confirmed <= 1.25) ||
-                (subscription.unconfirmed === 0 &&
-                 subscription.confirmed > 0)) {
-              messenger.flow(client.service + '/' + protonMsg.linkAddress,
-                             subscription.confirmed);
-              subscription.confirmed = 0;
-            }
-            protonMsg.destroy();
-          }
-        }
+        processMessage(client, protonMsg);
       }
     }
   } catch (e) {
@@ -2394,7 +2180,225 @@ Client.prototype.checkForMessages = function() {
   });
 };
 
+var processMessage = function(client, protonMsg) {
+  logger.entryLevel('entry_often', 'processMessage', client.id);
+  var messenger = client.messenger;
+  Object.defineProperty(protonMsg, 'connectionId', {
+    value: client._connectionId
+  });
 
+  // if body is a JSON'ified object, try to parse it back to a js obj
+  var data;
+  if (protonMsg.contentType === 'application/json') {
+    try {
+      data = JSON.parse(protonMsg.body);
+    } catch (_) {
+      logger.caughtLevel('entry_often', 'processMessage', client.id, _);
+      console.warn(_);
+    }
+  } else {
+    data = protonMsg.body;
+  }
+
+  var topic =
+      decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
+  var autoConfirm = true;
+  var qos = exports.QOS_AT_MOST_ONCE;
+  var matchedSubs = client.subscriptions.filter(function(el) {
+    // 1 added to length to account for the / we add
+    var addressNoService = el.address.slice(client.service.length + 1);
+    // possible to have 2 matches work out whether this is
+    // for a share or private topic
+    if (typeof el.share === 'undefined' &&
+        protonMsg.linkAddress.indexOf('private:') === 0) {
+      // slice off private: and compare to the no service address
+      var linkNoPrivShare = protonMsg.linkAddress.slice(8);
+      if (addressNoService === linkNoPrivShare) {
+        return el;
+      }
+    } else if (typeof el.share !== 'undefined' &&
+        protonMsg.linkAddress.indexOf('share:') === 0) {
+      // starting after the share: look for the next : denoting the end
+      // of the share name and get everything past that
+      var linkNoShare = protonMsg.linkAddress.slice(
+          protonMsg.linkAddress.indexOf(':', 7) + 1);
+      if (addressNoService === linkNoShare) {
+        return el;
+      }
+    }
+  });
+  // should only ever be one entry in matchedSubs
+  if (matchedSubs.length > 1) {
+    err = new Error('received message matched more than one ' +
+        'subscription');
+    logger.ffdc('processMessage', 'ffdc003', client.id,
+        err);
+  }
+  var subscription = matchedSubs[0];
+  if (typeof subscription !== 'undefined') {
+    qos = subscription.qos;
+    if (qos === exports.QOS_AT_LEAST_ONCE) {
+      autoConfirm = subscription.autoConfirm;
+    }
+    ++subscription.unconfirmed;
+  } else {
+    // ideally we shouldn't get here, but it can happen in a timing
+    // window if we had received a message from a subscription we've
+    // subsequently unsubscribed from
+    logger.log('debug', client.id, 'No subscription matched message: ' +
+        data + ' going to address: ' + protonMsg.address);
+    protonMsg.destroy();
+    protonMsg = null;
+    return;
+  }
+
+  var delivery = {
+    message: {
+      topic: topic
+    }
+  };
+
+  if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
+    delivery.message.confirmDelivery = function() {
+      logger.entry('message.confirmDelivery', client.id);
+      logger.log('data', client.id, 'delivery:', delivery);
+      if (client.isStopped()) {
+        err = new NetworkError('not started');
+        logger.throw('message.confirmDelivery', client.id, err);
+        throw err;
+      }
+      if (protonMsg) {
+        // also throw NetworkError if the client has
+        // disconnected at some point since this particular message was
+        // received
+        if (protonMsg.connectionId !== client._connectionId) {
+          err = new NetworkError('client has reconnected since this ' +
+                                       'message was received');
+          logger.throw('message.confirmDelivery', client.id, err);
+          throw err;
+        }
+        messenger.settle(protonMsg);
+        --subscription.unconfirmed;
+        ++subscription.confirmed;
+        logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
+            '[' + subscription.credit + ',' +
+            subscription.unconfirmed + ',' +
+            subscription.confirmed + ']');
+        // Ask to flow more messages if >= 80% of available credit
+        // (e.g. not including unconfirmed messages) has been used.
+        // Or we have just confirmed everything.
+        var available = subscription.credit - subscription.unconfirmed;
+        if ((available / subscription.confirmed) <= 1.25 ||
+            (subscription.unconfirmed === 0 &&
+            subscription.confirmed > 0)) {
+          messenger.flow(client.service + '/' + protonMsg.linkAddress,
+                               subscription.confirmed);
+          subscription.confirmed = 0;
+        }
+        protonMsg.destroy();
+        protonMsg = null;
+      }
+      logger.exit('message.confirmDelivery', client.id, null);
+    };
+  }
+
+  var linkAddress = protonMsg.linkAddress;
+  if (linkAddress) {
+    delivery.destination = {};
+    var link = linkAddress;
+    if (link.indexOf('share:') === 0) {
+      // remove 'share:' prefix from link name
+      link = link.substring(6, linkAddress.length);
+      // extract share name and add to delivery information
+      delivery.destination.share = link.substring(0, link.indexOf(':'));
+    }
+    // extract topicPattern and add to delivery information
+    delivery.destination.topicPattern =
+        link.substring(link.indexOf(':') + 1, link.length);
+  }
+  if (protonMsg.ttl > 0) {
+    delivery.message.ttl = protonMsg.ttl;
+  }
+
+  var da = protonMsg.deliveryAnnotations;
+  var malformed = {};
+  malformed.MQMD = {};
+  for (var an = 0; da && (an < da.length); ++an) {
+    if (da[an] && da[an].key) {
+      switch (da[an].key) {
+        case 'x-opt-message-malformed-condition':
+          malformed.condition = da[an].value;
+          break;
+        case 'x-opt-message-malformed-description':
+          malformed.description = da[an].value;
+          break;
+        case 'x-opt-message-malformed-MQMD.CodedCharSetId':
+          malformed.MQMD.CodedCharSetId = Number(da[an].value);
+          break;
+        case 'x-opt-message-malformed-MQMD.Format':
+          malformed.MQMD.Format = da[an].value;
+          break;
+        default:
+          break;
+      }
+    }
+  }
+  if (malformed.condition) {
+    if (client.listeners('malformed').length > 0) {
+      delivery.malformed = malformed;
+      logger.log('emit', client.id,
+          'malformed', protonMsg.body, delivery);
+      client.emit('malformed', protonMsg.body, delivery);
+    } else {
+      protonMsg.destroy();
+      err = new Error('No listener for "malformed" event.');
+      logger.throwLevel('exit_often', 'processMessage', client.id, err);
+      throw err;
+    }
+  } else {
+    logger.log('emit', client.id, 'message', delivery);
+    try {
+      client.emit('message', data, delivery);
+    } catch (err) {
+      logger.caughtLevel('entry_often', 'processMessage',
+                               client.id, err);
+      logger.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+    }
+  }
+
+  if (client.isStopped()) {
+    logger.log('debug', client.id,
+        'client is stopped so not accepting or settling message');
+    protonMsg.destroy();
+  } else {
+    if (qos === exports.QOS_AT_MOST_ONCE) {
+      messenger.accept(protonMsg);
+    }
+    if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
+      messenger.settle(protonMsg);
+      --subscription.unconfirmed;
+      ++subscription.confirmed;
+      logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
+          '[' + subscription.credit + ',' +
+          subscription.unconfirmed + ',' +
+          subscription.confirmed + ']');
+      // Ask to flow more messages if >= 80% of available credit
+      // (e.g. not including unconfirmed messages) has been used.
+      // Or we have just confirmed everything.
+      var available = subscription.credit - subscription.unconfirmed;
+      if ((available / subscription.confirmed <= 1.25) ||
+          (subscription.unconfirmed === 0 &&
+          subscription.confirmed > 0)) {
+        messenger.flow(client.service + '/' + protonMsg.linkAddress,
+                             subscription.confirmed);
+        subscription.confirmed = 0;
+      }
+      protonMsg.destroy();
+    }
+  }
+  logger.exitLevel('exit_often', 'processMessage', client.id);
+};
 /**
  * @param {function(object)}
  *          destCallback - callback, invoked with an Error object if
