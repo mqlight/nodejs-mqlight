@@ -2893,11 +2893,11 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     messenger.unsubscribe(address, ttl);
 
     if (callback) {
-      process.nextTick(function() {
+      process.setTimeout(function() {
         logger.entry('Client.unsubscribe.callback', client.id);
         callback.apply(client, [null, topicPattern, originalShareValue]);
         logger.exit('Client.unsubscribe.callback', client.id, null);
-      });
+      }, 100);
     }
     // if no errors, remove this from the stored list of subscriptions
     for (i = 0; i < client.subscriptions.length; i++) {
