@@ -1322,8 +1322,6 @@ var Client = function(service, id, securityOptions) {
   this.outstandingSends = [];
   // List of queuedSends for resending on a reconnect
   this.queuedSends = [];
-  // List of callbacks to notify when a send operation completes
-  this.queuedSendCallbacks = [];
 
   // No drain event initially required
   this.drainEventRequired = false;
@@ -2098,45 +2096,22 @@ Client.prototype.send = function(topic, data, options, callback) {
         callback: callback
       });
     }
-
-    // Reconnect can result in many callbacks being fired in a single tick,
-    // group these together into a single setImmediate - to avoid them being
-    // spread out over a, potentially, long period of time.
-    if (client.queuedSendCallbacks.length == 0) {
-      setImmediate(function() {
-        var doReconnect = false;
-        while (client.queuedSendCallbacks.length > 0) {
-          var invocation = client.queuedSendCallbacks.shift();
-          if (invocation.callback) {
-            if (invocation.qos === exports.QOS_AT_MOST_ONCE) {
-              logger.entry('Client.send.callback', client.id);
-              logger.log('parms', client.id, 'err:', invocation.error,
-                         ', topic:', invocation.topic, ', protonMsg.body:',
-                         invocation.body, ', options:', invocation.options);
-              invocation.callback.apply(client, [
-                invocation.error,
-                invocation.topic,
-                invocation.body,
-                invocation.options]);
-              logger.exit('Client.send.callback', client.id, null);
-            }
-          }
-          logger.log('emit', client.id, 'error', invocation.error);
-          client.emit('error', invocation.error);
-          doReconnect |= shouldReconnect(invocation.error);
+    setImmediate(function() {
+      if (callback) {
+        if (qos === exports.QOS_AT_MOST_ONCE) {
+          logger.entry('Client.send.callback', client.id);
+          logger.log('parms', client.id, 'err:', err, ', topic:',
+                     topic, ', protonMsg.body:', protonMsg.body, ', options:',
+                     options);
+          callback.apply(client, [err, topic, protonMsg.body, options]);
+          logger.exit('Client.send.callback', client.id, null);
         }
-        if (doReconnect) {
-          reconnect(client);
-        }
-      });
-    }
-    client.queuedSendCallbacks.push({
-      body: protonMsg.body,
-      callback: callback,
-      error: err,
-      options: options,
-      qos: qos,
-      topic: topic
+      }
+      logger.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+      if (shouldReconnect(err)) {
+        reconnect(client);
+      }
     });
   }
 
@@ -2206,6 +2181,7 @@ var processMessage = function(client, protonMsg) {
 
   // if body is a JSON'ified object, try to parse it back to a js obj
   var data;
+  var err;
   if (protonMsg.contentType === 'application/json') {
     try {
       data = JSON.parse(protonMsg.body);
@@ -2918,11 +2894,11 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     messenger.unsubscribe(address, ttl);
 
     if (callback) {
-      process.nextTick(function() {
+      setTimeout(function() {
         logger.entry('Client.unsubscribe.callback', client.id);
         callback.apply(client, [null, topicPattern, originalShareValue]);
         logger.exit('Client.unsubscribe.callback', client.id, null);
-      });
+      }, 100);
     }
     // if no errors, remove this from the stored list of subscriptions
     for (i = 0; i < client.subscriptions.length; i++) {
