@@ -83,7 +83,7 @@ void Proton::Exit(const char* lvl, const char* name, const char* id, int rc)
     sprintf(rcString, "%d", rc);
     Proton::Exit(lvl, name, id, rcString);
   } else {
-    Proton::Exit(lvl, name, id, "");
+    Proton::Exit(lvl, name, id, "0");
   }
 }
 
