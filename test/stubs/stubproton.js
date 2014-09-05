@@ -56,7 +56,6 @@ exports.unblockSendCompletion = function() {
   sendStatus = 7;
 };
 
-
 var remoteIdleTimeout = -1;
 var workCallback;
 
@@ -88,10 +87,14 @@ module.exports.createProtonStub = function() {
       send: function() {
         if (DEBUG) console.log('stub send function called');
       },
-      status: function() {
+      status: function(msg) {
+        var result = sendStatus;
+        if (result === 7 && msg.unitTestQos === 0) {
+          result = 0;
+        }
         if (DEBUG) console.log('stub status function called, returning: ',
-                               sendStatus);
-        return sendStatus;
+            result);
+        return result;
       },
       statusError: function() {
         if (DEBUG) console.log('stub statusError function called');
@@ -147,8 +150,9 @@ module.exports.createProtonStub = function() {
         if (DEBUG) console.log('stub stop function returning: '+this.stopped);
         return this.stopped;
       },
-      put: function() {
+      put: function(msg, qos) {
         if (DEBUG) console.log('stub put function called');
+        msg.unitTestQos = qos;
       },
       hasSent: function() {
         if (DEBUG) console.log('stub hasSent function called');
@@ -179,11 +183,6 @@ module.exports.createProtonStub = function() {
       pendingOutbound: function(address) {
         if (DEBUG) console.log('pendingOutbound function called with address ' +
                                address);
-        return 0;
-      },
-      buffered: function(message) {
-        if (DEBUG) console.log('buffered function called with message ' +
-                               message);
         return false;
       }
     },

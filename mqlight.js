@@ -1486,9 +1486,7 @@ Client.prototype.stop = function(callback) {
       stopMessenger(client, function(client, callback) {
         logger.entry('Client.stop.performDisconnect.stopProcessing',
             client.id);
-
         if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
-
         // clear queuedSends as we are disconnecting
         while (client.queuedSends.length > 0) {
           var msg = client.queuedSends.shift();
@@ -1507,18 +1505,17 @@ Client.prototype.stop = function(callback) {
         while (client.subscriptions.length > 0) {
           client.subscriptions.shift();
         }
-
         // Indicate that we've disconnected
         client.state = STATE_STOPPED;
-
         // Remove ourself from the active client list
         var activeClient = activeClientList.get(client.id);
         if (client === activeClient) activeClientList.remove(client.id);
-
         process.nextTick(function() {
           logger.log('emit', client.id, STATE_STOPPED);
-          client.firstStart = true;
-          client.emit(STATE_STOPPED);
+          if (!client.firstStart) {
+            client.firstStart = true;
+            client.emit(STATE_STOPPED);
+          }
         });
         if (callback) {
           process.nextTick(function() {
@@ -1902,6 +1899,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   var client = this;
   var messenger = client.messenger;
   var protonMsg;
+  var inOutstandingSends = false;
   try {
     logger.entry('proton.createMessage', client.id);
     protonMsg = proton.createMessage();
@@ -1930,149 +1928,189 @@ Client.prototype.send = function(topic, data, options, callback) {
       protonMsg.body = JSON.stringify(data);
       protonMsg.contentType = 'application/json';
     }
+
+    // Record that a send operation is in progress
+    client.outstandingSends.push({
+      msg: protonMsg,
+      qos: qos,
+      callback: callback,
+      topic: topic,
+      options: options
+    });
+    inOutstandingSends = true;
+
     messenger.put(protonMsg, qos);
     messenger.send();
 
-    // Record that a send operation is in progress
-    var localMessageId = uuid.v4();
-    client.outstandingSends.push(localMessageId);
+    if (client.outstandingSends.length === 1) {
+      var sendOutboundMessages = function() {
+        logger.entry('Client.send.sendOutboundMessages');
+        logger.log('debug', client.id,
+                   'outstandingSends:', client.outstandingSends.length);
+        try {
+          if (!messenger.stopped) {
+            // Write any data buffered within messenger
+            var tries = 50;
+            while (tries-- > 0 &&
+                   messenger.pendingOutbound(client.service)) {
+              messenger.send();
+            }
+            if (tries == 0) {
+              logger.log('debug', client.id, 'output still pending!');
+            }
 
-    // setup a timer to trigger the callback once the msg has been sent, or
-    // immediately if no message to be sent
-    var untilSendComplete = function(protonMsg, localMessageId, sendCallback) {
-      logger.entry('Client.send.untilSendComplete', client.id);
-
-      try {
-        var complete = false;
-        var err, index;
-        if (!messenger.stopped) { // if still connected
-          var status = messenger.status(protonMsg);
-          switch (status) {
-            case PN_STATUS_ACCEPTED:
-            case PN_STATUS_SETTLED:
-              messenger.settle(protonMsg);
-              complete = true;
-              break;
-            case PN_STATUS_REJECTED:
-              complete = true;
-              var rejectMsg = messenger.statusError(protonMsg);
-              if (!rejectMsg || rejectMsg === '') {
-                rejectMsg = 'send failed - message was rejected';
+            // See if any of the outstanding send operations have now completed
+            while (client.outstandingSends.length > 0) {
+              var inFlight = client.outstandingSends.slice(0, 1)[0];
+              var status = messenger.status(inFlight.msg);
+              var complete = false;
+              var err = null;
+              if (inFlight.qos == exports.QOS_AT_MOST_ONCE) {
+                complete = (status === PN_STATUS_UNKNOWN);
+              } else {
+                switch (status) {
+                  case PN_STATUS_ACCEPTED:
+                  case PN_STATUS_SETTLED:
+                    messenger.settle(inFlight.msg);
+                    complete = true;
+                    break;
+                  case PN_STATUS_REJECTED:
+                    complete = true;
+                    var rejectMsg = messenger.statusError(inFlight.msg);
+                    if (!rejectMsg || rejectMsg === '') {
+                      rejectMsg = 'send failed - message was rejected';
+                    }
+                    err = new RangeError(rejectMsg);
+                    break;
+                  case PN_STATUS_RELEASED:
+                    complete = true;
+                    err = new Error('send failed - message was released');
+                    break;
+                  case PN_STATUS_MODIFIED:
+                    complete = true;
+                    err = new Error('send failed - message was modified');
+                    break;
+                  case PN_STATUS_ABORTED:
+                    complete = true;
+                    err = new Error('send failed - message was aborted');
+                    break;
+                  case PN_STATUS_PENDING:
+                    messenger.send();
+                    break;
+                }
               }
-              err = new RangeError(rejectMsg);
-              break;
-            case PN_STATUS_RELEASED:
-              complete = true;
-              err = new Error('send failed - message was released');
-              break;
-            case PN_STATUS_MODIFIED:
-              complete = true;
-              err = new Error('send failed - message was modified');
-              break;
-            case PN_STATUS_ABORTED:
-              complete = true;
-              err = new Error('send failed - message was aborted');
-              break;
-          }
 
-          // If complete then do final processing of this message.
-          if (complete) {
-            index = client.outstandingSends.indexOf(localMessageId);
-            if (index >= 0) client.outstandingSends.splice(index, 1);
+              if (complete) {
+                // Remove send operation from list of outstanding send ops.
+                client.outstandingSends.shift();
 
-            // If previously send() returned false and now the backlog of
-            // messages is cleared, emit a drain event.
-            logger.log('debug', client.id,
-                       'outstandingSends:', client.outstandingSends.length);
-            if (client.drainEventRequired &&
-                (client.outstandingSends.length <= 1)) {
-              client.drainEventRequired = false;
-              process.nextTick(function() {
-                logger.log('emit', client.id, 'drain');
-                client.emit('drain');
+                // Generate drain event, if required.
+                if (client.drainEventRequired &&
+                    (client.outstandingSends.length <= 1)) {
+                  client.drainEventRequired = false;
+                  process.nextTick(function() {
+                    logger.log('emit', client.id, 'drain');
+                    client.emit('drain');
+                  });
+                }
+
+                // invoke the callback, if specified
+                if (inFlight.callback) {
+                  logger.entry('Client.send.sendOutboundMessages.callback',
+                      client.id);
+                  inFlight.callback.apply(client, [err,
+                                                   inFlight.topic,
+                                                   inFlight.msg.body,
+                                                   inFlight.options]);
+                  logger.exit('Client.send.sendOutboundMessages.callback',
+                      client.id, null);
+                }
+
+                // Free resources used by the message
+                inFlight.msg.destroy();
+              } else {
+                // Can't make any more progress for now - schedule remaining
+                // work for processing in the future.
+                setImmediate(sendOutboundMessages);
+                return;
+              }
+            }
+          } else {
+            // messenger has been stopped.
+            var callbackError = null;
+            while (client.outstandingSends.length > 0) {
+              inFlight = client.outstandingSends.shift();
+              client.queuedSends.push({
+                topic: inFlight.topic,
+                data: inFlight.msg.body,
+                options: inFlight.options,
+                callback: callback
               });
+              inFlight.msg.destroy();
             }
+            if (callbackError !== null) {
+              logger.throw('Client.send.sendOutboundMessages',
+                           client.id, callbackError);
+              throw callbackError;
+            }
+          }
+        } catch (e) {
+          var error = getNamedError(e);
+          var callbackError = null;
+          var doReconnect = false;
+          logger.caught('Client.send.sendOutboundMessages', client.id, error);
 
-            // invoke the callback, if specified
-            if (sendCallback) {
-              var body = protonMsg.body;
-              setImmediate(function() {
-                logger.entry('Client.send.untilSendComplete.callback',
-                             client.id);
-                sendCallback.apply(client, [err, topic, body, options]);
-                logger.exit('Client.send.untilSendComplete.callback', client.id,
-                            null);
+          // Error - so empty the outstandingSends array:
+          while (client.outstandingSends.length > 0) {
+            inFlight = client.outstandingSends.shift();
+            if (inFlight.qos === exports.QOS_AT_LEAST_ONCE) {
+              // Retry at-least-once qos messages
+              client.queuedSends.push({
+                topic: inFlight.topic,
+                data: inFlight.msg.body,
+                options: inFlight.options,
+                callback: callback
               });
+            } else {
+              // we don't know if an at-most-once message made it across.
+              // Call the callback with an err of null to indicate success
+              // otherwise the application could decide to resend (duplicate)
+              // the message
+              if (inFlight.callback) {
+                logger.entry('Client.send.sendOutboundMessages.callback',
+                    client.id);
+                try {
+                  inFlight.callback.apply(client,
+                      [null, inFlight.topic, inFlight.msg.body, options]);
+                } catch (e) {
+                  logger.caught('Client.send.sendOutboundMessages.callback',
+                                client.id, e);
+                  if (callbackError === null) callbackError = e;
+                }
+                logger.exit('Client.send.sendOutboundMessages.callback',
+                            client.id, null);
+              }
+
+              if (error) {
+                logger.log('emit', client.id, 'error', error);
+                client.emit('error', error);
+                doReconnect |= shouldReconnect(error);
+              }
             }
-            protonMsg.destroy();
-
-            logger.exit('Client.send.untilSendComplete', client.id, null);
-            return;
+            inFlight.msg.destroy();
           }
-
-          // message not sent yet, so check again in a second or so
-          messenger.send();
-          setImmediate(untilSendComplete, protonMsg, localMessageId,
-                       sendCallback);
-        } else {
-          // TODO Not sure we can actually get here (so FFDC?)
-          index = client.outstandingSends.indexOf(localMessageId);
-          if (index >= 0) client.outstandingSends.splice(index, 1);
-          if (sendCallback) {
-            err = new StoppedError('send may not have completed due to ' +
-                                   'client stop');
-            logger.entry('Client.send.untilSendComplete.callback', client.id);
-            sendCallback.apply(client, [err, topic, protonMsg.body, options]);
-            logger.exit('Client.send.untilSendComplete.callback',
-                        client.id, null);
+          if (doReconnect) {
+            reconnect(client);
           }
-          protonMsg.destroy();
-
-          logger.exit('Client.send.untilSendComplete', client.id, null);
-          return;
+          if (callbackError !== null) {
+            logger.throw('Client.send.sendOutboundMessages',
+                         client.id, callbackError);
+            throw callbackError;
+          }
         }
-      } catch (e) {
-        var error = getNamedError(e);
-        logger.caught('Client.send.untilSendComplete', client.id, error);
-        // error condition so won't retry send remove from list of unsent
-        index = client.outstandingSends.indexOf(localMessageId);
-        if (index >= 0) client.outstandingSends.splice(index, 1);
-        // an error here could still mean the message made it over
-        // so we only care about at least once messages
-        if (qos === exports.QOS_AT_LEAST_ONCE) {
-          client.queuedSends.push({
-            topic: topic,
-            data: data,
-            options: options,
-            callback: callback
-          });
-        }
-        process.nextTick(function() {
-          if (sendCallback) {
-            if (qos === exports.QOS_AT_MOST_ONCE) {
-              // we don't know if an at most once message made it across
-              // call the callback with an err of null to indicate success to
-              // avoid the user resending on error.
-              logger.entry('Client.send.untilSendComplete.callback', client.id);
-              sendCallback.apply(client, [null, topic, protonMsg.body,
-                options]);
-              logger.exit('Client.send.untilSendComplete.callback', client.id,
-                  null);
-            }
-          }
-          if (error) {
-            logger.log('emit', client.id, 'error', error);
-            client.emit('error', error);
-            if (shouldReconnect(error)) {
-              reconnect(client);
-            }
-          }
-        });
-      }
-      logger.exit('Client.send.untilSendComplete', client.id, null);
-    };
-    // start the timer to trigger it to keep sending until msg has sent
-    setImmediate(untilSendComplete, protonMsg, localMessageId, callback);
+      };
+      setImmediate(sendOutboundMessages);
+    }
 
     // If we have a backlog of messages, then record the need to emit a drain
     // event later to indicate the backlog has been cleared.
@@ -2086,10 +2124,13 @@ Client.prototype.send = function(topic, data, options, callback) {
   } catch (exception) {
     err = getNamedError(exception);
     logger.caught('Client.send', client.id, err);
+
     // error condition so won't retry send need to remove it from list of
     // unsent
-    var index = client.outstandingSends.indexOf(localMessageId);
-    if (index >= 0) client.outstandingSends.splice(index, 1);
+    if (inOutstandingSends) {
+      client.outstandingSends.shift();
+    }
+
     if (qos === exports.QOS_AT_LEAST_ONCE) {
       client.queuedSends.push({
         topic: topic,
@@ -2130,6 +2171,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         }
       });
     }
+
     client.queuedSendCallbacks.push({
       body: protonMsg.body,
       callback: callback,

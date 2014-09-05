@@ -147,8 +147,9 @@ module.exports.test_send_payloads = function(test) {
   // unit tests use in place of the native proton code.
   var savedPutMethod = mqlight.proton.messenger.put;
   var lastMsg;
-  mqlight.proton.messenger.put = function(message) {
+  mqlight.proton.messenger.put = function(message, qos) {
     lastMsg = message;
+    savedPutMethod(message, qos);
   };
 
   var client = mqlight.createClient({id: 'test_send_payloads', service:
@@ -474,6 +475,7 @@ module.exports.test_send_ttl = function(test) {
   var savedPutFunction = mqlight.proton.messenger.put;
   mqlight.proton.messenger.put = function(msg, qos) {
     mqlight.proton.messenger.putMessage = msg;
+    savedPutFunction(msg, qos);
   };
   client.on('started', function() {
     for (var i = 0; i < data.length; ++i) {
@@ -519,8 +521,11 @@ module.exports.test_send_drain_event = function(test) {
     client.on('drain', function() {
       test.ok(drainExpected, 'Drain event not expected to be emitted');
       clearTimeout(timeout);
-      test.done();
-      if (client) client.stop();
+      if (client) {
+        client.stop(function() {test.done()});
+      } else {
+        test.done();
+      }
     });
 
     for(var i = 0; i < 100; i++) {
@@ -556,12 +561,8 @@ module.exports.test_message_rejected = function(test) {
     service: 'amqp://host'});
 
   client.on('started', function() {
-
+  
     test.doesNotThrow(function() {
-      // Test that a message being rejected does not affect the operation
-      // of client.send(...)
-      client.send('topic', 'data', {qos: 0});
-
       // Test that a message being rejected result in the send(...) method's
       // callback being run.
       client.send('topic', 'data', {qos: 1}, function(err) {
@@ -571,7 +572,9 @@ module.exports.test_message_rejected = function(test) {
 
         mqlight.proton.messenger.status = savedStatusMethod;
         mqlight.proton.messenger.statusError = savedStatusErrorMethod;
+        client.stop();
         test.done();
+        
       });
     });
   });

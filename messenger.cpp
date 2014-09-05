@@ -121,6 +121,7 @@ void ProtonMessenger::Init(Handle<Object> target)
       constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
   NODE_SET_PROTOTYPE_METHOD(constructor, "work", Work);
   NODE_SET_PROTOTYPE_METHOD(constructor, "flow", Flow);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "pendingOutbound", PendingOutbound);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
 
@@ -262,18 +263,7 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
         "NetworkError", "Not connected", "ProtonMessenger::Put", name)
   }
 
-  /* Set the required QoS, by setting the sender settler mode to settled (QoS =
-   * AMO) or unsettled (QoS = ALO).
-   * Note that the receiver settler mode is always set to first, as the MQ Light
-   * listener will negotiate down any receiver settler mode to first.
-   */
-  if (qos == 0) {
-    pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_SETTLED);
-    pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
-  } else if (qos == 1) {
-    pn_messenger_set_snd_settle_mode(obj->messenger, PN_SND_UNSETTLED);
-    pn_messenger_set_rcv_settle_mode(obj->messenger, PN_RCV_FIRST);
-  } else {
+  if (qos != 0 && qos != 1) {
     THROW_EXCEPTION_TYPE(Exception::RangeError,
                          "qos argument is invalid must evaluate to 0 or 1",
                          "ProtonMessenger::Put",
@@ -296,6 +286,15 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
 
   pn_tracker_t tracker = pn_messenger_outgoing_tracker(obj->messenger);
   msg->tracker = tracker;
+
+  if (qos == 0) {
+    error = pn_messenger_settle(obj->messenger, tracker, 0);
+    if (error) {
+      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+      const char* err = GetErrorName(text);
+      THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Put", name)
+    }
+  }
 
   Proton::Exit("ProtonMessenger::Put", name, true);
   return scope.Close(Boolean::New(true));
@@ -326,7 +325,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   }
 
   Proton::Entry("pn_messenger_work", name);
-  pn_messenger_work(obj->messenger, 50);
+  pn_messenger_work(obj->messenger, 0);
   error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_work", name, error);
   if (error) {
@@ -1107,4 +1106,46 @@ Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
 
   Proton::Exit("ProtonMessenger::StatusError", name, description);
   return scope.Close(String::New(description));
+}
+
+Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::PendingOutbound", name);
+
+  // throw exception if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
+      args[0]->IsUndefined() || args[1].IsEmpty()) {
+    THROW_EXCEPTION(
+        "Missing required argument", "ProtonMessenger::PendingOutbound", name);
+  }
+
+  String::Utf8Value param(args[0]->ToString());
+  std::string address = std::string(*param);
+  Proton::Log("parms", name, "address:", address.c_str());
+
+  bool result = false;
+  if (!obj->messenger) {
+    THROW_NAMED_EXCEPTION("NetworkError",
+                          "Not connected",
+                          "ProtonMessenger::StatusError",
+                          name);
+  }
+
+  ssize_t pending = 
+    pn_messenger_pending_outbound(obj->messenger, address.c_str());
+  if (pending < 0) {
+    THROW_NAMED_EXCEPTION("NetworkError",
+                          "Not connected",
+                          "ProtonMessenger::StatusError",
+                          name);
+  } else if (pending > 0) {
+    result = true;
+  }
+  
+  Proton::Exit("ProtonMessenger::PendingOutbound", name, result);
+  return scope.Close(Boolean::New(result));
 }
