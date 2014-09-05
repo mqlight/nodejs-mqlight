@@ -1131,7 +1131,7 @@ Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
   if (!obj->messenger) {
     THROW_NAMED_EXCEPTION("NetworkError",
                           "Not connected",
-                          "ProtonMessenger::StatusError",
+                          "ProtonMessenger::PendingOutbound",
                           name);
   }
 
@@ -1140,7 +1140,7 @@ Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
   if (pending < 0) {
     THROW_NAMED_EXCEPTION("NetworkError",
                           "Not connected",
-                          "ProtonMessenger::StatusError",
+                          "ProtonMessenger::PendingOutbound",
                           name);
   } else if (pending > 0) {
     result = true;
