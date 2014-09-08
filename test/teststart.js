@@ -736,7 +736,7 @@ module.exports.test_start_heartbeat = function(test) {
                   'heartbeats');
         test.done();
       // If too many heartbeats then fail (note this is only an approximation)
-      } else if (heartbeatCount / count > 2) {
+      } else if (heartbeatCount / count > 2.5) {
         client.stop();
         stubproton.setRemoteIdleTimeout(-1);
         test.fail('too many/few heartbeats (heartbeat count: ' +
