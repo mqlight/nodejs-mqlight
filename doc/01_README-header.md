@@ -1,4 +1,4 @@
-# node-mqlight (beta)
+# node-mqlight
 
 MQ Light is designed to allow applications to exchange discrete pieces of
 information in the form of messages. This might sound a lot like TCP/IP

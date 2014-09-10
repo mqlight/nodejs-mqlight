@@ -16,9 +16,22 @@ that goes to stderr when you run your application.
 
 ### 9.9.9999999999
 
-* Third beta release
-* Necessary OpenSSL libraries built into the client.
-* ...
+* First official release.
+* Support for supplying time-to-live options when sending a message or creating
+  a destination.
+* Support for unsubscribing from an existing destination.
+* Support flow control for sending applications by having the `send` method
+  return a boolean value to indicate when data is being buffered and have the
+  client emit a `drain` event when all buffered data has been written.
+* Support passing authentication details as `user:pass@host` service URIs.
+* API changes based on user feedback to rename `connect -> start`,
+  `disconnect -> stop`, to make `createClient` return an already started
+  client and to have client properties rather than getter and setter methods.
+* Necessary OpenSSL libraries are now included within the module package to
+  simplify deployment (particularly on Windows).
+* Improve the samples so that they demonstrate more areas of the available API
+  functionality.
+* Numerous other bug fixes and performance improvements.
 
 ### 0.1.2014062301
 
