@@ -68,9 +68,7 @@ var url = require('url');
 var fs = require('fs');
 var http = require('http');
 
-var validClientIdChars =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789%/._';
-
+var invalidClientIdRegex = /[^A-Za-z0-9%/\._]+/;
 
 var HashMap = require('hashmap').HashMap;
 
@@ -1252,13 +1250,12 @@ var Client = function(service, id, securityOptions) {
   id = String(id);
 
   // currently client ids are restricted, reject any invalid ones
-  for (var i in id) {
-    if (validClientIdChars.indexOf(id[i]) == -1) {
-      msg = "Client Identifier '" + id + "' contains invalid char: " + id[i];
-      err = new InvalidArgumentError(msg);
-      logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
-      throw err;
-    }
+  var matches = invalidClientIdRegex.exec(id);
+  if (matches) {
+    msg = "Client Identifier '" + id + "' contains invalid char: " + matches[0];
+    err = new InvalidArgumentError(msg);
+    logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
+    throw err;
   }
 
   // User/password must either both be present, or both be absent.
