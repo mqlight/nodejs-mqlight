@@ -314,7 +314,7 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   }
 
   Proton::Entry("pn_messenger_work", name);
-  pn_messenger_work(obj->messenger, 50);
+  pn_messenger_work(obj->messenger, 0);
   error = pn_messenger_errno(obj->messenger);
   Proton::Exit("pn_messenger_work", name, error);
   if (error) {
