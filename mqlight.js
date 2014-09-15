@@ -2126,29 +2126,35 @@ Client.prototype.checkForMessages = function() {
           }
         }
 
-        if (qos === exports.QOS_AT_MOST_ONCE) {
-          messenger.accept(protonMsg);
-        }
-        if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
-          messenger.settle(protonMsg);
-          --matchedSubs[0].unconfirmed;
-          ++matchedSubs[0].confirmed;
-          logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
-                     '[' + matchedSubs[0].credit + ',' +
-                     matchedSubs[0].unconfirmed + ',' +
-                     matchedSubs[0].confirmed + ']');
-          // Ask to flow more messages if >= 80% of available credit
-          // (e.g. not including unconfirmed messages) has been used.
-          // Or we have just confirmed everything.
-          var available = matchedSubs[0].credit - matchedSubs[0].unconfirmed;
-          if ((available / matchedSubs[0].confirmed <= 1.25) ||
-              (matchedSubs[0].unconfirmed === 0 &&
-               matchedSubs[0].confirmed > 0)) {
-            messenger.flow(client.service + '/' + protonMsg.linkAddress,
-                           matchedSubs[0].confirmed);
-            matchedSubs[0].confirmed = 0;
-          }
+        if (client.isStopped()) {
+          logger.log('debug', client.id,
+              'client is stopped so not accepting or settling message');
           protonMsg.destroy();
+        } else {
+          if (qos === exports.QOS_AT_MOST_ONCE) {
+            messenger.accept(protonMsg);
+          }
+          if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
+            messenger.settle(protonMsg);
+            --matchedSubs[0].unconfirmed;
+            ++matchedSubs[0].confirmed;
+            logger.log('data', this.id, '[credit,unconfirmed,confirmed]:',
+                       '[' + matchedSubs[0].credit + ',' +
+                       matchedSubs[0].unconfirmed + ',' +
+                       matchedSubs[0].confirmed + ']');
+            // Ask to flow more messages if >= 80% of available credit
+            // (e.g. not including unconfirmed messages) has been used.
+            // Or we have just confirmed everything.
+            var available = matchedSubs[0].credit - matchedSubs[0].unconfirmed;
+            if ((available / matchedSubs[0].confirmed <= 1.25) ||
+                (matchedSubs[0].unconfirmed === 0 &&
+                 matchedSubs[0].confirmed > 0)) {
+              messenger.flow(client.service + '/' + protonMsg.linkAddress,
+                             matchedSubs[0].confirmed);
+              matchedSubs[0].confirmed = 0;
+            }
+            protonMsg.destroy();
+          }
         }
       }
     }
