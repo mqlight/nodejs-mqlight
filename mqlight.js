@@ -2893,7 +2893,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     messenger.unsubscribe(address, ttl);
 
     if (callback) {
-      process.setTimeout(function() {
+      setTimeout(function() {
         logger.entry('Client.unsubscribe.callback', client.id);
         callback.apply(client, [null, topicPattern, originalShareValue]);
         logger.exit('Client.unsubscribe.callback', client.id, null);
