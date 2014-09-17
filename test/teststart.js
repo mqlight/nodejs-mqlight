@@ -478,7 +478,7 @@ module.exports.test_start_http_timeout = function(test) {
     service: 'http://127.0.0.1:9999'
   }, function(err) {
     test.ok(err instanceof Error);
-    test.ok(/http request to http:\/\/127.0.0.1:9999 timed out/.test(err));
+    test.ok(/http request to http:\/\/127.0.0.1:9999\/ timed out/.test(err));
     client.stop();
     test.done();
     http.request = originalHttpRequestMethod;

@@ -67,6 +67,7 @@ var uuid = require('node-uuid');
 var url = require('url');
 var fs = require('fs');
 var http = require('http');
+var https = require('https');
 
 var invalidClientIdRegex = /[^A-Za-z0-9%/\._]+/;
 
@@ -606,7 +607,8 @@ var getHttpServiceFunction = function(serviceUrl) {
   logger.entry('getHttpServiceFunction', logger.NO_CLIENT_ID);
   logger.log('parms', logger.NO_CLIENT_ID, 'serviceUrl:', serviceUrl);
 
-  if (typeof serviceUrl !== 'string') {
+  var serviceHref = serviceUrl.href;
+  if (typeof serviceHref !== 'string') {
     var err = new TypeError('serviceUrl must be a string type');
     logger.throw('getHttpServiceFunction', logger.NO_CLIENT_ID, err);
     throw err;
@@ -614,8 +616,9 @@ var getHttpServiceFunction = function(serviceUrl) {
 
   var httpServiceFunction = function(callback) {
     logger.entry('httpServiceFunction', logger.NO_CLIENT_ID);
-
-    var req = http.request(serviceUrl, function(res) {
+    var request = (serviceUrl.protocol === 'https:') ? https.request :
+                                                       http.request;
+    var req = request(serviceHref, function(res) {
       logger.entry('httpServiceFunction.req.callback', logger.NO_CLIENT_ID);
 
       var data = '';
@@ -633,7 +636,7 @@ var getHttpServiceFunction = function(serviceUrl) {
           try {
             obj = JSON.parse(data);
           } catch (err) {
-            err.message = 'http request to ' + serviceUrl + ' returned ' +
+            err.message = 'http request to ' + serviceHref + ' returned ' +
                           'unparseable JSON: ' + err.message;
             logger.caught('httpServiceFunction.req.on.end.callback',
                           logger.NO_CLIENT_ID, err);
@@ -651,7 +654,7 @@ var getHttpServiceFunction = function(serviceUrl) {
                         null);
           }
         } else {
-          var message = 'http request to ' + serviceUrl + ' failed with a ' +
+          var message = 'http request to ' + serviceHref + ' failed with a ' +
                         'status code of ' + res.statusCode;
           if (data) message += ': ' + data;
           err = new NetworkError(message);
@@ -668,7 +671,7 @@ var getHttpServiceFunction = function(serviceUrl) {
       logger.exit('httpServiceFunction.req.callback', logger.NO_CLIENT_ID,
                   null);
     }).on('error', function(err) {
-      err.message = 'http request to ' + serviceUrl + ' failed ' +
+      err.message = 'http request to ' + serviceHref + ' failed ' +
                     'with an error: ' + err.message;
       err.name = 'NetworkError';
       err = getNamedError(err);
@@ -679,7 +682,7 @@ var getHttpServiceFunction = function(serviceUrl) {
       logger.exit('httpServiceFunction.callback', logger.NO_CLIENT_ID, null);
     });
     req.setTimeout(5000, function() {
-      var message = 'http request to ' + serviceUrl + ' timed out ' +
+      var message = 'http request to ' + serviceHref + ' timed out ' +
                     'after 5000 milliseconds';
       var err = new NetworkError(message);
       logger.log('error', logger.NO_CLIENT_ID, err);
@@ -745,7 +748,7 @@ var Client = function(service, id, securityOptions) {
   } else if (typeof service === 'string') {
     var serviceUrl = url.parse(service);
     if (serviceUrl.protocol === 'http:' || serviceUrl.protocol === 'https:') {
-      serviceFunction = getHttpServiceFunction(service);
+      serviceFunction = getHttpServiceFunction(serviceUrl);
     } else if (serviceUrl.protocol === 'file:') {
       if (serviceUrl.host.length > 0 && serviceUrl.host !== 'localhost') {
         msg = 'service contains unsupported file URI of ' + service +
