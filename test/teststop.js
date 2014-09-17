@@ -43,6 +43,7 @@ module.exports.test_stop_callback_and_event = function(test) {
       test.ok(this === client);
       test.equals(arguments.length, 0);
       test.equals(client.state, 'stopped');
+      test.equals(client.service, null);
       if (++count == 2) {
         test.done();
       }
