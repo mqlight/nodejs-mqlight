@@ -731,13 +731,13 @@ var getHttpServiceFunction = function(serviceUrl) {
  */
 var Client = function(service, id, securityOptions) {
   /** The current service being used */
-  var _service = undefined;
+  var _service;
 
   /** The current state */
-  var _state = undefined;
+  var _state;
 
   /** The client identifier */
-  var _id = undefined;
+  var _id;
 
   /*
    * Internal helper function for public methods, to return the current value of
