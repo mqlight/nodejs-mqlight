@@ -1975,6 +1975,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         logger.log('debug', client.id,
                    'outstandingSends:', client.outstandingSends.length);
         try {
+          var inFlight;
           if (!messenger.stopped) {
             // Write any data buffered within messenger
             var tries = 50;
@@ -1982,13 +1983,13 @@ Client.prototype.send = function(topic, data, options, callback) {
                    messenger.pendingOutbound(client.getService())) {
               messenger.send();
             }
-            if (tries == 0) {
+            if (tries === 0) {
               logger.log('debug', client.id, 'output still pending!');
             }
 
             // See if any of the outstanding send operations have now completed
             while (client.outstandingSends.length > 0) {
-              var inFlight = client.outstandingSends.slice(0, 1)[0];
+              inFlight = client.outstandingSends.slice(0, 1)[0];
               var status = messenger.status(inFlight.msg);
               var complete = false;
               var err = null;
@@ -2170,7 +2171,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     // Reconnect can result in many callbacks being fired in a single tick,
     // group these together into a single setImmediate - to avoid them being
     // spread out over a, potentially, long period of time.
-    if (client.queuedSendCallbacks.length == 0) {
+    if (client.queuedSendCallbacks.length === 0) {
       setImmediate(function() {
         var doReconnect = false;
         while (client.queuedSendCallbacks.length > 0) {
