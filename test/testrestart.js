@@ -158,9 +158,9 @@ module.exports.test_resubscribe_on_restart = function(test) {
   client.on('error', function(err) {
     if (/connect error: 1/.test(err.message)) {
       connectErrors++;
-      test.ok(client.subscriptions.length === 0, 'subs list has not ' +
+      test.ok(client._subscriptions.length === 0, 'subs list has not ' +
               'been cleared');
-      test.equal(client.queuedSubscriptions.length, 3, 'subs have ' +
+      test.equal(client._queuedSubscriptions.length, 3, 'subs have ' +
                  'not been queued');
       stubproton.setConnectStatus(0);
     }
@@ -176,7 +176,7 @@ module.exports.test_resubscribe_on_restart = function(test) {
           if (connectErrors > 0) return;
           if (connectErrors === 0) {
             setImmediate(function() {
-              origSubsList = origSubsList.concat(client.subscriptions);
+              origSubsList = origSubsList.concat(client._subscriptions);
               stubproton.setConnectStatus(1);
               mqlight.reconnect(client);
             });
@@ -190,12 +190,12 @@ module.exports.test_resubscribe_on_restart = function(test) {
     // this allows the restarted callback to get in and re-subscribe
     setImmediate(function() {
       test.equal(3, origSubsList.length, 'origSubsList length is wrong');
-      test.equal(client.subscriptions.length, origSubsList.length,
+      test.equal(client._subscriptions.length, origSubsList.length,
           'after reconect subs lists does not match original');
-      while (client.subscriptions.length > 0) {
+      while (client._subscriptions.length > 0) {
         var expected = origSubsList.pop();
         expected.callback = undefined;
-        var actual = client.subscriptions.pop();
+        var actual = client._subscriptions.pop();
         actual.callback = undefined;
         test.deepEqual(actual, expected, 'sub list objects do not match');
       }
@@ -279,7 +279,7 @@ module.exports.test_single_queued_send = function(test) {
       // This callback should only happen after the restart event is emitted
       test.equals(reconnected, 1, 'has reconnected');
       test.deepEqual(client.state, 'started', 'state is started');
-      test.equals(client.queuedSends.length, 0, 'queued sends now 0');
+      test.equals(client._queuedSends.length, 0, 'queued sends now 0');
       client.stop();
       clearTimeout(timeout);
       test.done();
@@ -288,7 +288,7 @@ module.exports.test_single_queued_send = function(test) {
 
   client.once('error', function(err) {
     stubproton.setConnectStatus(0);
-    test.equals(client.queuedSends.length, 1, 'check for queued send');
+    test.equals(client._queuedSends.length, 1, 'check for queued send');
   });
 
   client.on('restarted', function(x, y) {
@@ -314,7 +314,7 @@ module.exports.test_queue_sends_retrying = function(test) {
   var sentMessages = [];
 
   client.on('stopped', function() {
-    test.equal(client.queuedSends.length, 0, 'expected empty queued sends');
+    test.equal(client._queuedSends.length, 0, 'expected empty queued sends');
     test.equal(callbacksCalled, 4, 'expected 4 callbacks called with success');
     test.equal(callbacksCalledInError, 0, 'expected 0 callbacks in error');
     test.equal(sentMessages.length, 4, 'expected 4 successfully sent messages');
@@ -346,8 +346,8 @@ module.exports.test_queue_sends_retrying = function(test) {
         }
       });
     }
-    test.equal(client.queuedSends.length, 4, 'Expected 4 queued ' +
-               'sends. Found: ' + util.inspect(client.queuedSends));
+    test.equal(client._queuedSends.length, 4, 'Expected 4 queued ' +
+               'sends. Found: ' + util.inspect(client._queuedSends));
     stubproton.setConnectStatus(0);
     mqlight.reconnect(client);
   });
@@ -377,9 +377,9 @@ module.exports.test_queued_subs_retrying = function(test) {
     }
 
     if (subscribeErrors === 4) {
-      test.strictEqual(client.queuedSubscriptions.length, 4,
+      test.strictEqual(client._queuedSubscriptions.length, 4,
                        'expected to see 4 queued subscriptions, but saw ' +
-          client.queuedSubscriptions.length);
+          client._queuedSubscriptions.length);
       mqlight.proton.messenger.subscribe = savedSubFunction;
       stubproton.setConnectStatus(0);
       setTimeout(function(){client.stop();},500);
@@ -425,9 +425,9 @@ module.exports.test_queued_unsubscribe_before_connect = function(test) {
           successCallbacks++;
         });
       }
-      test.strictEqual(client.queuedUnsubscribes.length, 4,
+      test.strictEqual(client._queuedUnsubscribes.length, 4,
                        'expected to see 4 queued unsubscriptions, but saw ' +
-          client.queuedUnsubscribes.length);
+          client._queuedUnsubscribes.length);
       callback(null, 'amqp://host');
     }
   });
@@ -470,9 +470,9 @@ module.exports.test_queued_unsubscribe_via_error = function(test) {
     }
 
     if (unsubscribeErrors === 4) {
-      test.strictEqual(client.queuedUnsubscribes.length, 4,
+      test.strictEqual(client._queuedUnsubscribes.length, 4,
                        'expected to see 4 queued unsubscriptions, but saw ' +
-          client.queuedUnsubscribes.length);
+          client._queuedUnsubscribes.length);
       mqlight.proton.messenger.unsubscribe = savedUnsubscribeFn;
       stubproton.setConnectStatus(0);
       setTimeout(function() {client.stop();},500);
@@ -536,12 +536,12 @@ module.exports.test_queued_before_connect_unsubscribe_nop = function(test) {
           callbacks++;
         });
       }
-      test.strictEqual(client.queuedSubscriptions.length, 6,
+      test.strictEqual(client._queuedSubscriptions.length, 6,
                        'expected to see 6 queued subscriptions, but saw ' +
-          client.queuedSubscriptions.length);
-      test.strictEqual(client.queuedUnsubscribes.length, 4,
+          client._queuedSubscriptions.length);
+      test.strictEqual(client._queuedUnsubscribes.length, 4,
                        'expected to see 4 queued unsubscriptions, but saw ' +
-          client.queuedUnsubscribes.length);
+          client._queuedUnsubscribes.length);
       callback(null, 'amqp://host');
     }
   });
@@ -606,12 +606,12 @@ module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
     }
 
     if (subscribeErrors === 4 && unsubscribeErrors === 2) {
-      test.strictEqual(client.queuedSubscriptions.length, 4,
+      test.strictEqual(client._queuedSubscriptions.length, 4,
                        'expected to see 4 queued subscriptions, but saw ' +
-          client.queuedSubscriptions.length);
-      test.strictEqual(client.queuedUnsubscribes.length, 2,
+          client._queuedSubscriptions.length);
+      test.strictEqual(client._queuedUnsubscribes.length, 2,
                        'expected to see 2 queued unsubscriptions, but saw ' +
-          client.queuedUnsubscribes.length);
+          client._queuedUnsubscribes.length);
       mqlight.proton.messenger.subscribe = function() {
         ++subscribes;
       };
@@ -695,9 +695,9 @@ module.exports.test_queued_double_subscribe = function(test) {
           return true;
         }
       }, 'Service parameter as non string/array test');
-      test.strictEqual(client.queuedSubscriptions.length, 1,
+      test.strictEqual(client._queuedSubscriptions.length, 1,
                        'expected to see 1 queued subscription, but saw ' +
-          client.queuedSubscriptions.length);
+          client._queuedSubscriptions.length);
       callback(null, 'amqp://host');
     }
   });
@@ -728,7 +728,7 @@ module.exports.test_initial_failure_retry_sub = function(test){
   var callbackCalled = 0;
   var first = true;
   client.on('started', function() {
-    test.equal(client.queuedSubscriptions.length, 0,
+    test.equal(client._queuedSubscriptions.length, 0,
         'should be no queued subs');
     setTimeout(function() { client.stop() }, 10);
   });
@@ -744,7 +744,7 @@ module.exports.test_initial_failure_retry_sub = function(test){
       });
       first = false;
     } else {
-      test.equal(client.queuedSubscriptions.length, 1,
+      test.equal(client._queuedSubscriptions.length, 1,
                  'should be a queued sub');
       stubproton.setConnectStatus(0);
     }
@@ -771,7 +771,7 @@ module.exports.test_initial_failure_retry_send = function(test){
   var callbackCalled = 0;
   var first = true;
   client.on('started', function() {
-    test.equal(client.queuedSends.length, 0,
+    test.equal(client._queuedSends.length, 0,
         'should be no queued sends');
     setTimeout(function() { client.stop(); },10);
   });
@@ -787,7 +787,7 @@ module.exports.test_initial_failure_retry_send = function(test){
       });
       first = false;
     } else {
-      test.equal(client.queuedSends.length, 1,
+      test.equal(client._queuedSends.length, 1,
                  'should be a queued send');
       stubproton.setConnectStatus(0);
     }

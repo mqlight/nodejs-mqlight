@@ -671,7 +671,7 @@ module.exports.test_client_replaced = function(test) {
     test.ok(this === client);
     test.equals(arguments.length, 0);
     test.equals(client.state, 'started');
-    test.equals(client.messenger.stopped, false);
+    test.equals(client._messenger.stopped, false);
 
     client.subscribe('topic', 'share', function(err) {
       test.ok(err instanceof Error);

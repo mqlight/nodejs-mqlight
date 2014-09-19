@@ -461,7 +461,7 @@ exports.createClient = function(options, callback) {
 
     if (client && client.state === STATE_STARTED) {
       try {
-        client.messenger.send();
+        client._messenger.send();
         client.stop();
       } catch (err) {
         logger.caught('createClient.on.exit', client.id, err);
@@ -486,7 +486,7 @@ exports.createClient = function(options, callback) {
       logger.log('emit', previousActiveClient.id, 'error', error);
       previousActiveClient.emit('error', error);
       process.nextTick(function() {
-        client.performConnect(function(err) {
+        client._performConnect(function(err) {
           if (callback) callback.apply(client, [err, client]);
         }, true);
       });
@@ -494,7 +494,7 @@ exports.createClient = function(options, callback) {
   } else {
     activeClientList.add(client);
     process.nextTick(function() {
-      client.performConnect(function(err) {
+      client._performConnect(function(err) {
         if (callback) callback.apply(client, [err, client]);
       }, true);
     });
@@ -743,7 +743,7 @@ var Client = function(service, id, securityOptions) {
    * Internal helper function for public methods, to return the current value of
    * _service, regardless of state.
    */
-  this.getService = function() {
+  this._getService = function() {
     return _service;
   };
 
@@ -752,7 +752,7 @@ var Client = function(service, id, securityOptions) {
    * TODO - Ideally we should not have this (i.e. methods that change state
    *        should be defined in the constructor.
    */
-  this.setState = function(value) {
+  this._setState = function(value) {
     _state = value;
   };
 
@@ -833,8 +833,8 @@ var Client = function(service, id, securityOptions) {
   }
 
   // Add generateServiceList function to client with embedded securityOptions
-  this.generateServiceList = function(service) {
-    logger.entry('generateServiceList', _id);
+  this._generateServiceList = function(service) {
+    logger.entry('_generateServiceList', _id);
     logger.log('parms', _id, 'service:',
         String(service).replace(/:[^\/:]+@/g, ':********@'));
     logger.log('parms', _id, 'securityOptions:',
@@ -846,16 +846,16 @@ var Client = function(service, id, securityOptions) {
     var inputServiceList = [];
     if (!service) {
       err = new TypeError('service is undefined');
-      logger.throw('generateServiceList', _id, err);
+      logger.throw('_generateServiceList', _id, err);
       throw err;
     } else if (service instanceof Function) {
       err = new TypeError('service cannot be a function');
-      logger.throw('generateServiceList', _id, err);
+      logger.throw('_generateServiceList', _id, err);
       throw err;
     } else if (service instanceof Array) {
       if (service.length === 0) {
         err = new TypeError('service array is empty');
-        logger.throw('generateServiceList', _id, err);
+        logger.throw('_generateServiceList', _id, err);
         throw err;
       }
       inputServiceList = service;
@@ -863,7 +863,7 @@ var Client = function(service, id, securityOptions) {
       inputServiceList[0] = service;
     } else {
       err = new TypeError('service must be a string or array type');
-      logger.throw('generateServiceList', _id, err);
+      logger.throw('_generateServiceList', _id, err);
       throw err;
     }
 
@@ -893,7 +893,7 @@ var Client = function(service, id, securityOptions) {
           msg = "URLs supplied via the 'service' property must specify both a" +
                 ' user name and a password value, or omit both values';
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', _id, err);
+          logger.throw('_generateServiceList', _id, err);
           throw err;
         }
         if (securityOptions.propertyUser && authUser &&
@@ -903,7 +903,7 @@ var Client = function(service, id, securityOptions) {
                 "supplied via a URL passed via the 'service' property (" +
                 authUser + ')';
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', _id, err);
+          logger.throw('_generateServiceList', _id, err);
           throw err;
         }
         if (securityOptions.propertyPassword && authPassword &&
@@ -911,7 +911,7 @@ var Client = function(service, id, securityOptions) {
           msg = "Password supplied as 'password' property does not match a " +
                 "password supplied via a URL passed via the 'service' property";
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', _id, err);
+          logger.throw('_generateServiceList', _id, err);
           throw err;
         }
         if (i === 0) {
@@ -928,13 +928,13 @@ var Client = function(service, id, securityOptions) {
           msg = "URLs supplied via the 'service' property contain " +
                 'inconsistent user names';
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', _id, err);
+          logger.throw('_generateServiceList', _id, err);
           throw err;
         } else if (securityOptions.urlPassword !== authPassword) {
           msg = "URLs supplied via the 'service' property contain " +
                 'inconsistent password values';
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', _id, err);
+          logger.throw('_generateServiceList', _id, err);
           throw err;
         }
       }
@@ -945,7 +945,7 @@ var Client = function(service, id, securityOptions) {
               "' specified for service. Only the amqp or amqps protocol are " +
               'supported.';
         err = new InvalidArgumentError(msg);
-        logger.throw('generateServiceList', _id, err);
+        logger.throw('_generateServiceList', _id, err);
         throw err;
       }
       // Check we have a hostname
@@ -954,7 +954,7 @@ var Client = function(service, id, securityOptions) {
         msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
               'service. Must supply a hostname.';
         err = new InvalidArgumentError(msg);
-        logger.throw('generateServiceList', _id, err);
+        logger.throw('_generateServiceList', _id, err);
         throw err;
       }
       // Set default port if not supplied
@@ -968,7 +968,7 @@ var Client = function(service, id, securityOptions) {
         msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
               " ) can't be part of a service URL.";
         err = new InvalidArgumentError(msg);
-        logger.throw('generateServiceList', _id, err);
+        logger.throw('_generateServiceList', _id, err);
         throw err;
       }
 
@@ -978,7 +978,7 @@ var Client = function(service, id, securityOptions) {
       }
     }
 
-    logger.exit('generateServiceList', _id,
+    logger.exit('_generateServiceList', _id,
                 [
                   'serviceList:',
                   String(serviceList).replace(/:[^\/:]+@/g, ':********@'),
@@ -988,9 +988,9 @@ var Client = function(service, id, securityOptions) {
   };
 
   // performs the connect
-  this.performConnect = function(callback, newClient) {
+  this._performConnect = function(callback, newClient) {
     var client = this;
-    logger.entry('Client.connect.performConnect', _id, newClient);
+    logger.entry('Client.connect._performConnect', _id, newClient);
 
     var err = null;
 
@@ -1008,13 +1008,13 @@ var Client = function(service, id, securityOptions) {
       if (callback) {
         err = new LocalReplacedError(_id);
         process.nextTick(function() {
-          logger.entry('Client.connect.performConnect.callback', _id);
+          logger.entry('Client.connect._performConnect.callback', _id);
           callback.apply(client, [err]);
-          logger.exit('Client.connect.performConnect.callback', _id,
+          logger.exit('Client.connect._performConnect.callback', _id,
               null);
         });
       }
-      logger.exit('Client.connect.performConnect', _id, null);
+      logger.exit('Client.connect._performConnect', _id, null);
       return;
     }
 
@@ -1032,7 +1032,7 @@ var Client = function(service, id, securityOptions) {
               });
             } else {
               process.nextTick(function() {
-                client.performConnect(callback, newClient);
+                client._performConnect(callback, newClient);
               });
             }
 
@@ -1042,20 +1042,20 @@ var Client = function(service, id, securityOptions) {
           setImmediate(function() {
             stillDisconnecting(client, callback);
           });
-          logger.exit('Client.connect.performConnect', _id, null);
+          logger.exit('Client.connect._performConnect', _id, null);
           return;
         } else {
           process.nextTick(function() {
             if (callback) {
-              logger.entry('Client.connect.performConnect.callback',
+              logger.entry('Client.connect._performConnect.callback',
                   _id);
               callback.apply(client);
-              logger.exit('Client.connect.performConnect.callback',
+              logger.exit('Client.connect._performConnect.callback',
                           _id, null);
             }
           });
 
-          logger.exit('Client.connect.performConnect', _id, client);
+          logger.exit('Client.connect._performConnect', _id, client);
           return client;
         }
       }
@@ -1065,11 +1065,11 @@ var Client = function(service, id, securityOptions) {
       }
 
       // If the messenger is not already stopped then something has gone wrong
-      if (client.messenger && !client.messenger.stopped) {
+      if (client._messenger && !client._messenger.stopped) {
         err = new Error('messenger is not stopped');
-        logger.ffdc('Client.connect.performConnect', 'ffdc001', _id,
+        logger.ffdc('Client.connect._performConnect', 'ffdc001', _id,
             err);
-        logger.throw('Client.connect.performConnect', _id, err);
+        logger.throw('Client.connect._performConnect', _id, err);
         throw err;
       }
     } else {
@@ -1079,44 +1079,43 @@ var Client = function(service, id, securityOptions) {
     // Obtain the list of services for connect and connect to one of the
     // services, retrying until a connection can be established
     var serviceList;
-    if (client.serviceFunction instanceof Function) {
-      client.serviceFunction(function(err, service) {
+    if (client._serviceFunction instanceof Function) {
+      client._serviceFunction(function(err, service) {
         if (err) {
-          logger.entry('Client.connect.performConnect.serviceFunction.callback',
+          logger.entry('Client._serviceFunction.callback',
                        _id);
           callback.apply(client, [err]);
-          logger.exit('Client.connect.performConnect.serviceFunction.callback',
+          logger.exit('Client._serviceFunction.callback',
               _id, null);
         } else {
           try {
             serviceList =
-                client.generateServiceList.apply(client, [service]);
-            client.connectToService(serviceList, callback);
+                client._generateServiceList.apply(client, [service]);
+            client._connectToService(serviceList, callback);
           } catch (err) {
-            var name = 'Client.connect.performConnect.serviceFunction.callback';
-            logger.entry(name, _id);
+            logger.entry('Client._serviceFunction.callback', _id);
             callback.apply(client, [err]);
-            logger.exit(name, _id, null);
+            logger.exit('Client._serviceFunction.callback', _id, null);
           }
         }
       });
     } else {
       try {
-        serviceList = client.generateServiceList.apply(client, [service]);
-        client.connectToService(serviceList, callback);
+        serviceList = client._generateServiceList.apply(client, [service]);
+        client._connectToService(serviceList, callback);
       } catch (err) {
         if (callback) {
           process.nextTick(function() {
-            logger.entry('Client.connect.performConnect.callback', _id);
+            logger.entry('Client.connect._performConnect.callback', _id);
             callback.apply(client, [err]);
-            logger.exit('Client.connect.performConnect.callback', _id,
+            logger.exit('Client.connect._performConnect.callback', _id,
                         null);
           });
         }
       }
     }
 
-    logger.exit('Client.connect.performConnect', _id, null);
+    logger.exit('Client.connect._performConnect', _id, null);
     return;
   };
 
@@ -1130,18 +1129,18 @@ var Client = function(service, id, securityOptions) {
   * @param {connectCallback}
   *  - callback called when connect/reconnect happens
   */
-  this.connectToService = function(serviceList, callback) {
+  this._connectToService = function(serviceList, callback) {
     var client = this;
-    logger.entry('Client.connectToService', _id);
+    logger.entry('Client._connectToService', _id);
 
     if (client.isStopped()) {
       if (callback) {
-        logger.entry('Client.connectToService.callback', _id);
+        logger.entry('Client._connectToService.callback', _id);
         callback.apply(client,
                        [new StoppedError('connect aborted due to stop')]);
-        logger.exit('Client.connectToService.callback', _id, null);
+        logger.exit('Client._connectToService.callback', _id, null);
       }
-      logger.exit('Client.connectToService', _id, null);
+      logger.exit('Client._connectToService', _id, null);
       return;
     }
 
@@ -1192,9 +1191,9 @@ var Client = function(service, id, securityOptions) {
             connectUrl.pathname = connectUrl.path = null;
           }
           try {
-            client.messenger.connect(connectUrl,
-                                     securityOptions.sslTrustCertificate,
-                                     securityOptions.sslVerifyName);
+            client._messenger.connect(connectUrl,
+                                      securityOptions.sslTrustCertificate,
+                                      securityOptions.sslVerifyName);
             logger.log('data', _id, 'successfully connected to: ' +
                 logUrl);
             _service = serviceList[i];
@@ -1209,9 +1208,9 @@ var Client = function(service, id, securityOptions) {
           // should never get here, as it means that messenger.connect has been
           // called in an invalid way, so FFDC
           error = err;
-          logger.caught('Client.connectToService', _id, err);
-          logger.ffdc('Client.connectToService', 'ffdc002', _id, err);
-          logger.throw('Client.connectToService', _id, err);
+          logger.caught('Client._connectToService', _id, err);
+          logger.ffdc('Client._connectToService', 'ffdc002', _id, err);
+          logger.throw('Client._connectToService', _id, err);
           throw err;
         }
       }
@@ -1222,17 +1221,17 @@ var Client = function(service, id, securityOptions) {
       // Indicate that we're started
       _state = STATE_STARTED;
       var eventToEmit;
-      if (client.firstStart) {
+      if (client._firstStart) {
         eventToEmit = STATE_STARTED;
-        client.firstStart = false;
-        client.retryCount = 0;
+        client._firstStart = false;
+        client._retryCount = 0;
         // could be queued actions so need to process those here. On reconnect
         // this would be done via the callback we set, first connect its the
         // users callback so won't process anything.
         logger.log('data', _id, 'first start since being stopped');
         processQueuedActions.apply(client);
       } else {
-        client.retryCount = 0;
+        client._retryCount = 0;
         eventToEmit = STATE_RESTARTED;
       }
       ++client._connectionId;
@@ -1244,29 +1243,29 @@ var Client = function(service, id, securityOptions) {
 
       if (callback) {
         process.nextTick(function() {
-          logger.entry('Client.connectToService.callback', _id);
+          logger.entry('Client._connectToService.callback', _id);
           callback.apply(client);
-          logger.exit('Client.connectToService.callback', _id, null);
+          logger.exit('Client._connectToService.callback', _id, null);
         });
       }
 
       // Setup heartbeat timer to ensure that while connected we send heartbeat
       // frames to keep the connection alive, when required.
       var remoteIdleTimeout =
-          client.messenger.getRemoteIdleTimeout(_service);
+          client._messenger.getRemoteIdleTimeout(_service);
       var heartbeatInterval = remoteIdleTimeout > 0 ?
           remoteIdleTimeout / 2 : remoteIdleTimeout;
       logger.log('data', _id, 'set heartbeatInterval to: ',
                  heartbeatInterval);
       if (heartbeatInterval > 0) {
         var performHeartbeat = function(client, heartbeatInterval) {
-          logger.entry('Client.connectToService.performHeartbeat', _id);
-          if (client.messenger) {
-            client.messenger.work(0);
+          logger.entry('Client._connectToService.performHeartbeat', _id);
+          if (client._messenger) {
+            client._messenger.work(0);
             client.heartbeatTimeout = setTimeout(performHeartbeat,
                 heartbeatInterval, client, heartbeatInterval);
           }
-          logger.exit('Client.connectToService.performHeartbeat',
+          logger.exit('Client._connectToService.performHeartbeat',
                       _id, null);
         };
         client.heartbeatTimeout = setTimeout(performHeartbeat,
@@ -1281,16 +1280,16 @@ var Client = function(service, id, securityOptions) {
       var retry = function() {
         logger.entryLevel('entry_often', 'retry', _id);
         if (!client.isStopped()) {
-          client.performConnect.apply(client, [callback, false]);
+          client._performConnect.apply(client, [callback, false]);
         }
         logger.exitLevel('exit_often', 'retry', _id);
       };
 
-      client.retryCount++;
+      client._retryCount++;
       var retryCap = 60000;
       //limit to the power of 8 as anything above this will put the interval
       //higher than the cap straight away.
-      var exponent = (client.retryCount <= 8) ? client.retryCount : 8;
+      var exponent = (client._retryCount <= 8) ? client._retryCount : 8;
       var upperBound = Math.pow(2, exponent);
       var lowerBound = 0.75 * upperBound;
       var jitter = Math.random() * (0.25 * upperBound);
@@ -1306,7 +1305,7 @@ var Client = function(service, id, securityOptions) {
       }
     }
 
-    logger.exit('Client.connectToService', _id, null);
+    logger.exit('Client._connectToService', _id, null);
     return;
   };
 
@@ -1368,46 +1367,46 @@ var Client = function(service, id, securityOptions) {
   }
 
   // Save the required data as client fields
-  this.serviceFunction = serviceFunction;
-  this.serviceList = serviceList;
+  this._serviceFunction = serviceFunction;
+  this._serviceList = serviceList;
   _id = id;
 
   logger.entry('proton.createMessenger', _id);
-  this.messenger = proton.createMessenger(_id);
+  this._messenger = proton.createMessenger(_id);
   logger.exit('proton.createMessenger', _id, null);
 
   // Set the initial state to starting
   _state = STATE_STARTING;
   _service = null;
   // the first start, set to false after start and back to true on stop
-  this.firstStart = true;
+  this._firstStart = true;
 
   // List of message subscriptions
-  this.subscriptions = [];
+  this._subscriptions = [];
   // List of queued subscriptions
-  this.queuedSubscriptions = [];
+  this._queuedSubscriptions = [];
   // List of queued unsubscribe requests
-  this.queuedUnsubscribes = [];
+  this._queuedUnsubscribes = [];
 
   // List of outstanding send operations waiting to be accepted, settled, etc
   // by the listener.
-  this.outstandingSends = [];
+  this._outstandingSends = [];
   // List of queuedSends for resending on a reconnect
-  this.queuedSends = [];
+  this._queuedSends = [];
   // List of callbacks to notify when a send operation completes
-  this.queuedSendCallbacks = [];
+  this._queuedSendCallbacks = [];
 
   // No drain event initially required
-  this.drainEventRequired = false;
+  this._drainEventRequired = false;
 
   // Number of attempts the client has tried to reconnect
-  this.retryCount = 0;
+  this._retryCount = 0;
 
   // An identifier for the connection
   this._connectionId = 0;
 
   if (!serviceFunction) {
-    serviceList = this.generateServiceList.apply(this, [service]);
+    serviceList = this._generateServiceList.apply(this, [service]);
   }
   logger.exit('Client.constructor', _id, this);
 };
@@ -1459,13 +1458,13 @@ Client.prototype.start = function(callback) {
       logger.log('emit', previousActiveClient.id, 'error', error);
       previousActiveClient.emit('error', error);
       process.nextTick(function() {
-        client.performConnect(callback, false);
+        client._performConnect(callback, false);
       });
     });
   } else {
     activeClientList.add(client);
     process.nextTick(function() {
-      client.performConnect(callback, false);
+      client._performConnect(callback, false);
     });
   }
 
@@ -1503,8 +1502,8 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
 
   // If messenger available then request it to stop
   // (otherwise it must have already been stopped)
-  if (client.messenger) {
-    stopped = client.messenger.stop();
+  if (client._messenger) {
+    stopped = client._messenger.stop();
   }
 
   // If stopped then perform the required stop processing
@@ -1551,17 +1550,17 @@ Client.prototype.stop = function(callback) {
   var performDisconnect = function(client, callback) {
     logger.entry('Client.stop.performDisconnect', client.id);
 
-    client.setState(STATE_STOPPING);
+    client._setState(STATE_STOPPING);
 
     // Only disconnect when all outstanding send operations are complete
-    if (client.outstandingSends.length === 0) {
+    if (client._outstandingSends.length === 0) {
       stopMessenger(client, function(client, callback) {
         logger.entry('Client.stop.performDisconnect.stopProcessing',
             client.id);
         if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
         // clear queuedSends as we are disconnecting
-        while (client.queuedSends.length > 0) {
-          var msg = client.queuedSends.shift();
+        while (client._queuedSends.length > 0) {
+          var msg = client._queuedSends.shift();
           // call the callback in error as we have disconnected
           process.nextTick(function() {
             logger.entry('Client.stop.performDisconnect.' +
@@ -1572,20 +1571,20 @@ Client.prototype.stop = function(callback) {
           });
         }
         // clear the active subscriptions list as we were asked to disconnect
-        logger.log('data', client.id, 'client.subscriptions:',
-                   client.subscriptions);
-        while (client.subscriptions.length > 0) {
-          client.subscriptions.shift();
+        logger.log('data', client.id, 'client._subscriptions:',
+                   client._subscriptions);
+        while (client._subscriptions.length > 0) {
+          client._subscriptions.shift();
         }
         // Indicate that we've disconnected
-        client.setState(STATE_STOPPED);
+        client._setState(STATE_STOPPED);
         // Remove ourself from the active client list
         var activeClient = activeClientList.get(client.id);
         if (client === activeClient) activeClientList.remove(client.id);
         process.nextTick(function() {
           logger.log('emit', client.id, STATE_STOPPED);
-          if (!client.firstStart) {
-            client.firstStart = true;
+          if (!client._firstStart) {
+            client._firstStart = true;
             client.emit(STATE_STOPPED);
           }
         });
@@ -1668,7 +1667,7 @@ var reconnect = function(client) {
       return client;
     }
   }
-  client.setState(STATE_RETRYING);
+  client._setState(STATE_RETRYING);
 
   // stop the messenger to free the object then attempt a reconnect
   stopMessenger(client, function(client) {
@@ -1679,16 +1678,16 @@ var reconnect = function(client) {
     // clear the subscriptions list, if the cause of the reconnect happens
     // during check for messages we need a 0 length so it will check once
     // reconnected.
-    logger.log('data', client.id, 'client.subscriptions:',
-               client.subscriptions);
-    while (client.subscriptions.length > 0) {
-      client.queuedSubscriptions.push(client.subscriptions.shift());
+    logger.log('data', client.id, 'client._subscriptions:',
+               client._subscriptions);
+    while (client._subscriptions.length > 0) {
+      client._queuedSubscriptions.push(client._subscriptions.shift());
     }
     // also clear any left over outstanding sends
-    while (client.outstandingSends.length > 0) {
-      client.outstandingSends.shift();
+    while (client._outstandingSends.length > 0) {
+      client._outstandingSends.shift();
     }
-    client.performConnect.apply(client, [processQueuedActions, false]);
+    client._performConnect.apply(client, [processQueuedActions, false]);
 
     logger.exit('Client.reconnect.stopProcessing', client.id, null);
   });
@@ -1725,11 +1724,11 @@ var processQueuedActions = function(err) {
   logger.log('data', client.id, 'client.state:', client.state);
 
   if (!err) {
-    logger.log('data', client.id, 'client.queuedSubscriptions',
-               client.queuedSubscriptions);
-    while (client.queuedSubscriptions.length > 0 &&
+    logger.log('data', client.id, 'client._queuedSubscriptions',
+               client._queuedSubscriptions);
+    while (client._queuedSubscriptions.length > 0 &&
             client.state === STATE_STARTED) {
-      var sub = client.queuedSubscriptions.shift();
+      var sub = client._queuedSubscriptions.shift();
       if (sub.noop) {
         // no-op, so just trigger the callback without actually subscribing
         if (sub.callback) {
@@ -1747,11 +1746,11 @@ var processQueuedActions = function(err) {
                          sub.callback);
       }
     }
-    logger.log('data', client.id, 'client.queuedUnsubscribes',
-               client.queuedUnsubscribes);
-    while (client.queuedUnsubscribes.length > 0 &&
+    logger.log('data', client.id, 'client._queuedUnsubscribes',
+               client._queuedUnsubscribes);
+    while (client._queuedUnsubscribes.length > 0 &&
             client.state === STATE_STARTED) {
-      var rm = client.queuedUnsubscribes.shift();
+      var rm = client._queuedUnsubscribes.shift();
       if (rm.noop) {
         // no-op, so just trigger the callback without actually unsubscribing
         if (rm.callback) {
@@ -1761,11 +1760,11 @@ var processQueuedActions = function(err) {
         client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
       }
     }
-    logger.log('data', client.id, 'client.queuedSends',
-               client.queuedSends);
-    while (client.queuedSends.length > 0 &&
+    logger.log('data', client.id, 'client._queuedSends',
+               client._queuedSends);
+    while (client._queuedSends.length > 0 &&
             client.state === STATE_STARTED) {
-      var msg = client.queuedSends.shift();
+      var msg = client._queuedSends.shift();
       client.send(msg.topic, msg.data, msg.options, msg.callback);
     }
   }
@@ -1911,27 +1910,27 @@ Client.prototype.send = function(topic, data, options, callback) {
 
   // Ensure we are not retrying otherwise queue message and return
   if (this.state === STATE_RETRYING || this.state === STATE_STARTING) {
-    this.queuedSends.push({
+    this._queuedSends.push({
       topic: topic,
       data: data,
       options: options,
       callback: callback
     });
-    this.drainEventRequired = true;
+    this._drainEventRequired = true;
     logger.exit('Client.send', this.id, false);
     return false;
   }
 
   // Send the data as a message to the specified topic
   var client = this;
-  var messenger = client.messenger;
+  var messenger = client._messenger;
   var protonMsg;
   var inOutstandingSends = false;
   try {
     logger.entry('proton.createMessage', client.id);
     protonMsg = proton.createMessage();
     logger.exit('proton.createMessage', client.id, protonMsg);
-    protonMsg.address = client.getService();
+    protonMsg.address = client._getService();
     if (topic) {
       // need to encode the topic component but / has meaning that shouldn't be
       // encoded
@@ -1957,7 +1956,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     }
 
     // Record that a send operation is in progress
-    client.outstandingSends.push({
+    client._outstandingSends.push({
       msg: protonMsg,
       qos: qos,
       callback: callback,
@@ -1969,18 +1968,18 @@ Client.prototype.send = function(topic, data, options, callback) {
     messenger.put(protonMsg, qos);
     messenger.send();
 
-    if (client.outstandingSends.length === 1) {
+    if (client._outstandingSends.length === 1) {
       var sendOutboundMessages = function() {
         logger.entry('Client.send.sendOutboundMessages');
         logger.log('debug', client.id,
-                   'outstandingSends:', client.outstandingSends.length);
+                   'outstandingSends:', client._outstandingSends.length);
         try {
           var inFlight;
           if (!messenger.stopped) {
             // Write any data buffered within messenger
             var tries = 50;
             while (tries-- > 0 &&
-                   messenger.pendingOutbound(client.getService())) {
+                   messenger.pendingOutbound(client._getService())) {
               messenger.send();
             }
             if (tries === 0) {
@@ -1988,8 +1987,8 @@ Client.prototype.send = function(topic, data, options, callback) {
             }
 
             // See if any of the outstanding send operations have now completed
-            while (client.outstandingSends.length > 0) {
-              inFlight = client.outstandingSends.slice(0, 1)[0];
+            while (client._outstandingSends.length > 0) {
+              inFlight = client._outstandingSends.slice(0, 1)[0];
               var status = messenger.status(inFlight.msg);
               var complete = false;
               var err = null;
@@ -2030,12 +2029,12 @@ Client.prototype.send = function(topic, data, options, callback) {
 
               if (complete) {
                 // Remove send operation from list of outstanding send ops.
-                client.outstandingSends.shift();
+                client._outstandingSends.shift();
 
                 // Generate drain event, if required.
-                if (client.drainEventRequired &&
-                    (client.outstandingSends.length <= 1)) {
-                  client.drainEventRequired = false;
+                if (client._drainEventRequired &&
+                    (client._outstandingSends.length <= 1)) {
+                  client._drainEventRequired = false;
                   process.nextTick(function() {
                     logger.log('emit', client.id, 'drain');
                     client.emit('drain');
@@ -2066,9 +2065,9 @@ Client.prototype.send = function(topic, data, options, callback) {
           } else {
             // messenger has been stopped.
             var callbackError = null;
-            while (client.outstandingSends.length > 0) {
-              inFlight = client.outstandingSends.shift();
-              client.queuedSends.push({
+            while (client._outstandingSends.length > 0) {
+              inFlight = client._outstandingSends.shift();
+              client._queuedSends.push({
                 topic: inFlight.topic,
                 data: inFlight.msg.body,
                 options: inFlight.options,
@@ -2089,11 +2088,11 @@ Client.prototype.send = function(topic, data, options, callback) {
           logger.caught('Client.send.sendOutboundMessages', client.id, error);
 
           // Error - so empty the outstandingSends array:
-          while (client.outstandingSends.length > 0) {
-            inFlight = client.outstandingSends.shift();
+          while (client._outstandingSends.length > 0) {
+            inFlight = client._outstandingSends.shift();
             if (inFlight.qos === exports.QOS_AT_LEAST_ONCE) {
               // Retry at-least-once qos messages
-              client.queuedSends.push({
+              client._queuedSends.push({
                 topic: inFlight.topic,
                 data: inFlight.msg.body,
                 options: inFlight.options,
@@ -2143,11 +2142,11 @@ Client.prototype.send = function(topic, data, options, callback) {
     // If we have a backlog of messages, then record the need to emit a drain
     // event later to indicate the backlog has been cleared.
     logger.log('debug', client.id,
-               'outstandingSends:', client.outstandingSends.length);
-    if (client.outstandingSends.length <= 1) {
+               'outstandingSends:', client._outstandingSends.length);
+    if (client._outstandingSends.length <= 1) {
       nextMessage = true;
     } else {
-      client.drainEventRequired = true;
+      client._drainEventRequired = true;
     }
   } catch (exception) {
     err = getNamedError(exception);
@@ -2156,11 +2155,11 @@ Client.prototype.send = function(topic, data, options, callback) {
     // error condition so won't retry send need to remove it from list of
     // unsent
     if (inOutstandingSends) {
-      client.outstandingSends.shift();
+      client._outstandingSends.shift();
     }
 
     if (qos === exports.QOS_AT_LEAST_ONCE) {
-      client.queuedSends.push({
+      client._queuedSends.push({
         topic: topic,
         data: data,
         options: options,
@@ -2171,11 +2170,11 @@ Client.prototype.send = function(topic, data, options, callback) {
     // Reconnect can result in many callbacks being fired in a single tick,
     // group these together into a single setImmediate - to avoid them being
     // spread out over a, potentially, long period of time.
-    if (client.queuedSendCallbacks.length === 0) {
+    if (client._queuedSendCallbacks.length === 0) {
       setImmediate(function() {
         var doReconnect = false;
-        while (client.queuedSendCallbacks.length > 0) {
-          var invocation = client.queuedSendCallbacks.shift();
+        while (client._queuedSendCallbacks.length > 0) {
+          var invocation = client._queuedSendCallbacks.shift();
           if (invocation.callback) {
             if (invocation.qos === exports.QOS_AT_MOST_ONCE) {
               logger.entry('Client.send.callback', client.id);
@@ -2200,7 +2199,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       });
     }
 
-    client.queuedSendCallbacks.push({
+    client._queuedSendCallbacks.push({
       body: protonMsg.body,
       callback: callback,
       error: err,
@@ -2226,8 +2225,8 @@ Client.prototype.send = function(topic, data, options, callback) {
 Client.prototype.checkForMessages = function() {
   var client = this;
   logger.entryLevel('entry_often', 'checkForMessages', client.id);
-  var messenger = client.messenger;
-  if (client.state !== STATE_STARTED || client.subscriptions.length === 0 ||
+  var messenger = client._messenger;
+  if (client.state !== STATE_STARTED || client._subscriptions.length === 0 ||
       client.listeners('message').length === 0) {
     logger.exitLevel('exit_often', 'checkForMessages', client.id);
     return;
@@ -2269,7 +2268,7 @@ Client.prototype.checkForMessages = function() {
 
 var processMessage = function(client, protonMsg) {
   logger.entryLevel('entry_often', 'processMessage', client.id);
-  var messenger = client.messenger;
+  var messenger = client._messenger;
   Object.defineProperty(protonMsg, 'connectionId', {
     value: client._connectionId
   });
@@ -2292,9 +2291,9 @@ var processMessage = function(client, protonMsg) {
       decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
   var autoConfirm = true;
   var qos = exports.QOS_AT_MOST_ONCE;
-  var matchedSubs = client.subscriptions.filter(function(el) {
+  var matchedSubs = client._subscriptions.filter(function(el) {
     // 1 added to length to account for the / we add
-    var addressNoService = el.address.slice(client.getService().length + 1);
+    var addressNoService = el.address.slice(client._getService().length + 1);
     // possible to have 2 matches work out whether this is
     // for a share or private topic
     if (typeof el.share === 'undefined' &&
@@ -2379,7 +2378,7 @@ var processMessage = function(client, protonMsg) {
         if ((available / subscription.confirmed) <= 1.25 ||
             (subscription.unconfirmed === 0 &&
             subscription.confirmed > 0)) {
-          messenger.flow(client.getService() + '/' + protonMsg.linkAddress,
+          messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
                                subscription.confirmed);
           subscription.confirmed = 0;
         }
@@ -2478,7 +2477,7 @@ var processMessage = function(client, protonMsg) {
       if ((available / subscription.confirmed <= 1.25) ||
           (subscription.unconfirmed === 0 &&
           subscription.confirmed > 0)) {
-        messenger.flow(client.getService() + '/' + protonMsg.linkAddress,
+        messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
                              subscription.confirmed);
         subscription.confirmed = 0;
       }
@@ -2664,18 +2663,18 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   // Subscribe using the specified topic pattern and share options
   var client = this;
-  var messenger = client.messenger;
-  var address = client.getService() + '/' + share + topicPattern;
-  var subscriptionAddress = client.getService() + '/' + topicPattern;
+  var messenger = client._messenger;
+  var address = client._getService() + '/' + share + topicPattern;
+  var subscriptionAddress = client._getService() + '/' + topicPattern;
 
   var i = 0;
 
   // if client is in the retrying state, then queue this subscribe request
   if (client.state === STATE_RETRYING || client.state === STATE_STARTING) {
     // reject queued subscription if one already exists
-    for (i = 0; i < client.queuedSubscriptions.length; i++) {
-      if (client.queuedSubscriptions[i].address === subscriptionAddress &&
-          client.queuedSubscriptions[i].share === originalShareValue) {
+    for (i = 0; i < client._queuedSubscriptions.length; i++) {
+      if (client._queuedSubscriptions[i].address === subscriptionAddress &&
+          client._queuedSubscriptions[i].share === originalShareValue) {
         err = new SubscribedError('client already has a queued subscription ' +
                                   'to this address');
         logger.throw('Client.subscribe', this.id, err);
@@ -2684,7 +2683,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
     logger.log('data', client.id, 'client waiting for connection so queued ' +
                'subscription');
-    client.queuedSubscriptions.push({
+    client._queuedSubscriptions.push({
       address: subscriptionAddress,
       qos: qos,
       autoConfirm: autoConfirm,
@@ -2701,9 +2700,9 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   // if we already believe this subscription exists, we should reject the
   // request to subscribe by throwing a SubscribedError
-  for (i = 0; i < client.subscriptions.length; i++) {
-    if (client.subscriptions[i].address === subscriptionAddress &&
-        client.subscriptions[i].share === originalShareValue) {
+  for (i = 0; i < client._subscriptions.length; i++) {
+    if (client._subscriptions[i].address === subscriptionAddress &&
+        client._subscriptions[i].share === originalShareValue) {
       err = new SubscribedError('client is already subscribed to this address');
       logger.throw('Client.subscribe', this.id, err);
       throw err;
@@ -2738,7 +2737,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       logger.log('data', client.id, 'queued subscription and calling ' +
                  'reconnect');
       // error during subscribe so add to list of queued to resub
-      client.queuedSubscriptions.push({
+      client._queuedSubscriptions.push({
         address: subscriptionAddress,
         qos: qos,
         autoConfirm: autoConfirm,
@@ -2754,10 +2753,10 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
   } else {
     // if no errors, add this to the stored list of subscriptions
-    var isFirstSub = (client.subscriptions.length === 0);
+    var isFirstSub = (client._subscriptions.length === 0);
     logger.log('data', client.id, 'isFirstSub:', isFirstSub);
 
-    client.subscriptions.push({
+    client._subscriptions.push({
       address: subscriptionAddress,
       qos: qos,
       autoConfirm: autoConfirm,
@@ -2910,25 +2909,25 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   }
 
   var client = this;
-  var messenger = client.messenger;
-  var address = client.getService() + '/' + share + topicPattern;
-  var subscriptionAddress = client.getService() + '/' + topicPattern;
+  var messenger = client._messenger;
+  var address = client._getService() + '/' + share + topicPattern;
+  var subscriptionAddress = client._getService() + '/' + topicPattern;
 
   // Check that there is actually a subscription for the pattern and share
   var subscribed = false;
   var i = 0;
-  for (i = 0; i < client.subscriptions.length; i++) {
-    if (client.subscriptions[i].address === subscriptionAddress &&
-        client.subscriptions[i].share === originalShareValue) {
+  for (i = 0; i < client._subscriptions.length; i++) {
+    if (client._subscriptions[i].address === subscriptionAddress &&
+        client._subscriptions[i].share === originalShareValue) {
       subscribed = true;
       break;
     }
   }
   if (!subscribed) {
-    for (i = 0; i < client.queuedSubscriptions.length; i++) {
-      if (client.queuedSubscriptions[i].address === subscriptionAddress &&
-          client.queuedSubscriptions[i].share === originalShareValue &&
-          !(client.queuedSubscriptions[i].noop)) {
+    for (i = 0; i < client._queuedSubscriptions.length; i++) {
+      if (client._queuedSubscriptions[i].address === subscriptionAddress &&
+          client._queuedSubscriptions[i].share === originalShareValue &&
+          !(client._queuedSubscriptions[i].noop)) {
         subscribed = true;
         break;
       }
@@ -2940,11 +2939,11 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     // as a no-op operation, so the callback is called but a no-op takes place
     // on reconnection
     var noop = false;
-    for (var qs = 0; qs < client.queuedSubscriptions.length; qs++) {
-      if (client.queuedSubscriptions[qs].address === subscriptionAddress &&
-          client.queuedSubscriptions[qs].share === originalShareValue &&
-          !(client.queuedSubscriptions[qs].noop)) {
-        noop = client.queuedSubscriptions[qs].noop = true;
+    for (var qs = 0; qs < client._queuedSubscriptions.length; qs++) {
+      if (client._queuedSubscriptions[qs].address === subscriptionAddress &&
+          client._queuedSubscriptions[qs].share === originalShareValue &&
+          !(client._queuedSubscriptions[qs].noop)) {
+        noop = client._queuedSubscriptions[qs].noop = true;
       }
     }
 
@@ -2957,7 +2956,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
       logger.log('data', client.id, 'client waiting for connection so ' +
                  'queueing the unsubscribe request');
     }
-    client.queuedUnsubscribes.push({
+    client._queuedUnsubscribes.push({
       noop: noop,
       address: subscriptionAddress,
       topicPattern: topicPattern,
@@ -2996,10 +2995,10 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
       }, 100);
     }
     // if no errors, remove this from the stored list of subscriptions
-    for (i = 0; i < client.subscriptions.length; i++) {
-      if (client.subscriptions[i].address === subscriptionAddress &&
-          client.subscriptions[i].share === originalShareValue) {
-        client.subscriptions.splice(i, 1);
+    for (i = 0; i < client._subscriptions.length; i++) {
+      if (client._subscriptions[i].address === subscriptionAddress &&
+          client._subscriptions[i].share === originalShareValue) {
+        client._subscriptions.splice(i, 1);
         break;
       }
     }

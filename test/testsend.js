@@ -428,7 +428,7 @@ module.exports.test_clear_queuedsends_disconnect = function(test) {
       test.deepEqual(client.state, 'stopped',
           'callback called when stopped');
       test.notDeepEqual(err, undefined, 'not undefined so err set');
-      test.equal(client.queuedSends.length, 0, 'no queued sends left');
+      test.equal(client._queuedSends.length, 0, 'no queued sends left');
       mqlight.proton.messenger.send = savedSendFunction;
       clearTimeout(timeout);
       test.done();
@@ -606,7 +606,7 @@ module.exports.test_client_replaced = function(test) {
     test.ok(this === client);
     test.equals(arguments.length, 0);
     test.equals(client.state, 'started');
-    test.equals(client.messenger.stopped, false);
+    test.equals(client._messenger.stopped, false);
 
     client.send('topic', 'data', function(err) {
       test.ok(err instanceof Error);

@@ -158,13 +158,14 @@ module.exports.test_stop_cleared_subscriptions = function(test) {
   var client = mqlight.createClient({service: 'amqp://host'});
   client.on('started', function() {
     client.on('stopped', function() {
-      test.deepEqual(client.subscriptions, [], 'client.subscriptions was not ' +
+      test.deepEqual(client._subscriptions, [],
+                     'client.subscriptions was not ' +
                      'cleared during client.stop() call');
       test.done();
     });
     client.subscribe('/foo', function(err) {
       test.ifError(err);
-      test.deepEqual(client.subscriptions.length, 1, 'client.subscriptions ' +
+      test.deepEqual(client._subscriptions.length, 1, 'client.subscriptions ' +
                      'was not appended to');
       client.stop();
     });

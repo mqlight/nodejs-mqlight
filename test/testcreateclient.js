@@ -386,7 +386,7 @@ module.exports.test_bad_ssl_options = function(test) {
         service: 'amqp://host',
         sslTrustCertificate: testData[i].sslTrustCertificate,
         sslVerifyName: testData[i].sslVerifyName,
-        id: 'test_bad_ssl_options'
+        id: 'test_bad_ssl_options_' + i
       };
       mqlight.createClient(opts);
     }, function(err) {
