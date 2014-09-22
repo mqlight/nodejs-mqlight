@@ -740,15 +740,18 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
   pn_link_close(link);
   Proton::Exit("pn_link_close", name, 0);
 
-  Proton::Entry("pn_messenger_work", name);
-  pn_messenger_work(obj->messenger, 50);
-  int error = pn_messenger_errno(obj->messenger);
-  Proton::Exit("pn_messenger_work", name, error);
-  if (error) {
-    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-    const char* err = GetErrorName(text);
-    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Unsubscribe", name);
+  while (!(pn_link_state(link) & PN_REMOTE_CLOSED)) {
+    Proton::Entry("pn_messenger_work", name);
+    pn_messenger_work(obj->messenger, 50);
+    int error = pn_messenger_errno(obj->messenger);
+    Proton::Exit("pn_messenger_work", name, error);
+    if (error) {
+      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+      const char* err = GetErrorName(text);
+      THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Unsubscribe", name)
+    }
   }
+
   Proton::Exit("ProtonMessenger::Unsubscribe", name, true);
   return scope.Close(Boolean::New(true));
 }
