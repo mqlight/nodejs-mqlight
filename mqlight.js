@@ -795,7 +795,7 @@ var Client = function(service, id, securityOptions) {
    */
   Object.defineProperty(this, 'state', {
     get: function() {
-      logger.log('data', _id, 'Client.state', _state);
+      logger.log('data_often', _id, 'Client.state', _state);
       return _state;
     }
   });
@@ -2296,22 +2296,18 @@ var processMessage = function(client, protonMsg) {
     var addressNoService = el.address.slice(client._getService().length + 1);
     // possible to have 2 matches work out whether this is
     // for a share or private topic
-    if (typeof el.share === 'undefined' &&
-        protonMsg.linkAddress.indexOf('private:') === 0) {
-      // slice off private: and compare to the no service address
-      var linkNoPrivShare = protonMsg.linkAddress.slice(8);
-      if (addressNoService === linkNoPrivShare) {
-        return el;
-      }
-    } else if (typeof el.share !== 'undefined' &&
-        protonMsg.linkAddress.indexOf('share:') === 0) {
+    var linkAddress;
+    if (protonMsg.linkAddress.indexOf('private:') === 0 && !el.share) {
+      // slice off 'private:' prefix
+      linkAddress = protonMsg.linkAddress.slice(8);
+    } else if (protonMsg.linkAddress.indexOf('share:') === 0 && el.share) {
       // starting after the share: look for the next : denoting the end
       // of the share name and get everything past that
-      var linkNoShare = protonMsg.linkAddress.slice(
+      linkAddress = protonMsg.linkAddress.slice(
           protonMsg.linkAddress.indexOf(':', 7) + 1);
-      if (addressNoService === linkNoShare) {
-        return el;
-      }
+    }
+    if (addressNoService === linkAddress) {
+      return el;
     }
   });
   // should only ever be one entry in matchedSubs
