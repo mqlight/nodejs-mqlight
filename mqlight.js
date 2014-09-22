@@ -2059,6 +2059,7 @@ Client.prototype.send = function(topic, data, options, callback) {
                 // Can't make any more progress for now - schedule remaining
                 // work for processing in the future.
                 setImmediate(sendOutboundMessages);
+                logger.exit('Client.send.sendOutboundMessages');
                 return;
               }
             }
@@ -2135,6 +2136,7 @@ Client.prototype.send = function(topic, data, options, callback) {
             throw callbackError;
           }
         }
+        logger.exit('Client.send.sendOutboundMessages');
       };
       setImmediate(sendOutboundMessages);
     }
