@@ -829,19 +829,25 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
           err, text, "exit_often", "ProtonMessenger::Receive", name);
     }
 
-    vector.push_back(msgObj);
     pn_tracker_t tracker = pn_messenger_incoming_tracker(obj->messenger);
     msg->tracker = tracker;
     pn_link_t* link = pn_messenger_tracker_link(obj->messenger, tracker);
     if (link) {
-      msg->linkAddr = pn_terminus_get_address(pn_link_remote_target(link));
+      if (pn_link_state(link) & PN_LOCAL_CLOSED) {
+        Proton::Log("data_often", name, "Link closed, so ignoring received message for address:", pn_message_get_address(msg->message));
+      } else {
+        msg->linkAddr = pn_terminus_get_address(pn_link_remote_target(link));
+        vector.push_back(msgObj);
+      }
+    } else {
+      Proton::Log("data_often", name, "No link associated with received message tracker for address:", pn_message_get_address(msg->message));
+      vector.push_back(msgObj);
     }
   }
 
   Local<Array> messages = Array::New((int)vector.size());
   for (unsigned int i = 0; i < vector.size(); i++) {
     messages->Set(Number::New(i), vector[i]);
-    // messages->Set(Number::New(i), vector[i].handle_);
   }
 
   Proton::Exit("exit_often", "ProtonMessenger::Receive", name, 0);
