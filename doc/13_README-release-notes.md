@@ -16,6 +16,11 @@ that goes to stderr when you run your application.
 
 ### 9.9.9999999999
 
+* Minor fix to mqlight-log.js
+* ...
+
+### 1.0.2014091000
+
 * First official release.
 * Support for supplying time-to-live options when sending a message or creating
   a destination.

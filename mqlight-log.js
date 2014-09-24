@@ -56,8 +56,7 @@ var styles = {
  * heading.
  */
 var write = function(lvl, prefix, args) {
-  npmlog.heading = moment(new Date()).format('HH:mm:ss.SSS') +
-                   ' [' + process.pid + ']';
+  npmlog.heading = moment().format('HH:mm:ss.SSS') + ' [' + process.pid + ']';
   npmlog.log.apply(this, arguments);
 };
 
@@ -73,7 +72,7 @@ var header = function(lvl, clientId, options) {
           options.title);
     write(lvl, clientId, HEADER_BANNER);
     write(lvl, clientId, '| Date/Time         :-',
-          moment(new Date()).format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
+          moment().format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
     write(lvl, clientId, '| Host Name         :-', os.hostname());
     write(lvl, clientId, '| Operating System  :-', os.type(), os.release());
     write(lvl, clientId, '| Architecture      :-', os.platform(), os.arch());
@@ -100,7 +99,7 @@ var header = function(lvl, clientId, options) {
     if ('ffdcSequence' in options) {
       write(lvl, clientId, '| FDCSequenceNumber :-', options.ffdcSequence++);
     }
-    if (potentialUnwinds != 0) {
+    if (potentialUnwinds !== 0) {
       write(lvl, clientId, '| potentialUnwinds :-', potentialUnwinds);
     }
     write(lvl, clientId, HEADER_BANNER);
@@ -297,7 +296,7 @@ logger.exitLevel = function(lvl, name, id, rc) {
     if (stack.length == 1) {
       // We have. Generate an FFDC if we believe the stack to be good. Most
       // likely we've exited with the wrong function name.
-      if (potentialUnwinds == 0) {
+      if (potentialUnwinds === 0) {
         logger.ffdc('logger.exitLevel', 10, null, name);
       }
       potentialUnwinds--;
