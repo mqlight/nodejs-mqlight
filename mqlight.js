@@ -2043,14 +2043,17 @@ Client.prototype.send = function(topic, data, options, callback) {
 
                 // invoke the callback, if specified
                 if (inFlight.callback) {
-                  logger.entry('Client.send.sendOutboundMessages.callback',
-                      client.id);
-                  inFlight.callback.apply(client, [err,
-                                                   inFlight.topic,
-                                                   inFlight.msg.body,
-                                                   inFlight.options]);
-                  logger.exit('Client.send.sendOutboundMessages.callback',
-                      client.id, null);
+                  setImmediate(function(client, err, topic, body, options) {
+                    logger.entry('Client.send.sendOutboundMessages.callback',
+                        client.id);
+                    inFlight.callback.apply(client, [err,
+                                                     topic,
+                                                     body,
+                                                     options]);
+                    logger.exit('Client.send.sendOutboundMessages.callback',
+                        client.id, null);
+                  }, client, err, inFlight.topic, inFlight.msg.body,
+                  inFlight.options);
                 }
 
                 // Free resources used by the message
@@ -2105,18 +2108,22 @@ Client.prototype.send = function(topic, data, options, callback) {
               // otherwise the application could decide to resend (duplicate)
               // the message
               if (inFlight.callback) {
-                logger.entry('Client.send.sendOutboundMessages.callback',
-                    client.id);
-                try {
-                  inFlight.callback.apply(client,
-                      [null, inFlight.topic, inFlight.msg.body, options]);
-                } catch (e) {
-                  logger.caught('Client.send.sendOutboundMessages.callback',
-                                client.id, e);
-                  if (callbackError === null) callbackError = e;
-                }
-                logger.exit('Client.send.sendOutboundMessages.callback',
-                            client.id, null);
+                setImmediate(function(client, error, topic, body, options) {
+                  logger.entry('Client.send.sendOutboundMessages.callback',
+                      client.id);
+                  try {
+                    inFlight.callback.apply(client,
+                        [null, topic, body, options]);
+                  } catch (e) {
+                    logger.caught('Client.send.sendOutboundMessages.callback',
+                                  client.id, e);
+                    if (callbackError === null) callbackError = e;
+                  }
+                  logger.exit('Client.send.sendOutboundMessages.callback',
+                              client.id, null);
+
+                }, client, error, inFlight.topic, inFlight.msg.body,
+                inFlight.options);
               }
 
               if (error) {

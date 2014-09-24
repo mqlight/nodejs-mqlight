@@ -214,27 +214,25 @@ module.exports.test_send_callback = function(test) {
   var client = mqlight.createClient({id: 'test_send_callback', service:
         'amqp://host'});
   var count = 0;
-  var callbackMaker = function(data) {
-    return function() {
-      test.equals(arguments.length, 4);
-      test.equals(arguments[0], undefined);
-      test.equals(arguments[1], data.topic);
-      test.equals(arguments[2], data.data);
-      test.equals(arguments[3], data.options);
-      test.ok(this === client);
-      ++count;
-      if (count === testData.length) {
-        client.stop();
-        clearTimeout(timeout);
-        test.done();
-      }
-    };
+  var callback = function() {
+    test.equals(arguments.length, 4);
+    test.equals(arguments[0], undefined);
+    test.equals(arguments[1], testData[count].topic);
+    test.equals(arguments[2], testData[count].data);
+    test.equals(arguments[3], testData[count].options);
+    test.ok(this === client);
+    ++count;
+    if (count === testData.length) {
+      client.stop();
+      clearTimeout(timeout);
+      test.done();
+    }
   };
   client.on('started', function() {
     for (var i = 0; i < testData.length; ++i) {
       test.doesNotThrow(function() {
         client.send(testData[i].topic, testData[i].data, testData[i].options,
-                    callbackMaker(testData[i]));
+                    callback);
       });
     }
   });
