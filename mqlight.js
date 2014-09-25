@@ -1970,7 +1970,7 @@ Client.prototype.send = function(topic, data, options, callback) {
 
     if (client._outstandingSends.length === 1) {
       var sendOutboundMessages = function() {
-        logger.entry('Client.send.sendOutboundMessages');
+        logger.entry('Client.send.sendOutboundMessages', client.id);
         logger.log('debug', client.id,
                    'outstandingSends:', client._outstandingSends.length);
         try {
@@ -2062,7 +2062,8 @@ Client.prototype.send = function(topic, data, options, callback) {
                 // Can't make any more progress for now - schedule remaining
                 // work for processing in the future.
                 setImmediate(sendOutboundMessages);
-                logger.exit('Client.send.sendOutboundMessages');
+                logger.exit('Client.send.sendOutboundMessages', client.id,
+                            null);
                 return;
               }
             }
@@ -2143,7 +2144,7 @@ Client.prototype.send = function(topic, data, options, callback) {
             throw callbackError;
           }
         }
-        logger.exit('Client.send.sendOutboundMessages');
+        logger.exit('Client.send.sendOutboundMessages', client.id, null);
       };
       setImmediate(sendOutboundMessages);
     }
