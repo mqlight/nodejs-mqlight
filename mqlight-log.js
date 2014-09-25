@@ -111,11 +111,12 @@ var header = function(lvl, clientId, options) {
 /**
  * Set the logging level.
  *
- * @param {String} lvl The logging level to write at.
+ * @param {String} level The logging level to write at.
  */
-logger.setLevel = function(lvl) {
-  if (npmlog.levels[lvl.toLowerCase()]) {
-    npmlog.level = lvl.toLowerCase();
+logger.setLevel = function(level) {
+  var lvl = String(level).toLowerCase().trim();
+  if (npmlog.levels[lvl]) {
+    npmlog.level = lvl;
 
     header('header', logger.NO_CLIENT_ID, {title: 'Log'});
 
