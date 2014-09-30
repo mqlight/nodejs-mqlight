@@ -81,9 +81,9 @@ var HashMap = require('hashmap').HashMap;
 var activeClientList = {
   clients: new HashMap(),
   add: function(client) {
-    logger.entry('activeClientList.add', client.id);
-    this.clients.set(client.id, client);
-    logger.exit('activeClientList.add', client.id);
+    logger.entry('activeClientList.add', client._id);
+    this.clients.set(client._id, client);
+    logger.exit('activeClientList.add', client._id);
   },
   remove: function(id) {
     logger.entry('activeClientList.remove', id);
@@ -459,12 +459,12 @@ exports.createClient = function(options, callback) {
   process.once('exit', function() {
     logger.entry('createClient.on.exit', logger.NO_CLIENT_ID);
 
-    if (client && client.state == STATE_STARTED) {
+    if (client && client._state == STATE_STARTED) {
       try {
         client.messenger.send();
         client.stop();
       } catch (err) {
-        logger.caught('createClient.on.exit', client.id, err);
+        logger.caught('createClient.on.exit', client._id, err);
       }
     }
 
@@ -473,17 +473,17 @@ exports.createClient = function(options, callback) {
 
   // Check that the id for this instance is not already in use. If it is then
   // we need to stop the active instance before starting
-  if (activeClientList.has(client.id)) {
-    logger.log('debug', client.id,
+  if (activeClientList.has(client._id)) {
+    logger.log('debug', client._id,
         'stopping previously active client with same client id');
-    var previousActiveClient = activeClientList.get(client.id);
+    var previousActiveClient = activeClientList.get(client._id);
     activeClientList.add(client);
     previousActiveClient.stop(function() {
-      logger.log('debug', client.id,
+      logger.log('debug', client._id,
           'stopped previously active client with same client id');
-      var err = new LocalReplacedError(client.id);
+      var err = new LocalReplacedError(client._id);
       var error = getNamedError(err);
-      logger.log('emit', previousActiveClient.id, 'error', error);
+      logger.log('emit', previousActiveClient._id, 'error', error);
       previousActiveClient.emit('error', error);
       process.nextTick(function() {
         client.performConnect(function(err) {
@@ -500,7 +500,7 @@ exports.createClient = function(options, callback) {
     });
   }
 
-  logger.exit('createClient', client.id, client);
+  logger.exit('createClient', client._id, client);
   return client;
 };
 
@@ -764,10 +764,10 @@ var Client = function(service, id, securityOptions) {
   // Add generateServiceList function to client with embedded securityOptions
   this.generateServiceList = function(service) {
     var client = this;
-    logger.entry('generateServiceList', client.id);
-    logger.log('parms', client.id, 'service:',
+    logger.entry('generateServiceList', client._id);
+    logger.log('parms', client._id, 'service:',
         String(service).replace(/:[^\/:]+@/g, ':********@'));
-    logger.log('parms', client.id, 'securityOptions:',
+    logger.log('parms', client._id, 'securityOptions:',
                securityOptions.toString());
 
     var err;
@@ -776,16 +776,16 @@ var Client = function(service, id, securityOptions) {
     var inputServiceList = [];
     if (!service) {
       err = new TypeError('service is undefined');
-      logger.throw('generateServiceList', client.id, err);
+      logger.throw('generateServiceList', client._id, err);
       throw err;
     } else if (service instanceof Function) {
       err = new TypeError('service cannot be a function');
-      logger.throw('generateServiceList', client.id, err);
+      logger.throw('generateServiceList', client._id, err);
       throw err;
     } else if (service instanceof Array) {
       if (service.length === 0) {
         err = new TypeError('service array is empty');
-        logger.throw('generateServiceList', client.id, err);
+        logger.throw('generateServiceList', client._id, err);
         throw err;
       }
       inputServiceList = service;
@@ -793,7 +793,7 @@ var Client = function(service, id, securityOptions) {
       inputServiceList[0] = service;
     } else {
       err = new TypeError('service must be a string or array type');
-      logger.throw('generateServiceList', client.id, err);
+      logger.throw('generateServiceList', client._id, err);
       throw err;
     }
 
@@ -823,7 +823,7 @@ var Client = function(service, id, securityOptions) {
           msg = "URLs supplied via the 'service' property must specify both a" +
                 ' user name and a password value, or omit both values';
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', client.id, err);
+          logger.throw('generateServiceList', client._id, err);
           throw err;
         }
         if (securityOptions.propertyUser && authUser &&
@@ -833,7 +833,7 @@ var Client = function(service, id, securityOptions) {
                 "supplied via a URL passed via the 'service' property (" +
                 authUser + ')';
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', client.id, err);
+          logger.throw('generateServiceList', client._id, err);
           throw err;
         }
         if (securityOptions.propertyPassword && authPassword &&
@@ -841,7 +841,7 @@ var Client = function(service, id, securityOptions) {
           msg = "Password supplied as 'password' property does not match a " +
                 "password supplied via a URL passed via the 'service' property";
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', client.id, err);
+          logger.throw('generateServiceList', client._id, err);
           throw err;
         }
         if (i === 0) {
@@ -858,13 +858,13 @@ var Client = function(service, id, securityOptions) {
           msg = "URLs supplied via the 'service' property contain " +
                 'inconsistent user names';
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', client.id, err);
+          logger.throw('generateServiceList', client._id, err);
           throw err;
         } else if (securityOptions.urlPassword !== authPassword) {
           msg = "URLs supplied via the 'service' property contain " +
                 'inconsistent password values';
           err = new InvalidArgumentError(msg);
-          logger.throw('generateServiceList', client.id, err);
+          logger.throw('generateServiceList', client._id, err);
           throw err;
         }
       }
@@ -875,7 +875,7 @@ var Client = function(service, id, securityOptions) {
               "' specified for service. Only the amqp or amqps protocol are " +
               'supported.';
         err = new InvalidArgumentError(msg);
-        logger.throw('generateServiceList', client.id, err);
+        logger.throw('generateServiceList', client._id, err);
         throw err;
       }
       // Check we have a hostname
@@ -884,7 +884,7 @@ var Client = function(service, id, securityOptions) {
         msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
               'service. Must supply a hostname.';
         err = new InvalidArgumentError(msg);
-        logger.throw('generateServiceList', client.id, err);
+        logger.throw('generateServiceList', client._id, err);
         throw err;
       }
       // Set default port if not supplied
@@ -898,7 +898,7 @@ var Client = function(service, id, securityOptions) {
         msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
               " ) can't be part of a service URL.";
         err = new InvalidArgumentError(msg);
-        logger.throw('generateServiceList', client.id, err);
+        logger.throw('generateServiceList', client._id, err);
         throw err;
       }
 
@@ -908,7 +908,7 @@ var Client = function(service, id, securityOptions) {
       }
     }
 
-    logger.exit('generateServiceList', client.id,
+    logger.exit('generateServiceList', client._id,
                 [
                   'serviceList:',
                   String(serviceList).replace(/:[^\/:]+@/g, ':********@'),
@@ -920,43 +920,43 @@ var Client = function(service, id, securityOptions) {
   // performs the connect
   this.performConnect = function(callback, newClient) {
     var client = this;
-    logger.entry('Client.connect.performConnect', client.id, newClient);
+    logger.entry('Client.connect.performConnect', client._id, newClient);
 
     var err = null;
 
     // If there is no active client (i.e. we've been stopped) then add
     // ourselves back to the active list. Otherwise if there is another
     // active client (that's replaced us) then exit function now
-    var activeClient = activeClientList.get(client.id);
+    var activeClient = activeClientList.get(client._id);
     if (activeClient === undefined) {
-      logger.log('debug', client.id, 'Adding client to active list, as there' +
+      logger.log('debug', client._id, 'Adding client to active list, as there' +
           ' is no currently active client');
-      activeClientList.add(client.id);
+      activeClientList.add(client._id);
     } else if (client !== activeClient) {
-      logger.log('debug', client.id,
+      logger.log('debug', client._id,
           'Not connecting because client has been replaced');
       if (callback) {
-        err = new LocalReplacedError(client.id);
+        err = new LocalReplacedError(client._id);
         process.nextTick(function() {
-          logger.entry('Client.connect.performConnect.callback', client.id);
+          logger.entry('Client.connect.performConnect.callback', client._id);
           callback.apply(client, [err]);
-          logger.exit('Client.connect.performConnect.callback', client.id,
+          logger.exit('Client.connect.performConnect.callback', client._id,
               null);
         });
       }
-      logger.exit('Client.connect.performConnect', client.id, null);
+      logger.exit('Client.connect.performConnect', client._id, null);
       return;
     }
 
     if (!newClient) {
-      var currentState = client.state;
+      var currentState = client._state;
       // if we are not stopped or stopping state return with the client object
       if (currentState !== STATE_STOPPED && currentState !== STATE_RETRYING) {
         if (currentState === STATE_STOPPING) {
           var stillDisconnecting = function(client, callback) {
-            logger.entry('stillDisconnecting', client.id);
+            logger.entry('stillDisconnecting', client._id);
 
-            if (client.state === STATE_STOPPING) {
+            if (client._state === STATE_STOPPING) {
               setImmediate(function() {
                 stillDisconnecting(client, callback);
               });
@@ -966,42 +966,44 @@ var Client = function(service, id, securityOptions) {
               });
             }
 
-            logger.exit('stillDisconnecting', client.id, null);
+            logger.exit('stillDisconnecting', client._id, null);
           };
 
           setImmediate(function() {
             stillDisconnecting(client, callback);
           });
-          logger.exit('Client.connect.performConnect', client.id, null);
+          logger.exit('Client.connect.performConnect', client._id, null);
           return;
         } else {
           process.nextTick(function() {
             if (callback) {
-              logger.entry('Client.connect.performConnect.callback', client.id);
+              logger.entry('Client.connect.performConnect.callback',
+                  client._id);
               callback.apply(client);
               logger.exit('Client.connect.performConnect.callback',
-                          client.id, null);
+                          client._id, null);
             }
           });
 
-          logger.exit('Client.connect.performConnect', client.id, client);
+          logger.exit('Client.connect.performConnect', client._id, client);
           return client;
         }
       }
 
-      if (client.state === STATE_STOPPED) {
-        client.state = STATE_STARTING;
+      if (client._state === STATE_STOPPED) {
+        client._state = STATE_STARTING;
       }
 
       // If the messenger is not already stopped then something has gone wrong
       if (client.messenger && !client.messenger.stopped) {
         err = new Error('messenger is not stopped');
-        logger.ffdc('Client.connect.performConnect', 'ffdc001', client.id, err);
-        logger.throw('Client.connect.performConnect', client.id, err);
+        logger.ffdc('Client.connect.performConnect', 'ffdc001', client._id,
+            err);
+        logger.throw('Client.connect.performConnect', client._id, err);
         throw err;
       }
     } else {
-      client.state = STATE_STARTING;
+      client._state = STATE_STARTING;
     }
 
     // Obtain the list of services for connect and connect to one of the
@@ -1011,10 +1013,10 @@ var Client = function(service, id, securityOptions) {
       client.serviceFunction(function(err, service) {
         if (err) {
           logger.entry('Client.connect.performConnect.serviceFunction.callback',
-                       client.id);
+                       client._id);
           callback.apply(client, [err]);
           logger.exit('Client.connect.performConnect.serviceFunction.callback',
-              client.id, null);
+              client._id, null);
         } else {
           try {
             serviceList =
@@ -1022,9 +1024,9 @@ var Client = function(service, id, securityOptions) {
             client.connectToService(serviceList, callback);
           } catch (err) {
             var name = 'Client.connect.performConnect.serviceFunction.callback';
-            logger.entry(name, client.id);
+            logger.entry(name, client._id);
             callback.apply(client, [err]);
-            logger.exit(name, client.id, null);
+            logger.exit(name, client._id, null);
           }
         }
       });
@@ -1035,16 +1037,16 @@ var Client = function(service, id, securityOptions) {
       } catch (err) {
         if (callback) {
           process.nextTick(function() {
-            logger.entry('Client.connect.performConnect.callback', client.id);
+            logger.entry('Client.connect.performConnect.callback', client._id);
             callback.apply(client, [err]);
-            logger.exit('Client.connect.performConnect.callback', client.id,
+            logger.exit('Client.connect.performConnect.callback', client._id,
                         null);
           });
         }
       }
     }
 
-    logger.exit('Client.connect.performConnect', client.id, null);
+    logger.exit('Client.connect.performConnect', client._id, null);
     return;
   };
 
@@ -1060,16 +1062,16 @@ var Client = function(service, id, securityOptions) {
   */
   this.connectToService = function(serviceList, callback) {
     var client = this;
-    logger.entry('Client.connectToService', client.id);
+    logger.entry('Client.connectToService', client._id);
 
     if (client.isStopped()) {
       if (callback) {
-        logger.entry('Client.connectToService.callback', client.id);
+        logger.entry('Client.connectToService.callback', client._id);
         callback.apply(client,
                        [new StoppedError('connect aborted due to stop')]);
-        logger.exit('Client.connectToService.callback', client.id, null);
+        logger.exit('Client.connectToService.callback', client._id, null);
       }
-      logger.exit('Client.connectToService', client.id, null);
+      logger.exit('Client.connectToService', client._id, null);
       return;
     }
 
@@ -1110,7 +1112,7 @@ var Client = function(service, id, securityOptions) {
           } else {
             logUrl = service;
           }
-          logger.log('data', client.id, 'attempting to connect to: ' + logUrl);
+          logger.log('data', client._id, 'attempting to connect to: ' + logUrl);
 
           var connectUrl = url.parse(service);
           // remove any path elements from the URL (for ipv6 which appends /)
@@ -1123,23 +1125,23 @@ var Client = function(service, id, securityOptions) {
             client.messenger.connect(connectUrl,
                                      securityOptions.sslTrustCertificate,
                                      securityOptions.sslVerifyName);
-            logger.log('data', client.id, 'successfully connected to: ' +
+            logger.log('data', client._id, 'successfully connected to: ' +
                 logUrl);
-            client.service = serviceList[i];
+            client._service = serviceList[i];
             connected = true;
             break;
           } catch (err) {
             error = getNamedError(err);
-            logger.log('data', client.id, 'failed to connect to: ' + logUrl +
+            logger.log('data', client._id, 'failed to connect to: ' + logUrl +
                        ' due to error: ' + error);
           }
         } catch (err) {
           // should never get here, as it means that messenger.connect has been
           // called in an invalid way, so FFDC
           error = err;
-          logger.caught('Client.connectToService', client.id, err);
-          logger.ffdc('Client.connectToService', 'ffdc002', client.id, err);
-          logger.throw('Client.connectToService', client.id, err);
+          logger.caught('Client.connectToService', client._id, err);
+          logger.ffdc('Client.connectToService', 'ffdc002', client._id, err);
+          logger.throw('Client.connectToService', client._id, err);
           throw err;
         }
       }
@@ -1148,7 +1150,7 @@ var Client = function(service, id, securityOptions) {
     // If we've successfully connected then we're done, otherwise we'll retry
     if (connected) {
       // Indicate that we're started
-      client.state = STATE_STARTED;
+      client._state = STATE_STARTED;
       var eventToEmit;
       if (client.firstStart) {
         eventToEmit = STATE_STARTED;
@@ -1157,7 +1159,7 @@ var Client = function(service, id, securityOptions) {
         // could be queued actions so need to process those here. On reconnect
         // this would be done via the callback we set, first connect its the
         // users callback so won't process anything.
-        logger.log('data', client.id, 'first start since being stopped');
+        logger.log('data', client._id, 'first start since being stopped');
         processQueuedActions.apply(client);
       } else {
         client.retryCount = 0;
@@ -1166,36 +1168,36 @@ var Client = function(service, id, securityOptions) {
       ++client._connectionId;
 
       process.nextTick(function() {
-        logger.log('emit', client.id, eventToEmit);
+        logger.log('emit', client._id, eventToEmit);
         client.emit(eventToEmit);
       });
 
       if (callback) {
         process.nextTick(function() {
-          logger.entry('Client.connectToService.callback', client.id);
+          logger.entry('Client.connectToService.callback', client._id);
           callback.apply(client);
-          logger.exit('Client.connectToService.callback', client.id, null);
+          logger.exit('Client.connectToService.callback', client._id, null);
         });
       }
 
       // Setup heartbeat timer to ensure that while connected we send heartbeat
       // frames to keep the connection alive, when required.
       var remoteIdleTimeout =
-          client.messenger.getRemoteIdleTimeout(client.service);
+          client.messenger.getRemoteIdleTimeout(client._service);
       var heartbeatInterval = remoteIdleTimeout > 0 ?
           remoteIdleTimeout / 2 : remoteIdleTimeout;
-      logger.log('data', client.id, 'set heartbeatInterval to: ',
+      logger.log('data', client._id, 'set heartbeatInterval to: ',
                  heartbeatInterval);
       if (heartbeatInterval > 0) {
         var performHeartbeat = function(client, heartbeatInterval) {
-          logger.entry('Client.connectToService.performHeartbeat', client.id);
+          logger.entry('Client.connectToService.performHeartbeat', client._id);
           if (client.messenger) {
             client.messenger.work(0);
             client.heartbeatTimeout = setTimeout(performHeartbeat,
                 heartbeatInterval, client, heartbeatInterval);
           }
           logger.exit('Client.connectToService.performHeartbeat',
-                      client.id, null);
+                      client._id, null);
         };
         client.heartbeatTimeout = setTimeout(performHeartbeat,
                                              heartbeatInterval,
@@ -1205,13 +1207,13 @@ var Client = function(service, id, securityOptions) {
     } else {
       // We've tried all services without success. Pause for a while before
       // trying again
-      client.state = STATE_RETRYING;
+      client._state = STATE_RETRYING;
       var retry = function() {
-        logger.entryLevel('entry_often', 'retry', client.id);
+        logger.entryLevel('entry_often', 'retry', client._id);
         if (!client.isStopped()) {
           client.performConnect.apply(client, [callback, false]);
         }
-        logger.exitLevel('exit_often', 'retry', client.id);
+        logger.exitLevel('exit_often', 'retry', client._id);
       };
 
       client.retryCount++;
@@ -1225,16 +1227,16 @@ var Client = function(service, id, securityOptions) {
       var interval = Math.min(retryCap, (lowerBound + jitter) * 1000);
       //times by CONNECT_RETRY_INTERVAL for unittest purposes
       interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
-      logger.log('data', client.id, 'trying to connect again ' +
+      logger.log('data', client._id, 'trying to connect again ' +
                  'after ' + interval / 1000 + ' seconds');
       setTimeout(retry, interval);
       if (error) {
-        logger.log('emit', client.id, 'error', error);
+        logger.log('emit', client._id, 'error', error);
         client.emit('error', error);
       }
     }
 
-    logger.exit('Client.connectToService', client.id, null);
+    logger.exit('Client.connectToService', client._id, null);
     return;
   };
 
@@ -1276,21 +1278,21 @@ var Client = function(service, id, securityOptions) {
       err = new TypeError("sslTrustCertificate value '" +
                           securityOptions.sslTrustCertificate +
                           "' is invalid. Must be of type String");
-      logger.throw('Client.constructor', this.id, err);
+      logger.throw('Client.constructor', this._id, err);
       throw err;
     }
     if (!fs.existsSync(securityOptions.sslTrustCertificate)) {
       err = new TypeError("The file specified for sslTrustCertificate '" +
                           securityOptions.sslTrustCertificate +
                           "' does not exist");
-      logger.throw('Client.constructor', this.id, err);
+      logger.throw('Client.constructor', this._id, err);
       throw err;
     }
     if (!fs.statSync(securityOptions.sslTrustCertificate).isFile()) {
       err = new TypeError("The file specified for sslTrustCertificate '" +
                           securityOptions.sslTrustCertificate +
                           "' is not a regular file");
-      logger.throw('Client.constructor', this.id, err);
+      logger.throw('Client.constructor', this._id, err);
       throw err;
     }
   }
@@ -1298,15 +1300,15 @@ var Client = function(service, id, securityOptions) {
   // Save the required data as client fields
   this.serviceFunction = serviceFunction;
   this.serviceList = serviceList;
-  this.id = id;
+  this._id = id;
 
-  logger.entry('proton.createMessenger', this.id);
-  this.messenger = proton.createMessenger(this.id);
-  logger.exit('proton.createMessenger', this.id, null);
+  logger.entry('proton.createMessenger', this._id);
+  this.messenger = proton.createMessenger(this._id);
+  logger.exit('proton.createMessenger', this._id, null);
 
   // Set the initial state to starting
-  this.state = STATE_STARTING;
-  this.service = null;
+  this._state = STATE_STARTING;
+  this._service = null;
   // the first start, set to false after start and back to true on stop
   this.firstStart = true;
 
@@ -1337,7 +1339,7 @@ var Client = function(service, id, securityOptions) {
   if (!serviceFunction) {
     serviceList = this.generateServiceList.apply(this, [service]);
   }
-  logger.exit('Client.constructor', this.id, this);
+  logger.exit('Client.constructor', this._id, this);
 };
 util.inherits(Client, EventEmitter);
 
@@ -1362,11 +1364,11 @@ util.inherits(Client, EventEmitter);
  * @throws {TypeError} If callback is specified and is not a function.
  */
 Client.prototype.start = function(callback) {
-  logger.entry('Client.start', this.id);
+  logger.entry('Client.start', this._id);
 
   if (callback && (typeof callback !== 'function')) {
     var err = new TypeError('Callback must be a function');
-    logger.throw('Client.start', this.id, err);
+    logger.throw('Client.start', this._id, err);
     throw err;
   }
 
@@ -1374,17 +1376,17 @@ Client.prototype.start = function(callback) {
 
   // Check that the id for this instance is not already in use. If it is then
   // we need to stop the active instance before starting
-  var previousActiveClient = activeClientList.get(client.id);
+  var previousActiveClient = activeClientList.get(client._id);
   if (previousActiveClient !== undefined && previousActiveClient !== client) {
-    logger.log('debug', client.id,
+    logger.log('debug', client._id,
         'stopping previously active client with same client id');
     activeClientList.add(client);
     previousActiveClient.stop(function() {
-      logger.log('debug', client.id,
+      logger.log('debug', client._id,
           'stopped previously active client with same client id');
-      var err = new LocalReplacedError(client.id);
+      var err = new LocalReplacedError(client._id);
       var error = getNamedError(err);
-      logger.log('emit', previousActiveClient.id, 'error', error);
+      logger.log('emit', previousActiveClient._id, 'error', error);
       previousActiveClient.emit('error', error);
       process.nextTick(function() {
         client.performConnect(callback, false);
@@ -1397,7 +1399,7 @@ Client.prototype.start = function(callback) {
     });
   }
 
-  logger.exit('Client.start', client.id, client);
+  logger.exit('Client.start', client._id, client);
   return client;
 };
 
@@ -1425,7 +1427,7 @@ Client.prototype.start = function(callback) {
  *          errors and completion (passed to the stopProcessingCallback).
  */
 var stopMessenger = function(client, stopProcessingCallback, callback) {
-  logger.entry('stopMessenger', client.id);
+  logger.entry('stopMessenger', client._id);
 
   var stopped = true;
 
@@ -1444,7 +1446,7 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
     setImmediate(stopMessenger, client, stopProcessingCallback, callback);
   }
 
-  logger.exit('stopMessenger', client.id, null);
+  logger.exit('stopMessenger', client._id, null);
 };
 
 
@@ -1471,21 +1473,21 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
  *           If callback is specified and is not a function.
  */
 Client.prototype.stop = function(callback) {
-  logger.entry('Client.stop', this.id);
+  logger.entry('Client.stop', this._id);
 
   var client = this;
 
   // Performs the disconnect
   var performDisconnect = function(client, callback) {
-    logger.entry('Client.stop.performDisconnect', client.id);
+    logger.entry('Client.stop.performDisconnect', client._id);
 
-    client.state = STATE_STOPPING;
+    client._state = STATE_STOPPING;
 
     // Only disconnect when all outstanding send operations are complete
     if (client.outstandingSends.length === 0) {
       stopMessenger(client, function(client, callback) {
         logger.entry('Client.stop.performDisconnect.stopProcessing',
-            client.id);
+            client._id);
         if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
         // clear queuedSends as we are disconnecting
         while (client.queuedSends.length > 0) {
@@ -1493,25 +1495,25 @@ Client.prototype.stop = function(callback) {
           // call the callback in error as we have disconnected
           process.nextTick(function() {
             logger.entry('Client.stop.performDisconnect.' +
-                'stopProcessing.queuedSendCallback', client.id);
+                'stopProcessing.queuedSendCallback', client._id);
             msg.callback(new StoppedError('send aborted due to client stop'));
             logger.exit('Client.stop.performDisconnect.' +
-                'stopProcessing.queuedSendCallback', client.id, null);
+                'stopProcessing.queuedSendCallback', client._id, null);
           });
         }
         // clear the active subscriptions list as we were asked to disconnect
-        logger.log('data', client.id, 'client.subscriptions:',
+        logger.log('data', client._id, 'client.subscriptions:',
                    client.subscriptions);
         while (client.subscriptions.length > 0) {
           client.subscriptions.shift();
         }
         // Indicate that we've disconnected
-        client.state = STATE_STOPPED;
+        client._state = STATE_STOPPED;
         // Remove ourself from the active client list
-        var activeClient = activeClientList.get(client.id);
-        if (client === activeClient) activeClientList.remove(client.id);
+        var activeClient = activeClientList.get(client._id);
+        if (client === activeClient) activeClientList.remove(client._id);
         process.nextTick(function() {
-          logger.log('emit', client.id, STATE_STOPPED);
+          logger.log('emit', client._id, STATE_STOPPED);
           if (!client.firstStart) {
             client.firstStart = true;
             client.emit(STATE_STOPPED);
@@ -1520,30 +1522,30 @@ Client.prototype.stop = function(callback) {
         if (callback) {
           process.nextTick(function() {
             logger.entry('Client.stop.performDisconnect.stopProcessing.' +
-                'callback', client.id);
+                'callback', client._id);
             callback.apply(client);
             logger.exit('Client.stop.performDisconnect.stopProcessing.' +
-                'callback', client.id, null);
+                'callback', client._id, null);
           });
         }
 
         logger.exit('Client.stop.performDisconnect.stopProcessing',
-            client.id, null);
+            client._id, null);
       }, callback);
 
-      logger.exit('Client.stop.performDisconnect', client.id, null);
+      logger.exit('Client.stop.performDisconnect', client._id, null);
       return;
     }
 
     // try disconnect again
     setImmediate(performDisconnect, client, callback);
 
-    logger.exit('Client.stop.performDisconnect', client.id, null);
+    logger.exit('Client.stop.performDisconnect', client._id, null);
   };
 
   if (callback && !(callback instanceof Function)) {
     var err = new TypeError('callback must be a function');
-    logger.throw('Client.stop', client.id, err);
+    logger.throw('Client.stop', client._id, err);
     throw err;
   }
 
@@ -1551,13 +1553,13 @@ Client.prototype.stop = function(callback) {
   if (client.isStopped()) {
     process.nextTick(function() {
       if (callback) {
-        logger.entry('Client.stop.callback', client.id);
+        logger.entry('Client.stop.callback', client._id);
         callback.apply(client);
-        logger.exit('Client.stop.callback', client.id, null);
+        logger.exit('Client.stop.callback', client._id, null);
       }
     });
 
-    logger.exit('Client.stop', client.id, client);
+    logger.exit('Client.stop', client._id, client);
     return client;
   }
 
@@ -1565,7 +1567,7 @@ Client.prototype.stop = function(callback) {
     performDisconnect(client, callback);
   });
 
-  logger.exit('Client.stop', client.id, client);
+  logger.exit('Client.stop', client._id, client);
   return client;
 };
 
@@ -1586,28 +1588,28 @@ var reconnect = function(client) {
     logger.exit('Client.reconnect', logger.NO_CLIENT_ID, undefined);
     return;
   }
-  logger.entry('Client.reconnect', client.id);
-  if (client.state !== STATE_STARTED) {
+  logger.entry('Client.reconnect', client._id);
+  if (client._state !== STATE_STARTED) {
     if (client.isStopped()) {
-      logger.exit('Client.reconnect', client.id, null);
+      logger.exit('Client.reconnect', client._id, null);
       return;
-    } else if (client.state === STATE_RETRYING) {
-      logger.exit('Client.reconnect', client.id, client);
+    } else if (client._state === STATE_RETRYING) {
+      logger.exit('Client.reconnect', client._id, client);
       return client;
     }
   }
-  client.state = STATE_RETRYING;
+  client._state = STATE_RETRYING;
 
   // stop the messenger to free the object then attempt a reconnect
   stopMessenger(client, function(client) {
-    logger.entry('Client.reconnect.stopProcessing', client.id);
+    logger.entry('Client.reconnect.stopProcessing', client._id);
 
     if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
 
     // clear the subscriptions list, if the cause of the reconnect happens
     // during check for messages we need a 0 length so it will check once
     // reconnected.
-    logger.log('data', client.id, 'client.subscriptions:',
+    logger.log('data', client._id, 'client.subscriptions:',
                client.subscriptions);
     while (client.subscriptions.length > 0) {
       client.queuedSubscriptions.push(client.subscriptions.shift());
@@ -1618,10 +1620,10 @@ var reconnect = function(client) {
     }
     client.performConnect.apply(client, [processQueuedActions, false]);
 
-    logger.exit('Client.reconnect.stopProcessing', client.id, null);
+    logger.exit('Client.reconnect.stopProcessing', client._id, null);
   });
 
-  logger.exit('Client.reconnect', client.id, client);
+  logger.exit('Client.reconnect', client._id, client);
   return client;
 };
 if (process.env.NODE_ENV === 'unittest') {
@@ -1648,26 +1650,26 @@ var processQueuedActions = function(err) {
     logger.exit('processQueuedActions', 'client not set returning', null);
     return;
   }
-  logger.entry('processQueuedActions', client.id);
-  logger.log('parms', client.id, 'err:', err);
-  logger.log('data', client.id, 'client.state:', client.state);
+  logger.entry('processQueuedActions', client._id);
+  logger.log('parms', client._id, 'err:', err);
+  logger.log('data', client._id, 'client._state:', client._state);
 
   if (!err) {
-    logger.log('data', client.id, 'client.queuedSubscriptions',
+    logger.log('data', client._id, 'client.queuedSubscriptions',
                client.queuedSubscriptions);
     while (client.queuedSubscriptions.length > 0 &&
-            client.state === STATE_STARTED) {
+            client._state === STATE_STARTED) {
       var sub = client.queuedSubscriptions.shift();
       if (sub.noop) {
         // no-op, so just trigger the callback without actually subscribing
         if (sub.callback) {
           process.nextTick(function() {
-            logger.entry('Client.subscribe.callback', client.id);
-            logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+            logger.entry('Client.subscribe.callback', client._id);
+            logger.log('parms', client._id, 'err:', err, ', topicPattern:',
                        sub.topicPattern, ', originalShareValue:', sub.share);
             sub.callback.apply(client,
                 [err, sub.topicPattern, sub.originalShareValue]);
-            logger.exit('Client.subscribe.callback', client.id, null);
+            logger.exit('Client.subscribe.callback', client._id, null);
           });
         }
       } else {
@@ -1675,10 +1677,10 @@ var processQueuedActions = function(err) {
                          sub.callback);
       }
     }
-    logger.log('data', client.id, 'client.queuedUnsubscribes',
+    logger.log('data', client._id, 'client.queuedUnsubscribes',
                client.queuedUnsubscribes);
     while (client.queuedUnsubscribes.length > 0 &&
-            client.state === STATE_STARTED) {
+            client._state === STATE_STARTED) {
       var rm = client.queuedUnsubscribes.shift();
       if (rm.noop) {
         // no-op, so just trigger the callback without actually unsubscribing
@@ -1689,15 +1691,15 @@ var processQueuedActions = function(err) {
         client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
       }
     }
-    logger.log('data', client.id, 'client.queuedSends',
+    logger.log('data', client._id, 'client.queuedSends',
                client.queuedSends);
     while (client.queuedSends.length > 0 &&
-            client.state === STATE_STARTED) {
+            client._state === STATE_STARTED) {
       var msg = client.queuedSends.shift();
       client.send(msg.topic, msg.data, msg.options, msg.callback);
     }
   }
-  logger.exit('processQueuedActions', client.id, null);
+  logger.exit('processQueuedActions', client._id, null);
 };
 
 
@@ -1708,9 +1710,9 @@ var processQueuedActions = function(err) {
  * generated identifier if the id property was not specified when the client
  * was created.
  */
-Object.defineProperty(Client, 'id', {
+Object.defineProperty(Client.prototype, 'id', {
   get: function() {
-    return this.id;
+    return this._id;
   }
 });
 
@@ -1720,14 +1722,14 @@ Object.defineProperty(Client, 'id', {
  * connected (when the client is in 'started' state) - otherwise (for all other
  * client states) null is returned.
  */
-Object.defineProperty(Client, 'service', {
+Object.defineProperty(Client.prototype, 'service', {
   get: function() {
-    return this.state === STATE_STARTED ?
-        this.service : null;
+    return this._state === STATE_STARTED ?
+        this._service : null;
   },
   set: function(value) {
     if (process.env.NODE_ENV === 'unittest') {
-      this.service = value;
+      this._service = value;
     }
   }
 });
@@ -1738,10 +1740,10 @@ Object.defineProperty(Client, 'service', {
  * following string values: 'started', 'starting', 'stopped', 'stopping', or
  * 'retrying'.
  */
-Object.defineProperty(Client, 'state', {
+Object.defineProperty(Client.prototype, 'state', {
   get: function() {
-    logger.log('data', this.id, 'Client.state', this.state);
-    return this.state;
+    logger.log('data', this._id, 'Client.state', this._state);
+    return this._state;
   }
 });
 
@@ -1751,8 +1753,8 @@ Object.defineProperty(Client, 'state', {
  * <code>false</code> otherwise.
  */
 Client.prototype.isStopped = function() {
-  return (this.state === STATE_STOPPING ||
-          this.state === STATE_STOPPED);
+  return (this._state === STATE_STOPPING ||
+          this._state === STATE_STOPPED);
 };
 
 /**
@@ -1784,27 +1786,27 @@ Client.prototype.isStopped = function() {
  *                   buffered in memory (due to a backlog of messages to send).
  */
 Client.prototype.send = function(topic, data, options, callback) {
-  logger.entry('Client.send', this.id);
+  logger.entry('Client.send', this._id);
   var err;
   var nextMessage = false;
 
   // Validate the passed parameters
   if (!topic) {
     err = new TypeError('Cannot send to undefined topic');
-    logger.throw('Client.send', this.id, err);
+    logger.throw('Client.send', this._id, err);
     throw err;
   } else {
     topic = String(topic);
   }
-  logger.log('parms', this.id, 'topic:', topic);
-  logger.log('parms', this.id, 'data: typeof', typeof data);
+  logger.log('parms', this._id, 'topic:', topic);
+  logger.log('parms', this._id, 'data: typeof', typeof data);
   if (typeof data === 'undefined') {
     err = new TypeError('Cannot send undefined data');
-    logger.throw('Client.send', this.id, err);
+    logger.throw('Client.send', this._id, err);
     throw err;
   } else if (data instanceof Function) {
     err = new TypeError('Cannot send a function');
-    logger.throw('Client.send', this.id, err);
+    logger.throw('Client.send', this._id, err);
     throw err;
   }
 
@@ -1820,11 +1822,11 @@ Client.prototype.send = function(topic, data, options, callback) {
   // Validate the options parameter, when specified
   if (typeof options !== 'undefined') {
     if (typeof options === 'object') {
-      logger.log('parms', this.id, 'options:', options);
+      logger.log('parms', this._id, 'options:', options);
     } else {
       err = new TypeError('options must be an object type not a ' +
                           (typeof options) + ')');
-      logger.throw('Client.send', this.id, err);
+      logger.throw('Client.send', this._id, err);
       throw err;
     }
   }
@@ -1840,7 +1842,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       } else {
         err = new RangeError("options:qos value '" + options.qos +
                              "' is invalid must evaluate to 0 or 1");
-        logger.throw('Client.send', this.id, err);
+        logger.throw('Client.send', this._id, err);
         throw err;
       }
     }
@@ -1851,7 +1853,7 @@ Client.prototype.send = function(topic, data, options, callback) {
         err = new RangeError("options:ttl value '" +
             options.ttl +
             "' is invalid, must be an unsigned non-zero integer number");
-        logger.throw('Client.send', this.id, err);
+        logger.throw('Client.send', this._id, err);
         throw err;
       } else if (ttl > 4294967295) {
         ttl = 4294967295; // Cap at max AMQP value for TTL (2^32-1)
@@ -1864,26 +1866,26 @@ Client.prototype.send = function(topic, data, options, callback) {
   if (callback) {
     if (!(callback instanceof Function)) {
       err = new TypeError('callback must be a function type');
-      logger.throw('Client.send', this.id, err);
+      logger.throw('Client.send', this._id, err);
       throw err;
     }
   } else if (qos === exports.QOS_AT_LEAST_ONCE) {
     err = new InvalidArgumentError('callback must be specified when ' +
                                    'options:qos value of 1 (at least once) ' +
                                    'is specified');
-    logger.throw('Client.send', this.id, err);
+    logger.throw('Client.send', this._id, err);
     throw err;
   }
 
   // Ensure we have attempted a connect
   if (this.isStopped()) {
     err = new StoppedError('not started');
-    logger.throw('Client.send', this.id, err);
+    logger.throw('Client.send', this._id, err);
     throw err;
   }
 
   // Ensure we are not retrying otherwise queue message and return
-  if (this.state === STATE_RETRYING || this.state === STATE_STARTING) {
+  if (this._state === STATE_RETRYING || this._state === STATE_STARTING) {
     this.queuedSends.push({
       topic: topic,
       data: data,
@@ -1891,7 +1893,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       callback: callback
     });
     this.drainEventRequired = true;
-    logger.exit('Client.send', this.id, false);
+    logger.exit('Client.send', this._id, false);
     return false;
   }
 
@@ -1901,10 +1903,10 @@ Client.prototype.send = function(topic, data, options, callback) {
   var protonMsg;
   var inOutstandingSends = false;
   try {
-    logger.entry('proton.createMessage', client.id);
+    logger.entry('proton.createMessage', client._id);
     protonMsg = proton.createMessage();
-    logger.exit('proton.createMessage', client.id, protonMsg);
-    protonMsg.address = this.service;
+    logger.exit('proton.createMessage', client._id, protonMsg);
+    protonMsg.address = this._service;
     if (topic) {
       // need to encode the topic component but / has meaning that shouldn't be
       // encoded
@@ -1945,18 +1947,18 @@ Client.prototype.send = function(topic, data, options, callback) {
     if (client.outstandingSends.length === 1) {
       var sendOutboundMessages = function() {
         logger.entry('Client.send.sendOutboundMessages');
-        logger.log('debug', client.id,
+        logger.log('debug', client._id,
                    'outstandingSends:', client.outstandingSends.length);
         try {
           if (!messenger.stopped) {
             // Write any data buffered within messenger
             var tries = 50;
             while (tries-- > 0 &&
-                   messenger.pendingOutbound(client.service)) {
+                   messenger.pendingOutbound(client._service)) {
               messenger.send();
             }
             if (tries == 0) {
-              logger.log('debug', client.id, 'output still pending!');
+              logger.log('debug', client._id, 'output still pending!');
             }
 
             // See if any of the outstanding send operations have now completed
@@ -2009,7 +2011,7 @@ Client.prototype.send = function(topic, data, options, callback) {
                     (client.outstandingSends.length <= 1)) {
                   client.drainEventRequired = false;
                   process.nextTick(function() {
-                    logger.log('emit', client.id, 'drain');
+                    logger.log('emit', client._id, 'drain');
                     client.emit('drain');
                   });
                 }
@@ -2017,13 +2019,13 @@ Client.prototype.send = function(topic, data, options, callback) {
                 // invoke the callback, if specified
                 if (inFlight.callback) {
                   logger.entry('Client.send.sendOutboundMessages.callback',
-                      client.id);
+                      client._id);
                   inFlight.callback.apply(client, [err,
                                                    inFlight.topic,
                                                    inFlight.msg.body,
                                                    inFlight.options]);
                   logger.exit('Client.send.sendOutboundMessages.callback',
-                      client.id, null);
+                      client._id, null);
                 }
 
                 // Free resources used by the message
@@ -2050,7 +2052,7 @@ Client.prototype.send = function(topic, data, options, callback) {
             }
             if (callbackError !== null) {
               logger.throw('Client.send.sendOutboundMessages',
-                           client.id, callbackError);
+                           client._id, callbackError);
               throw callbackError;
             }
           }
@@ -2058,7 +2060,7 @@ Client.prototype.send = function(topic, data, options, callback) {
           var error = getNamedError(e);
           var callbackError = null;
           var doReconnect = false;
-          logger.caught('Client.send.sendOutboundMessages', client.id, error);
+          logger.caught('Client.send.sendOutboundMessages', client._id, error);
 
           // Error - so empty the outstandingSends array:
           while (client.outstandingSends.length > 0) {
@@ -2078,21 +2080,21 @@ Client.prototype.send = function(topic, data, options, callback) {
               // the message
               if (inFlight.callback) {
                 logger.entry('Client.send.sendOutboundMessages.callback',
-                    client.id);
+                    client._id);
                 try {
                   inFlight.callback.apply(client,
                       [null, inFlight.topic, inFlight.msg.body, options]);
                 } catch (e) {
                   logger.caught('Client.send.sendOutboundMessages.callback',
-                                client.id, e);
+                                client._id, e);
                   if (callbackError === null) callbackError = e;
                 }
                 logger.exit('Client.send.sendOutboundMessages.callback',
-                            client.id, null);
+                            client._id, null);
               }
 
               if (error) {
-                logger.log('emit', client.id, 'error', error);
+                logger.log('emit', client._id, 'error', error);
                 client.emit('error', error);
                 doReconnect |= shouldReconnect(error);
               }
@@ -2104,7 +2106,7 @@ Client.prototype.send = function(topic, data, options, callback) {
           }
           if (callbackError !== null) {
             logger.throw('Client.send.sendOutboundMessages',
-                         client.id, callbackError);
+                         client._id, callbackError);
             throw callbackError;
           }
         }
@@ -2114,7 +2116,7 @@ Client.prototype.send = function(topic, data, options, callback) {
 
     // If we have a backlog of messages, then record the need to emit a drain
     // event later to indicate the backlog has been cleared.
-    logger.log('debug', client.id,
+    logger.log('debug', client._id,
                'outstandingSends:', client.outstandingSends.length);
     if (client.outstandingSends.length <= 1) {
       nextMessage = true;
@@ -2123,7 +2125,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     }
   } catch (exception) {
     err = getNamedError(exception);
-    logger.caught('Client.send', client.id, err);
+    logger.caught('Client.send', client._id, err);
 
     // error condition so won't retry send need to remove it from list of
     // unsent
@@ -2150,8 +2152,8 @@ Client.prototype.send = function(topic, data, options, callback) {
           var invocation = client.queuedSendCallbacks.shift();
           if (invocation.callback) {
             if (invocation.qos === exports.QOS_AT_MOST_ONCE) {
-              logger.entry('Client.send.callback', client.id);
-              logger.log('parms', client.id, 'err:', invocation.error,
+              logger.entry('Client.send.callback', client._id);
+              logger.log('parms', client._id, 'err:', invocation.error,
                          ', topic:', invocation.topic, ', protonMsg.body:',
                          invocation.body, ', options:', invocation.options);
               invocation.callback.apply(client, [
@@ -2159,10 +2161,10 @@ Client.prototype.send = function(topic, data, options, callback) {
                 invocation.topic,
                 invocation.body,
                 invocation.options]);
-              logger.exit('Client.send.callback', client.id, null);
+              logger.exit('Client.send.callback', client._id, null);
             }
           }
-          logger.log('emit', client.id, 'error', invocation.error);
+          logger.log('emit', client._id, 'error', invocation.error);
           client.emit('error', invocation.error);
           doReconnect |= shouldReconnect(invocation.error);
         }
@@ -2182,7 +2184,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     });
   }
 
-  logger.exit('Client.send', this.id, nextMessage);
+  logger.exit('Client.send', this._id, nextMessage);
   return nextMessage;
 };
 
@@ -2197,11 +2199,11 @@ Client.prototype.send = function(topic, data, options, callback) {
  */
 Client.prototype.checkForMessages = function() {
   var client = this;
-  logger.entryLevel('entry_often', 'checkForMessages', client.id);
+  logger.entryLevel('entry_often', 'checkForMessages', client._id);
   var messenger = client.messenger;
-  if (client.state !== STATE_STARTED || client.subscriptions.length === 0 ||
+  if (client._state !== STATE_STARTED || client.subscriptions.length === 0 ||
       client.listeners('message').length === 0) {
-    logger.exitLevel('exit_often', 'checkForMessages', client.id);
+    logger.exitLevel('exit_often', 'checkForMessages', client._id);
     return;
   }
 
@@ -2210,19 +2212,19 @@ Client.prototype.checkForMessages = function() {
   try {
     var messages = messenger.receive(50);
     if (messages.length > 0) {
-      logger.log('debug', client.id, 'received %d messages', messages.length);
+      logger.log('debug', client._id, 'received %d messages', messages.length);
 
       for (var msg = 0, tot = messages.length; msg < tot; msg++) {
-        logger.log('debug', client.id, 'processing message %d', msg);
+        logger.log('debug', client._id, 'processing message %d', msg);
         var protonMsg = messages[msg];
         processMessage(client, protonMsg);
       }
     }
   } catch (e) {
     err = getNamedError(e);
-    logger.caughtLevel('entry_often', 'checkForMessages', client.id, err);
+    logger.caughtLevel('entry_often', 'checkForMessages', client._id, err);
     process.nextTick(function() {
-      logger.log('emit', client.id, 'error', err);
+      logger.log('emit', client._id, 'error', err);
       client.emit('error', err);
       if (shouldReconnect(err)) {
         reconnect(client);
@@ -2230,17 +2232,17 @@ Client.prototype.checkForMessages = function() {
     });
   }
 
-  logger.exitLevel('exit_often', 'checkForMessages', client.id);
+  logger.exitLevel('exit_often', 'checkForMessages', client._id);
 
   setImmediate(function() {
-    if (client.state === STATE_STARTED) {
+    if (client._state === STATE_STARTED) {
       client.checkForMessages.apply(client);
     }
   });
 };
 
 var processMessage = function(client, protonMsg) {
-  logger.entryLevel('entry_often', 'processMessage', client.id);
+  logger.entryLevel('entry_often', 'processMessage', client._id);
   var messenger = client.messenger;
   Object.defineProperty(protonMsg, 'connectionId', {
     value: client._connectionId
@@ -2253,7 +2255,7 @@ var processMessage = function(client, protonMsg) {
     try {
       data = JSON.parse(protonMsg.body);
     } catch (_) {
-      logger.caughtLevel('entry_often', 'processMessage', client.id, _);
+      logger.caughtLevel('entry_often', 'processMessage', client._id, _);
       console.warn(_);
     }
   } else {
@@ -2266,7 +2268,7 @@ var processMessage = function(client, protonMsg) {
   var qos = exports.QOS_AT_MOST_ONCE;
   var matchedSubs = client.subscriptions.filter(function(el) {
     // 1 added to length to account for the / we add
-    var addressNoService = el.address.slice(client.service.length + 1);
+    var addressNoService = el.address.slice(client._service.length + 1);
     // possible to have 2 matches work out whether this is
     // for a share or private topic
     if (typeof el.share === 'undefined' &&
@@ -2291,7 +2293,7 @@ var processMessage = function(client, protonMsg) {
   if (matchedSubs.length > 1) {
     err = new Error('received message matched more than one ' +
         'subscription');
-    logger.ffdc('processMessage', 'ffdc003', client.id,
+    logger.ffdc('processMessage', 'ffdc003', client._id,
         err);
   }
   var subscription = matchedSubs[0];
@@ -2305,7 +2307,7 @@ var processMessage = function(client, protonMsg) {
     // ideally we shouldn't get here, but it can happen in a timing
     // window if we had received a message from a subscription we've
     // subsequently unsubscribed from
-    logger.log('debug', client.id, 'No subscription matched message: ' +
+    logger.log('debug', client._id, 'No subscription matched message: ' +
         data + ' going to address: ' + protonMsg.address);
     protonMsg.destroy();
     protonMsg = null;
@@ -2320,11 +2322,11 @@ var processMessage = function(client, protonMsg) {
 
   if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
     delivery.message.confirmDelivery = function() {
-      logger.entry('message.confirmDelivery', client.id);
-      logger.log('data', client.id, 'delivery:', delivery);
+      logger.entry('message.confirmDelivery', client._id);
+      logger.log('data', client._id, 'delivery:', delivery);
       if (client.isStopped()) {
         err = new NetworkError('not started');
-        logger.throw('message.confirmDelivery', client.id, err);
+        logger.throw('message.confirmDelivery', client._id, err);
         throw err;
       }
       if (protonMsg) {
@@ -2334,13 +2336,13 @@ var processMessage = function(client, protonMsg) {
         if (protonMsg.connectionId !== client._connectionId) {
           err = new NetworkError('client has reconnected since this ' +
                                        'message was received');
-          logger.throw('message.confirmDelivery', client.id, err);
+          logger.throw('message.confirmDelivery', client._id, err);
           throw err;
         }
         messenger.settle(protonMsg);
         --subscription.unconfirmed;
         ++subscription.confirmed;
-        logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
+        logger.log('data', client._id, '[credit,unconfirmed,confirmed]:',
             '[' + subscription.credit + ',' +
             subscription.unconfirmed + ',' +
             subscription.confirmed + ']');
@@ -2351,14 +2353,14 @@ var processMessage = function(client, protonMsg) {
         if ((available / subscription.confirmed) <= 1.25 ||
             (subscription.unconfirmed === 0 &&
             subscription.confirmed > 0)) {
-          messenger.flow(client.service + '/' + protonMsg.linkAddress,
+          messenger.flow(client._service + '/' + protonMsg.linkAddress,
                                subscription.confirmed);
           subscription.confirmed = 0;
         }
         protonMsg.destroy();
         protonMsg = null;
       }
-      logger.exit('message.confirmDelivery', client.id, null);
+      logger.exit('message.confirmDelivery', client._id, null);
     };
   }
 
@@ -2406,29 +2408,29 @@ var processMessage = function(client, protonMsg) {
   if (malformed.condition) {
     if (client.listeners('malformed').length > 0) {
       delivery.malformed = malformed;
-      logger.log('emit', client.id,
+      logger.log('emit', client._id,
           'malformed', protonMsg.body, delivery);
       client.emit('malformed', protonMsg.body, delivery);
     } else {
       protonMsg.destroy();
       err = new Error('No listener for "malformed" event.');
-      logger.throwLevel('exit_often', 'processMessage', client.id, err);
+      logger.throwLevel('exit_often', 'processMessage', client._id, err);
       throw err;
     }
   } else {
-    logger.log('emit', client.id, 'message', delivery);
+    logger.log('emit', client._id, 'message', delivery);
     try {
       client.emit('message', data, delivery);
     } catch (err) {
       logger.caughtLevel('entry_often', 'processMessage',
-                               client.id, err);
-      logger.log('emit', client.id, 'error', err);
+                               client._id, err);
+      logger.log('emit', client._id, 'error', err);
       client.emit('error', err);
     }
   }
 
   if (client.isStopped()) {
-    logger.log('debug', client.id,
+    logger.log('debug', client._id,
         'client is stopped so not accepting or settling message');
     protonMsg.destroy();
   } else {
@@ -2439,7 +2441,7 @@ var processMessage = function(client, protonMsg) {
       messenger.settle(protonMsg);
       --subscription.unconfirmed;
       ++subscription.confirmed;
-      logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
+      logger.log('data', client._id, '[credit,unconfirmed,confirmed]:',
           '[' + subscription.credit + ',' +
           subscription.unconfirmed + ',' +
           subscription.confirmed + ']');
@@ -2450,14 +2452,14 @@ var processMessage = function(client, protonMsg) {
       if ((available / subscription.confirmed <= 1.25) ||
           (subscription.unconfirmed === 0 &&
           subscription.confirmed > 0)) {
-        messenger.flow(client.service + '/' + protonMsg.linkAddress,
+        messenger.flow(client._service + '/' + protonMsg.linkAddress,
                              subscription.confirmed);
         subscription.confirmed = 0;
       }
       protonMsg.destroy();
     }
   }
-  logger.exitLevel('exit_often', 'processMessage', client.id);
+  logger.exitLevel('exit_often', 'processMessage', client._id);
 };
 /**
  * @param {function(object)}
@@ -2490,19 +2492,19 @@ var processMessage = function(client, protonMsg) {
  * @throws {Error} the topic pattern parameter is undefined.
  */
 Client.prototype.subscribe = function(topicPattern, share, options, callback) {
-  logger.entry('Client.subscribe', this.id);
-  logger.log('parms', this.id, 'topicPattern:', topicPattern);
+  logger.entry('Client.subscribe', this._id);
+  logger.log('parms', this._id, 'topicPattern:', topicPattern);
 
   // Must accept at least one option - and first option is always a
   // topicPattern.
   if (arguments.length === 0) {
     err = new TypeError("You must specify a 'topicPattern' argument");
-    logger.throw('Client.subscribe', this.id, err);
+    logger.throw('Client.subscribe', this._id, err);
     throw err;
   }
   if (!topicPattern) {
     err = new TypeError("You must specify a 'topicPattern' argument");
-    logger.throw('Client.subscribe', this.id, err);
+    logger.throw('Client.subscribe', this._id, err);
     throw err;
   }
   topicPattern = String(topicPattern);
@@ -2544,23 +2546,23 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       err = new InvalidArgumentError("share argument value '" + share +
                                      "' is invalid because it contains a " +
                                      "colon (\':\') character");
-      logger.throw('Client.subscribe', this.id, err);
+      logger.throw('Client.subscribe', this._id, err);
       throw err;
     }
     share = 'share:' + share + ':';
   } else {
     share = 'private:';
   }
-  logger.log('parms', this.id, 'share:', share);
+  logger.log('parms', this._id, 'share:', share);
 
   // Validate the options parameter, when specified
   if (typeof options !== 'undefined') {
     if (typeof options === 'object') {
-      logger.log('parms', this.id, 'options:', options);
+      logger.log('parms', this._id, 'options:', options);
     } else {
       err = new TypeError('options must be an object type not a ' +
                           (typeof options) + ')');
-      logger.throw('Client.subscribe', this.id, err);
+      logger.throw('Client.subscribe', this._id, err);
       throw err;
     }
   }
@@ -2578,7 +2580,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       } else {
         err = new RangeError("options:qos value '" + options.qos +
                              "' is invalid must evaluate to 0 or 1");
-        logger.throw('Client.subscribe', this.id, err);
+        logger.throw('Client.subscribe', this._id, err);
         throw err;
       }
     }
@@ -2591,7 +2593,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
         err = new TypeError("options:autoConfirm value '" +
                             options.autoConfirm +
                             "' is invalid must evaluate to true or false");
-        logger.throw('Client.subscribe', this.id, err);
+        logger.throw('Client.subscribe', this._id, err);
         throw err;
       }
     }
@@ -2602,7 +2604,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
                              options.ttl +
                              "' is invalid, must be an unsigned integer " +
                              'number');
-        logger.throw('Client.subscribe', this.id, err);
+        logger.throw('Client.subscribe', this._id, err);
         throw err;
       }
       ttl = Math.round(ttl / 1000);
@@ -2615,7 +2617,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
                              options.credit +
                              "' is invalid, must be an unsigned integer " +
                              'number');
-        logger.throw('Client.subscribe', this.id, err);
+        logger.throw('Client.subscribe', this._id, err);
         throw err;
       }
     }
@@ -2623,38 +2625,38 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   if (callback && !(callback instanceof Function)) {
     err = new TypeError('callback must be a function type');
-    logger.throw('Client.subscribe', this.id, err);
+    logger.throw('Client.subscribe', this._id, err);
     throw err;
   }
 
   // Ensure we have attempted a connect
   if (this.isStopped()) {
     err = new StoppedError('not started');
-    logger.throw('Client.subscribe', this.id, err);
+    logger.throw('Client.subscribe', this._id, err);
     throw err;
   }
 
   // Subscribe using the specified topic pattern and share options
   var messenger = this.messenger;
-  var address = this.service + '/' + share + topicPattern;
+  var address = this._service + '/' + share + topicPattern;
   var client = this;
-  var subscriptionAddress = this.service + '/' + topicPattern;
+  var subscriptionAddress = this._service + '/' + topicPattern;
 
   var i = 0;
 
   // if client is in the retrying state, then queue this subscribe request
-  if (client.state === STATE_RETRYING || client.state === STATE_STARTING) {
+  if (client._state === STATE_RETRYING || client._state === STATE_STARTING) {
     // reject queued subscription if one already exists
     for (i = 0; i < client.queuedSubscriptions.length; i++) {
       if (client.queuedSubscriptions[i].address === subscriptionAddress &&
           client.queuedSubscriptions[i].share === originalShareValue) {
         err = new SubscribedError('client already has a queued subscription ' +
                                   'to this address');
-        logger.throw('Client.subscribe', this.id, err);
+        logger.throw('Client.subscribe', this._id, err);
         throw err;
       }
     }
-    logger.log('data', client.id, 'client waiting for connection so queued ' +
+    logger.log('data', client._id, 'client waiting for connection so queued ' +
                'subscription');
     client.queuedSubscriptions.push({
       address: subscriptionAddress,
@@ -2665,7 +2667,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       options: options,
       callback: callback
     });
-    logger.exit('Client.subscribe', client.id, client);
+    logger.exit('Client.subscribe', client._id, client);
     return client;
   }
 
@@ -2677,7 +2679,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     if (client.subscriptions[i].address === subscriptionAddress &&
         client.subscriptions[i].share === originalShareValue) {
       err = new SubscribedError('client is already subscribed to this address');
-      logger.throw('Client.subscribe', this.id, err);
+      logger.throw('Client.subscribe', this._id, err);
       throw err;
     }
   }
@@ -2686,28 +2688,28 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     try {
       messenger.subscribe(address, qos, ttl, credit);
     } catch (e) {
-      logger.caught('Client.subscribe', client.id, e);
+      logger.caught('Client.subscribe', client._id, e);
       err = getNamedError(e);
     }
   }
 
   if (callback) {
     process.nextTick(function() {
-      logger.entry('Client.subscribe.callback', client.id);
-      logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+      logger.entry('Client.subscribe.callback', client._id);
+      logger.log('parms', client._id, 'err:', err, ', topicPattern:',
                  topicPattern, ', originalShareValue:', originalShareValue);
       callback.apply(client, [err, topicPattern, originalShareValue]);
-      logger.exit('Client.subscribe.callback', client.id, null);
+      logger.exit('Client.subscribe.callback', client._id, null);
     });
   }
 
   if (err) {
     setImmediate(function() {
-      logger.log('emit', client.id, 'error', err);
+      logger.log('emit', client._id, 'error', err);
       client.emit('error', err);
     });
     if (shouldReconnect(err)) {
-      logger.log('data', client.id, 'queued subscription and calling ' +
+      logger.log('data', client._id, 'queued subscription and calling ' +
                  'reconnect');
       // error during subscribe so add to list of queued to resub
       client.queuedSubscriptions.push({
@@ -2727,7 +2729,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   } else {
     // if no errors, add this to the stored list of subscriptions
     var isFirstSub = (client.subscriptions.length === 0);
-    logger.log('data', client.id, 'isFirstSub:', isFirstSub);
+    logger.log('data', client._id, 'isFirstSub:', isFirstSub);
 
     client.subscriptions.push({
       address: subscriptionAddress,
@@ -2751,7 +2753,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
   }
 
-  logger.exit('Client.subscribe', client.id, client);
+  logger.exit('Client.subscribe', client._id, client);
   return client;
 };
 
@@ -2778,19 +2780,19 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
  */
 Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
                                {
-  logger.entry('Client.unsubscribe', this.id);
-  logger.log('parms', this.id, 'topicPattern:', topicPattern);
+  logger.entry('Client.unsubscribe', this._id);
+  logger.log('parms', this._id, 'topicPattern:', topicPattern);
 
   // Must accept at least one option - and first option is always a
   // topicPattern.
   if (arguments.length === 0) {
     err = new TypeError("You must specify a 'topicPattern' argument");
-    logger.throw('Client.unsubscribe', this.id, err);
+    logger.throw('Client.unsubscribe', this._id, err);
     throw err;
   }
   if (!topicPattern) {
     err = new TypeError("You must specify a 'topicPattern' argument");
-    logger.throw('Client.unsubscribe', this.id, err);
+    logger.throw('Client.unsubscribe', this._id, err);
     throw err;
   }
   topicPattern = String(topicPattern);
@@ -2832,23 +2834,23 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
       err = new InvalidArgumentError("share argument value '" + share +
                                      "' is invalid because it contains a " +
                                      "colon (\':\') character");
-      logger.throw('Client.unsubscribe', this.id, err);
+      logger.throw('Client.unsubscribe', this._id, err);
       throw err;
     }
     share = 'share:' + share + ':';
   } else {
     share = 'private:';
   }
-  logger.log('parms', this.id, 'share:', share);
+  logger.log('parms', this._id, 'share:', share);
 
   // Validate the options parameter, when specified
   if (typeof options !== 'undefined') {
     if (typeof options === 'object') {
-      logger.log('parms', this.id, 'options:', options);
+      logger.log('parms', this._id, 'options:', options);
     } else {
       err = new TypeError('options must be an object type not a ' +
                           (typeof options) + ')');
-      logger.throw('Client.unsubscribe', this.id, err);
+      logger.throw('Client.unsubscribe', this._id, err);
       throw err;
     }
   }
@@ -2862,7 +2864,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
                              options.ttl +
                              "' is invalid, only 0 is a supported value for " +
                              ' an unsubscribe request');
-        logger.throw('Client.unsubscribe', this.id, err);
+        logger.throw('Client.unsubscribe', this._id, err);
         throw err;
       }
     }
@@ -2870,21 +2872,21 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
 
   if (callback && !(callback instanceof Function)) {
     err = new TypeError('callback must be a function type');
-    logger.throw('Client.unsubscribe', this.id, err);
+    logger.throw('Client.unsubscribe', this._id, err);
     throw err;
   }
 
   // Ensure we have attempted a connect
   if (this.isStopped()) {
     err = new StoppedError('not started');
-    logger.throw('Client.unsubscribe', this.id, err);
+    logger.throw('Client.unsubscribe', this._id, err);
     throw err;
   }
 
   var messenger = this.messenger;
-  var address = this.service + '/' + share + topicPattern;
+  var address = this._service + '/' + share + topicPattern;
   var client = this;
-  var subscriptionAddress = this.service + '/' + topicPattern;
+  var subscriptionAddress = this._service + '/' + topicPattern;
 
   // Check that there is actually a subscription for the pattern and share
   var subscribed = false;
@@ -2922,11 +2924,11 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
 
     // queue unsubscribe request as appropriate
     if (noop) {
-      logger.log('data', client.id, 'client already had a queued subscribe ' +
+      logger.log('data', client._id, 'client already had a queued subscribe ' +
                  'request for this address, so marked that as a noop and ' +
                  'will queue this unsubscribe request as a noop too');
     } else {
-      logger.log('data', client.id, 'client waiting for connection so ' +
+      logger.log('data', client._id, 'client waiting for connection so ' +
                  'queueing the unsubscribe request');
     }
     client.queuedUnsubscribes.push({
@@ -2940,11 +2942,11 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   };
 
   // if client is in the retrying state, then queue this unsubscribe request
-  if (client.state === STATE_RETRYING || client.state === STATE_STARTING) {
-    logger.log('data', client.id, 'client is still in the process of ' +
+  if (client._state === STATE_RETRYING || client._state === STATE_STARTING) {
+    logger.log('data', client._id, 'client is still in the process of ' +
                'connecting so queueing the unsubscribe request');
     queueUnsubscribe();
-    logger.exit('Client.unsubscribe', client.id, client);
+    logger.exit('Client.unsubscribe', client._id, client);
     return client;
   }
 
@@ -2952,7 +2954,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
 
   if (!subscribed) {
     err = new UnsubscribedError('client is not subscribed to this address');
-    logger.throw('Client.unsubscribe', this.id, err);
+    logger.throw('Client.unsubscribe', this._id, err);
     throw err;
   }
 
@@ -2962,9 +2964,9 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
 
     if (callback) {
       setTimeout(function() {
-        logger.entry('Client.unsubscribe.callback', client.id);
+        logger.entry('Client.unsubscribe.callback', client._id);
         callback.apply(client, [null, topicPattern, originalShareValue]);
-        logger.exit('Client.unsubscribe.callback', client.id, null);
+        logger.exit('Client.unsubscribe.callback', client._id, null);
       }, 100);
     }
     // if no errors, remove this from the stored list of subscriptions
@@ -2977,13 +2979,13 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     }
   } catch (e) {
     err = getNamedError(e);
-    logger.caught('Client.unsubscribe', client.id, err);
+    logger.caught('Client.unsubscribe', client._id, err);
     setImmediate(function() {
-      logger.log('emit', client.id, 'error', err);
+      logger.log('emit', client._id, 'error', err);
       client.emit('error', err);
     });
     if (shouldReconnect(err)) {
-      logger.log('data', client.id, 'client error "' + err + '" during ' +
+      logger.log('data', client._id, 'client error "' + err + '" during ' +
                  'messenger.unsubscribe call so queueing the unsubscribe ' +
                  'request');
       queueUnsubscribe();
@@ -2993,7 +2995,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     }
   }
 
-  logger.exit('Client.unsubscribe', client.id, client);
+  logger.exit('Client.unsubscribe', client._id, client);
   return client;
 };
 
