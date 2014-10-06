@@ -95,19 +95,58 @@ ProtonMessage::~ProtonMessage()
 {
   Proton::Entry("ProtonMessage::destructor", name);
 
-  linkAddr = NULL;
-
   if (message) {
     Proton::Entry("ProtonMessage::pn_message_free", name);
+    pn_message_clear(message);
     pn_message_free(message);
+    free(message);
     message = NULL;
     Proton::Exit("ProtonMessage::pn_message_free", name, 0);
   }
+
+  if (linkAddr) {
+    free(linkAddr);
+    linkAddr = NULL;
+  }
+
   handle_->SetInternalField(0, Undefined());
   handle_.Dispose();
   handle_.Clear();
 
   Proton::Exit("ProtonMessage::destructor", name, 0);
+}
+
+ProtonMessage::ProtonMessage(const ProtonMessage& that)
+{
+  Proton::Entry("ProtonMessage::constructor(that)", name);
+  memset(name, '\0', sizeof(name));
+  strcpy(name, that.name);
+  message = pn_message();
+  pn_message_copy(message, that.message);
+  tracker = that.tracker;
+  linkAddr = (char*)malloc(strlen(that.linkAddr) + 1);
+  strcpy(linkAddr, that.linkAddr);
+  Proton::Exit("ProtonMessage::constructor(that)", name, 0);
+}
+
+ProtonMessage& ProtonMessage::operator=(const ProtonMessage& that)
+{
+  Proton::Entry("ProtonMessage::operator=", name);
+  if (this != &that) {
+    memset(name, '\0', sizeof(name));
+    strcpy(name, that.name);
+    pn_message_clear(message);
+    pn_message_free(message);
+    free(message);
+    message = pn_message();
+    pn_message_copy(message, that.message);
+    tracker = that.tracker;
+    if (linkAddr) free(linkAddr);
+    linkAddr = (char*)malloc(strlen(that.linkAddr) + 1);
+    strcpy(linkAddr, that.linkAddr);
+  }
+  Proton::Exit("ProtonMessage::operator=", name, 0);
+  return *this;
 }
 
 Handle<Value> ProtonMessage::NewInstance(const Arguments& args)

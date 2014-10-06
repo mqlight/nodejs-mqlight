@@ -833,13 +833,23 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
     pn_link_t* link = pn_messenger_tracker_link(obj->messenger, tracker);
     if (link) {
       if (pn_link_state(link) & PN_LOCAL_CLOSED) {
-        Proton::Log("data_often", name, "Link closed, so ignoring received message for address:", pn_message_get_address(msg->message));
+        Proton::Log("data_often",
+                    name,
+                    "Link closed, so ignoring received message for address:",
+                    pn_message_get_address(msg->message));
       } else {
-        msg->linkAddr = pn_terminus_get_address(pn_link_remote_target(link));
+        const char* tmpAddr =
+            pn_terminus_get_address(pn_link_remote_target(link));
+        msg->linkAddr = (char*)malloc(strlen(tmpAddr) + 1);
+        strcpy(msg->linkAddr, tmpAddr);
         vector.push_back(msgObj);
       }
     } else {
-      Proton::Log("data_often", name, "No link associated with received message tracker for address:", pn_message_get_address(msg->message));
+      Proton::Log(
+          "data_often",
+          name,
+          "No link associated with received message tracker for address:",
+          pn_message_get_address(msg->message));
       vector.push_back(msgObj);
     }
   }
@@ -1172,7 +1182,7 @@ Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
                           name);
   }
 
-  ssize_t pending = 
+  ssize_t pending =
     pn_messenger_pending_outbound(obj->messenger, address.c_str());
   if (pending < 0) {
     THROW_NAMED_EXCEPTION("NetworkError",
@@ -1182,7 +1192,7 @@ Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
   } else if (pending > 0) {
     result = true;
   }
-  
+
   Proton::Exit("ProtonMessenger::PendingOutbound", name, result);
   return scope.Close(Boolean::New(result));
 }

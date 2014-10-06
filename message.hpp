@@ -46,11 +46,13 @@ class ProtonMessage : public node::ObjectWrap
   static void Init(v8::Handle<v8::Object> target);
   static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
   ProtonMessage();
+  ProtonMessage(const ProtonMessage& that);
+  ProtonMessage& operator=(const ProtonMessage& that);
   ~ProtonMessage();
 
   pn_message_t* message;
   pn_tracker_t tracker;
-  const char* linkAddr;
+  char* linkAddr;
   char name[24];
 
  protected:
