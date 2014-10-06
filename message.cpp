@@ -99,7 +99,6 @@ ProtonMessage::~ProtonMessage()
     Proton::Entry("ProtonMessage::pn_message_free", name);
     pn_message_clear(message);
     pn_message_free(message);
-    free(message);
     message = NULL;
     Proton::Exit("ProtonMessage::pn_message_free", name, 0);
   }
