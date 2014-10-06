@@ -943,17 +943,6 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
   }
 
   pn_delivery_t* d = pn_messenger_delivery(obj->messenger, msg->tracker);
-  Proton::Entry("pn_delivery_tag", name);
-  pn_delivery_tag_t tag = pn_delivery_tag(d);
-  char tagstr[128];
-  if (tag.size * 4 > 128) {
-    THROW_EXCEPTION(
-        "Delivery tag larger than expected.", "ProtonMessenger::Settle", name);
-  }
-  for (unsigned int i = 0; i < tag.size; i++) {
-    sprintf(tagstr + (i * 4), "\\x%.2x", tag.bytes[i]);
-  }
-  Proton::Exit("pn_delivery_tag", name, tagstr);
   int status = pn_messenger_settle(obj->messenger, msg->tracker, 0);
   if (pn_messenger_errno(obj->messenger)) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
@@ -966,20 +955,29 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
 
   // For incoming messages, if we haven't already settled it, block for a while
   // until we *think* the settlement disposition has been communicated over the
-  // network. We detect that by determining when the delivery tag has been 
-  // NULL'ed out by the call to `pn_real_settle`.
+  // network. We detect that by querying pn_transport_quiesced which should
+  // return true once all pending output has been written to the wire.
   // (as per other comments, ideally we should wrap this in a callback...)
-  if (d != NULL && !pn_delivery_settled(d) &&
-      pn_link_is_receiver(pn_delivery_link(d))) {
-    while (pn_delivery_tag(d).size > 0) {
-      Proton::Entry("pn_messenger_work", name);
-      pn_messenger_work(obj->messenger, 0);
-      int error = pn_messenger_errno(obj->messenger);
-      Proton::Exit("pn_messenger_work", name, error);
-      if (error) {
-        const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-        const char* err = GetErrorName(text);
-        THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Settle", name)
+  if (d != NULL && pn_link_is_receiver(pn_delivery_link(d))) {
+    pn_session_t* session = pn_link_session(pn_delivery_link(d));
+    if (session) {
+      pn_connection_t* connection = pn_session_connection(session);
+      if (connection) {
+        pn_transport_t* transport = pn_connection_transport(connection);
+        if (transport) {
+          while (!pn_transport_quiesced(transport)) {
+            Proton::Entry("pn_messenger_work", name);
+            pn_messenger_work(obj->messenger, 0);
+            int error = pn_messenger_errno(obj->messenger);
+            Proton::Exit("pn_messenger_work", name, error);
+            if (error) {
+              const char* text =
+                  pn_error_text(pn_messenger_error(obj->messenger));
+              const char* err = GetErrorName(text);
+              THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Settle", name)
+            }
+          }
+        }
       }
     }
   }
