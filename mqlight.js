@@ -2253,6 +2253,12 @@ Client.prototype.checkForMessages = function() {
         logger.log('debug', client.id, 'processing message %d', msg);
         var protonMsg = messages[msg];
         processMessage(client, protonMsg);
+        if (msg < (tot - 1)) {
+          // Unless this is the last pass around the loop, call work() so that
+          // Messenger has a chance to respond to any heartbeat requests
+          // that may have arrived from the server.
+          client._messenger.work(0);
+        }
       }
     }
   } catch (e) {

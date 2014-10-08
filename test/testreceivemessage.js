@@ -630,3 +630,61 @@ module.exports.test_presence_of_confirmDelivery_method = function(test) {
     test.ok(false);
   });
 };
+
+
+/**
+ * Tests that the pn_messenger_work function is invoked each time a
+ * message is delivered.  This is required to avoid a situation where the loop
+ * that is responsible for delivering messages is so busy - heart beats are
+ * never responded to and the server disconnects the client believing that it
+ * has ended.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_work_between_messages = function(test) {
+  var originalReceiveMethod = mqlight.proton.messenger.receive;
+  var originalWorkMethod = mqlight.proton.messenger.work;
+  
+  mqlight.proton.messenger.receive = function() {};
+
+  var client = mqlight.createClient({service: 'amqp://host'});
+
+  var messageEvents = 0;
+  var workCalls = 0;
+  
+  client.start(function(err) {
+    test.ifError(err);
+    client.on('message', function(data, delivery) {
+      ++messageEvents;
+      if (messageEvents === 2) {
+        client.stop();
+        mqlight.proton.messenger.receive = originalReceiveMethod;
+        mqlight.proton.messenger.work = originalWorkMethod;
+        test.ok(workCalls > 0, 'expected work to be invoked!');
+        test.done();
+      }
+    });
+    client.subscribe('/#');
+  });
+
+  client.on('malformed', function() {
+    test.ok(false, 'malformed event should not be emitted');
+  });
+
+  client.on('error', function(err) {
+    console.log(err, 'error event should not be emitted');
+    test.ok(false);
+  });
+
+  var messages = [testMessage('/test_work_between_messages', '/#'),
+                  testMessage('/test_work_between_messages', '/#')];
+  mqlight.proton.messenger.receive = function() {
+    var result = messages;
+    messages = [];
+    return result;
+  };
+  
+  mqlight.proton.messenger.work = function() {
+    ++workCalls;
+    return 0;
+  };
+};
