@@ -2069,7 +2069,6 @@ Client.prototype.send = function(topic, data, options, callback) {
             }
           } else {
             // messenger has been stopped.
-            var callbackError = null;
             while (client._outstandingSends.length > 0) {
               inFlight = client._outstandingSends.shift();
               client._queuedSends.push({
@@ -2080,16 +2079,10 @@ Client.prototype.send = function(topic, data, options, callback) {
               });
               inFlight.msg.destroy();
             }
-            if (callbackError !== null) {
-              logger.throw('Client.send.sendOutboundMessages',
-                           client.id, callbackError);
-              throw callbackError;
-            }
           }
         } catch (e) {
           var error = getNamedError(e);
           var callbackError = null;
-          var doReconnect = false;
           logger.caught('Client.send.sendOutboundMessages', client.id, error);
 
           // Error - so empty the outstandingSends array:
@@ -2115,10 +2108,10 @@ Client.prototype.send = function(topic, data, options, callback) {
                   try {
                     inFlight.callback.apply(client,
                         [null, topic, body, options]);
-                  } catch (e) {
+                  } catch (cberr) {
                     logger.caught('Client.send.sendOutboundMessages.callback',
-                                  client.id, e);
-                    if (callbackError === null) callbackError = e;
+                                  client.id, cberr);
+                    if (callbackError === null) callbackError = cberr;
                   }
                   logger.exit('Client.send.sendOutboundMessages.callback',
                               client.id, null);
@@ -2126,25 +2119,25 @@ Client.prototype.send = function(topic, data, options, callback) {
                 }, client, error, inFlight.topic, inFlight.msg.body,
                 inFlight.options);
               }
-
-              if (error) {
-                logger.log('emit', client.id, 'error', error);
-                client.emit('error', error);
-                doReconnect |= shouldReconnect(error);
-              }
             }
-            inFlight.msg.destroy();
           }
-          if (doReconnect) {
+
+          if (error) {
+            logger.log('emit', client.id, 'error', error);
+            client.emit('error', error);
+          }
+          inFlight.msg.destroy();
+
+          if (shouldReconnect(error)) {
             reconnect(client);
           }
+
           if (callbackError !== null) {
             logger.throw('Client.send.sendOutboundMessages',
                          client.id, callbackError);
             throw callbackError;
           }
         }
-        logger.exit('Client.send.sendOutboundMessages', client.id, null);
       };
       setImmediate(sendOutboundMessages);
     }
