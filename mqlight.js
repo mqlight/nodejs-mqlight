@@ -1764,8 +1764,15 @@ var processQueuedActions = function(err) {
                client._queuedSends);
     while (client._queuedSends.length > 0 &&
             client.state === STATE_STARTED) {
+      var remaining = client._queuedSends.length;
       var msg = client._queuedSends.shift();
       client.send(msg.topic, msg.data, msg.options, msg.callback);
+      if (client._queuedSends.length >= remaining) {
+        // Calling client.send can cause messages to be added back into
+        // _queuedSends, if the network connection is broken.  Check that the
+        // size of the array is decreasing to avoid looping forever...
+        break;
+      }
     }
   }
   logger.exit('processQueuedActions', client.id, null);
