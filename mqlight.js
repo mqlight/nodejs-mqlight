@@ -2138,6 +2138,7 @@ Client.prototype.send = function(topic, data, options, callback) {
             throw callbackError;
           }
         }
+        logger.exit('Client.send.sendOutboundMessages', client.id, null);
       };
       setImmediate(sendOutboundMessages);
     }
