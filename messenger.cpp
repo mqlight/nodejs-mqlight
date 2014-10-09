@@ -739,15 +739,54 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
   pn_link_close(link);
   Proton::Exit("pn_link_close", name, 0);
 
-  while (!(pn_link_state(link) & PN_REMOTE_CLOSED)) {
-    Proton::Entry("pn_messenger_work", name);
-    pn_messenger_work(obj->messenger, 50);
-    int error = pn_messenger_errno(obj->messenger);
-    Proton::Exit("pn_messenger_work", name, error);
-    if (error) {
-      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
-      const char* err = GetErrorName(text);
-      THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Unsubscribe", name)
+  // check if we are detaching with @closed=true
+  bool closed = true;
+  pn_expiry_policy_t expiry_policy =
+      pn_terminus_get_expiry_policy(pn_link_target(link));
+  pn_seconds_t timeout = pn_terminus_get_timeout(pn_link_target(link));
+  if (expiry_policy == PN_NEVER || timeout > 0) {
+    closed = false;
+  }
+  Proton::Log("data", name, "closed:", closed);
+
+  // if @closed=true, keep calling work until we have received the close
+  // acknowledgment from the remote end
+  if (closed) {
+    while (!(pn_link_state(link) & PN_REMOTE_CLOSED)) {
+      Proton::Entry("pn_messenger_work", name);
+      pn_messenger_work(obj->messenger, 0);
+      int error = pn_messenger_errno(obj->messenger);
+      Proton::Exit("pn_messenger_work", name, error);
+      if (error) {
+        const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+        const char* err = GetErrorName(text);
+        THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Unsubscribe", name)
+      }
+    }
+  } else {
+    // otherwise, all we can do is keep calling work until our close request
+    // has been pushed over the network connection as we won't get an ACK
+    pn_session_t* session = pn_link_session(link);
+    if (session) {
+      pn_connection_t* connection = pn_session_connection(session);
+      if (connection) {
+        pn_transport_t* transport = pn_connection_transport(connection);
+        if (transport) {
+          while (!pn_transport_quiesced(transport)) {
+            Proton::Entry("pn_messenger_work", name);
+            pn_messenger_work(obj->messenger, 0);
+            int error = pn_messenger_errno(obj->messenger);
+            Proton::Exit("pn_messenger_work", name, error);
+            if (error) {
+              const char* text =
+                  pn_error_text(pn_messenger_error(obj->messenger));
+              const char* err = GetErrorName(text);
+              THROW_NAMED_EXCEPTION(
+                  err, text, "ProtonMessenger::Unsubscribe", name)
+            }
+          }
+        }
+      }
     }
   }
 
