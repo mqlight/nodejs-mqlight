@@ -27,24 +27,26 @@ var fs = require('fs');
 
 // parse the commandline arguments
 var types = {
+  help: Boolean,
   service: String,
+  'trust-certificate': String,
   topic: String,
   id: String,
   'message-ttl': Number,
   delay: Number,
-  file: String,
-  'trust-certificate': String,
-  repeat: Number
+  repeat: Number,
+  sequence: Boolean,
+  file: String
 };
 var shorthands = {
   h: ['--help'],
   s: ['--service'],
+  c: ['--trust-certificate'],
   t: ['--topic'],
   i: ['--id'],
   d: ['--delay'],
-  f: ['--file'],
-  c: ['--trust-certificate'],
-  r: ['--repeat']
+  r: ['--repeat'],
+  f: ['--file']
 };
 var parsed = nopt(types, shorthands, process.argv, 2);
 
@@ -80,11 +82,19 @@ var showUsage = function() {
   puts('');
 };
 
-
 if (parsed.help) {
   showUsage();
   process.exit(0);
 }
+
+Object.getOwnPropertyNames(parsed).forEach(function(key) {
+  if (key !== 'argv' && !types.hasOwnProperty(key)) {
+    console.error('Error: Unsupported commandline option "%s"', key);
+    console.error();
+    showUsage();
+    process.exit(1);
+  }
+});
 
 var service = parsed.service ? parsed.service : 'amqp://localhost';
 var topic = parsed.topic ? parsed.topic : 'public';
@@ -97,7 +107,8 @@ var opts = {
   id: id
 };
 if (parsed['trust-certificate']) {
-  opts['sslTrustCertificate'] = parsed['trust-certificate'];
+  /** the trust-certificate to use for a TLS/SSL connection */
+  opts.sslTrustCertificate = parsed['trust-certificate'];
   if (parsed.service) {
     if (service.indexOf('amqps', 0) !== 0) {
       console.error('*** error ***');
@@ -107,7 +118,8 @@ if (parsed['trust-certificate']) {
       process.exit(1);
     }
   } else {
-    opts['service'] = 'amqps://localhost';
+    /** if none specified, change the default service to be amqps:// */
+    opts.service = 'amqps://localhost';
   }
 }
 var client = mqlight.createClient(opts);

@@ -9,9 +9,9 @@
     },
     "dependencies": {
         "node-uuid": "~1.4.0",
-        "nopt": "~2.2.0",
-        "npmlog": "0.0.6",
-        "moment": "2.7.0",
+        "nopt": "~3.0.1",
+        "npmlog": "0.1.1",
+        "moment": "2.8.3",
         "hashmap": "1.1.0"
     },
     "devDependencies": {

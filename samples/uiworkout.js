@@ -60,6 +60,7 @@ var loremIpsum = 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, ' +
 
 // parse the command-line arguments
 var types = {
+  help: Boolean,
   service: String,
   'trust-certificate': String
 };
@@ -96,6 +97,15 @@ if (parsed.help) {
   showUsage();
   process.exit(1);
 }
+
+Object.getOwnPropertyNames(parsed).forEach(function(key) {
+  if (key !== 'argv' && !types.hasOwnProperty(key)) {
+    console.error('Error: Unsupported commandline option "%s"', key);
+    console.error();
+    showUsage();
+    process.exit(1);
+  }
+});
 
 // Build an array of word ending offsets for loremIpsum
 var loremIpsumWords = [];
@@ -166,7 +176,8 @@ function startClient(topic, share) {
     opts.service = 'amqp://localhost';
   }
   if (parsed['trust-certificate']) {
-    opts['sslTrustCertificate'] = parsed['trust-certificate'];
+    /** the trust-certificate to use for a TLS/SSL connection */
+    opts.sslTrustCertificate = parsed['trust-certificate'];
     if (parsed.service) {
       if (opts.service.indexOf('amqps', 0) !== 0) {
         console.error("Error: the service URL must start 'amqps://' when " +
@@ -174,7 +185,8 @@ function startClient(topic, share) {
         process.exit(1);
       }
     } else {
-      opts['service'] = 'amqps://localhost';
+      /** if none specified, change the default service to be amqps:// */
+      opts.service = 'amqps://localhost';
     }
   }
 
@@ -206,11 +218,11 @@ function startClient(topic, share) {
           console.err('Problem with send request: ' + err.message);
           process.exit(0);
         } else {
-          if (messageCount == 0) {
+          if (messageCount === 0) {
             console.log('Sending messages');
           }
           ++messageCount;
-          if (messageCount % 10 == 0) {
+          if (messageCount % 10 === 0) {
             console.log('Sent ' + messageCount + ' messages');
           }
         }
