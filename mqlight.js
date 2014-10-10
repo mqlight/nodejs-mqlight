@@ -1176,8 +1176,7 @@ var Client = function(service, id, securityOptions) {
             var serviceUrl = url.parse(service);
             service = serviceUrl.protocol + '//' + auth + serviceUrl.host;
             logUrl = serviceUrl.protocol + '//' +
-                     auth.replace(/:[^\/:]+@/g, ':********@') +
-                     serviceUrl.host + ':' + serviceUrl.port;
+                     auth.replace(/:[^\/:]+@/g, ':********@') + serviceUrl.host;
           } else {
             logUrl = service;
           }
