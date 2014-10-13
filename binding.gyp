@@ -13,7 +13,7 @@
                     'PreprocessorDefinitions': [ '_WIN32_WINNT=0x0600', 'PN_NODEFINE_SSIZE_T' ]
                   }
                 },
-                "include_dirs+": [".", "<!(echo %BROOT%)/thirdpartyproducts/qpid-proton/qpid-proton-0.7/proton-c/include"],
+                "include_dirs+": [".", "<!(echo %BROOT%)/appmsging/qpid-proton/qpid-proton-0.7/proton-c/include"],
                 "libraries": ["<!(echo %QPIDLIB%)"],
             }],
             ["OS=='linux'", {
