@@ -1,0 +1,21 @@
+// Render using:
+//  dot -o state-machine.gif -Tgif state-machine.dot
+
+digraph statemachine {
+    fontsize=12;
+    stopping -> stopped [label=" <stopped>"];
+    stopped -> starting [label=" start()"];
+    starting -> retrying1 [label=" [failed]\l <error>"];
+    starting -> started [label=" [connected]\l <started>"];
+    starting -> stopping [label=" stop()", weight=1];
+    retrying1 -> retrying1 [label=" [failed]\l <error>"];
+    retrying1 -> stopping [label=" stop()"];
+    retrying1 -> started [label=" [connected]\l <started>"]
+    retrying2 -> started [label=" [connected]\l <restarted>"];
+    retrying2 -> retrying2 [label=" [failed]\l <error>"];
+    started -> stopping [label=" stop()"];
+    started -> retrying2 [label=" [broken]\l <error>"];
+    retrying2 -> stopping [label=" stop()"];
+
+    { rank = same; starting; retrying1 }
+}
