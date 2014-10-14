@@ -6,8 +6,8 @@ backed by the following state machine:
 ![Diagram of a state machine](state-machine.gif)
 
 Each of the states shown in the state machine diagram corresponds to the values
-stored `mqlight.Client.state` property, with the exception of `retrying1` and
-`retrying2` which are collapsed into a single `retrying` value. While in the
+stored i the `mqlight.Client.state` property, with the exception of `retrying1`
+and `retrying2` which are collapsed into a single `retrying` value. While in the
 `retrying` state the client will wait for up approximately 60 seconds (based on
 an exponential backoff algorithm) before attempting to transition into a new
 state.
