@@ -472,10 +472,10 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
     int count = 0;
     while (true) {
       if (pn_data_type(da) == PN_SYMBOL) {
-        char* key = pn_data_get_symbol(da).start;
+        const char* key = pn_data_get_symbol(da).start;
 
         if (pn_data_next(da)) {
-          char* value;
+          const char* value;
           const char* value_type;
           char int_buffer[12];  // strlen("-2147483648") + '\0'
           pn_type_t type = pn_data_type(da);

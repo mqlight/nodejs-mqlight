@@ -37,11 +37,14 @@
 
 #include <proton/message.h>
 #include <proton/messenger.h>
+
 #include <proton/condition.h>
-#include <proton/terminus.h>
-#include <proton/link.h>
-#include <proton/transport.h>
 #include <proton/connection.h>
+#include <proton/delivery.h>
+#include <proton/link.h>
+#include <proton/session.h>
+#include <proton/terminus.h>
+#include <proton/transport.h>
 
 class ProtonMessenger : public node::ObjectWrap
 {

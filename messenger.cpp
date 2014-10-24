@@ -726,8 +726,8 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
 
   if (ttl == 0) {
     Proton::Entry("pn_terminus_set_expiry_policy", name);
-    pn_terminus_set_expiry_policy(pn_link_target(link), PN_LINK_CLOSE);
-    pn_terminus_set_expiry_policy(pn_link_source(link), PN_LINK_CLOSE);
+    pn_terminus_set_expiry_policy(pn_link_target(link), PN_EXPIRE_WITH_LINK);
+    pn_terminus_set_expiry_policy(pn_link_source(link), PN_EXPIRE_WITH_LINK);
     Proton::Exit("pn_terminus_set_expiry_policy", name, 0);
     Proton::Entry("pn_terminus_set_timeout", name);
     Proton::Log("parms", name, "ttl:", ttl);
@@ -744,7 +744,7 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
   pn_expiry_policy_t expiry_policy =
       pn_terminus_get_expiry_policy(pn_link_target(link));
   pn_seconds_t timeout = pn_terminus_get_timeout(pn_link_target(link));
-  if (expiry_policy == PN_NEVER || timeout > 0) {
+  if (expiry_policy == PN_EXPIRE_NEVER || timeout > 0) {
     closed = false;
   }
   Proton::Log("data", name, "closed:", closed);
