@@ -1176,7 +1176,8 @@ var Client = function(service, id, securityOptions) {
             var serviceUrl = url.parse(service);
             service = serviceUrl.protocol + '//' + auth + serviceUrl.host;
             logUrl = serviceUrl.protocol + '//' +
-                     auth.replace(/:[^\/:]+@/g, ':********@') + serviceUrl.host;
+                     auth.replace(/:[^\/:]+@/g, ':********@') +
+                     serviceUrl.host + ':' + serviceUrl.port;
           } else {
             logUrl = service;
           }
@@ -2049,17 +2050,19 @@ Client.prototype.send = function(topic, data, options, callback) {
 
                 // invoke the callback, if specified
                 if (inFlight.callback) {
-                  setImmediate(function(client, err, topic, body, options) {
-                    logger.entry('Client.send.sendOutboundMessages.callback',
-                        client.id);
-                    inFlight.callback.apply(client, [err,
-                                                     topic,
-                                                     body,
-                                                     options]);
-                    logger.exit('Client.send.sendOutboundMessages.callback',
-                        client.id, null);
-                  }, client, err, inFlight.topic, inFlight.msg.body,
-                  inFlight.options);
+                  setImmediate(
+                      function(client, cbFunc, err, topic, body, options) {
+                        logger.entry(
+                            'Client.send.sendOutboundMessages.callback',
+                            client.id);
+                        cbFunc.apply(client, [err,
+                                              topic,
+                                              body,
+                                              options]);
+                        logger.exit('Client.send.sendOutboundMessages.callback',
+                            client.id, null);
+                      }, client, inFlight.callback, err, inFlight.topic,
+                      inFlight.msg.body, inFlight.options);
                 }
 
                 // Free resources used by the message

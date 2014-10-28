@@ -616,3 +616,36 @@ module.exports.test_client_replaced = function(test) {
   });
 };
 
+
+/**
+ * Unit test for the fix to defect 74527.  Calls send twice, each time
+ * specifying a different callback.  The expected behaviour is that both send
+ * calls complete in order and invoke their respective callbacks.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_sends_call_correct_callbacks = function(test) {
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_sends_call_correct_callbacks'
+  });
+  var firstCallbackRun = false;
+  var secondCallbackRun = false;
+
+  client.once('started', function() {
+    client.send('topic', 'data', function(err) {
+      test.ok(!firstCallbackRun, 'first callback run twice!');
+      test.ok(!secondCallbackRun, 'second callback called before first(1)!');
+      firstCallbackRun = true;
+    });
+
+    client.send('topic', 'data', function(err) {
+      test.ok(!secondCallbackRun, 'second callback called twice!');
+      test.ok(firstCallbackRun, 'second callback called before first(2)!');
+      secondCallbackRun = true;
+      client.stop();
+      test.done();
+    });
+  });
+};
+
