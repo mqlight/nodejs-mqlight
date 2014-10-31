@@ -97,7 +97,7 @@ var header = function(lvl, clientId, options) {
       write(lvl, clientId, '| Probe Id          :-', options.probeId);
     }
     if ('ffdcSequence' in options) {
-      write(lvl, clientId, '| FDCSequenceNumber :-', options.ffdcSequence++);
+      write(lvl, clientId, '| FFDCSequenceNumber :-', options.ffdcSequence++);
     }
     if (potentialUnwinds !== 0) {
       write(lvl, clientId, '| potentialUnwinds :-', potentialUnwinds);

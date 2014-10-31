@@ -65,7 +65,7 @@ var showUsage = function() {
        '                        PEM or DER format) to validate the\n' +
        '                        identify of the server. The connection must\n' +
        '                        be secured with SSL/TLS (e.g. the service\n' +
-       "                        URL must start 'amqps://')");
+       "                        URL must start with 'amqps://')");
   puts('  -t TOPIC, --topic=TOPIC');
   puts('                        send messages to topic TOPIC\n' +
        '                        (default: public)');
@@ -112,7 +112,7 @@ if (parsed['trust-certificate']) {
   if (parsed.service) {
     if (service.indexOf('amqps', 0) !== 0) {
       console.error('*** error ***');
-      console.error("The service URL must start 'amqps://' when using a " +
+      console.error("The service URL must start with 'amqps://' when using a " +
                     'trust certificate.');
       console.error('Exiting.');
       process.exit(1);

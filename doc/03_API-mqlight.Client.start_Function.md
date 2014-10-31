@@ -8,6 +8,6 @@ of the client has been stopped using the `mqlight.Client.stop` method.
   has either: transitioned into `started` state; or has entered `stopped` state
   before it can transition into `started` state. The callback function will be
   invoked with a `StoppedError` as its argument if the client transitions
-  into stopped state before it attains started state - which can happen as a
-  result of calling the `client.stop` method.
+  into `stopped` state before it attains `started` state - which can happen 
+  as a result of calling the `client.stop` method.
 

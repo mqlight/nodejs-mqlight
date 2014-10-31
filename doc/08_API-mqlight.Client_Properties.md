@@ -6,7 +6,7 @@ was passed in on the `Client.createClient` call or an auto-generated id.
 ### mqlight.Client.service
 
 Returns the URL of the server to which the client is currently connected
-to, or undefined if not connected.
+to, or `undefined` if not connected.
 
 ### mqlight.Client.state
 
