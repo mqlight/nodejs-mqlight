@@ -10,6 +10,6 @@ to, or `undefined` if not connected.
 
 ### mqlight.Client.state
 
-Returns the current state of the client, which will be one of:
+Returns the current state of the client, which will be one of the following states:
 'starting', 'started', 'stopping', 'stopped', or 'retrying'.
 

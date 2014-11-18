@@ -6,9 +6,9 @@ backed by the following state machine:
 ![Diagram of a state machine](state-machine.gif)
 
 Each of the states shown in the state machine diagram corresponds to the values
-stored i the `mqlight.Client.state` property, with the exception of `retrying1`
+stored in the `mqlight.Client.state` property, with the exception of `retrying1`
 and `retrying2` which are collapsed into a single `retrying` value. While in the
-`retrying` state the client will wait for up approximately 60 seconds (based on
+`retrying` state, the client will wait for up approximately 60 seconds (based on
 an exponential backoff algorithm) before attempting to transition into a new
 state.
 
@@ -27,7 +27,7 @@ information about the transitions, which includes:
   * `[failed]` occurs when the client unsuccessfully attempts to establish a
     network connection to the server.
 3. Events that are emitted. Specifically:
-  * `<error>` indicates that an error event is emitted.
-  * `<restarted>` indicates that a restarted event is emitted.
-  * `<started>` indicates that a started event is emitted.
-  * `<stopped>` indicates that a stopped event is emitted.
+  * `<error>` indicates that an error event is sent.
+  * `<restarted>` indicates that a restarted event is sent.
+  * `<started>` indicates that a started event is sent.
+  * `<stopped>` indicates that a stopped event is sent.

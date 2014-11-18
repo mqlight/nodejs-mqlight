@@ -15,35 +15,35 @@ subscribing client.
 * `topicPattern` - (String) used to match against the `topic` specified when a
   message is sent to the messaging service. A pattern can contain any character
   in the Unicode character set, with `#` representing a multilevel wildcard and
-  `+` a single level wildcard as described
-  [here](https://developer.ibm.com/messaging/mq-light/wildcard-topicpatterns/).
+  `+` a single level wildcard. For more information, see 
+  [Wildcards](https://developer.ibm.com/messaging/mq-light/docs/wildcards/).
 * `share` - (String) (optional) name for creating or joining a shared
   destination for which messages are anycast between connected subscribers. If
-  omitted defaults to a private destination (e.g. messages can only be received
+  omitted, this defaults to a private destination (for example, messages can only be received
   by a specific instance of the client).
 * `options` - (Object) (optional) additional options for the subscribe
   operation. Supported options are:
-  *  **autoConfirm**, (Boolean) (optional) When set to true (the default) the
+  *  **autoConfirm**, (Boolean) (optional) when set to true (the default) the
      client will automatically confirm delivery of messages when all of the
      listeners registered for the client's `message` event have returned.
      When set to `false`, application code is responsible for confirming the
      delivery of messages using the `confirmDelivery` method, passed via
      the `delivery` argument of the listener registered for `message` events.
-     `autoConfirm` is only applicable when the `qos` property is set to 1. The
-     `qos` property is described later.
-  *  **credit**, (Number) The maximum number of unconfirmed messages a client
+     `autoConfirm` is only applicable when the `qos` property is set to 1. (The
+     `qos` property is described later.)
+  *  **credit**, (Number) the maximum number of unconfirmed messages a client
      can have before the server will stop sending new messages to the client
      and require that it confirms some of the outstanding message deliveries in
      order to receive more messages.  The default for this property is 1024. If
-     specified the value will be coerced to a `Number` and must be finite
-     and >= 0, otherwise a `RangeError` will be thrown.
-  *  **qos**, (Number) The quality of service to use for delivering messages to
+     specified, the value will be coerced to a `Number` and must be finite
+     and greater than, or equal to 0, otherwise a `RangeError` will be thrown.
+  *  **qos**, (Number) the quality of service to use for delivering messages to
      the subscription.  Valid values are: 0 to denote at most once (the
      default), and 1 for at least once. A `RangeError` will be thrown for other
      value.
-  *  **ttl**, (Number) A time-to-live value, in milliseconds, that is applied
-     to the destination that the client is subscribed to. If specified the
-     value will be coerced to a `Number`, which must be finite and >= 0,
+  *  **ttl**, (Number) a time-to-live value, in milliseconds, that is applied
+     to the destination that the client is subscribed to. If specified, the
+     value will be coerced to a `Number`, which must be finite and greater than, or equal to 0,
      otherwise a `RangeError` will be thrown. This value will replace any
      previous value, if the destination already exists. Time to live starts
      counting down when there are no instances of a client subscribed to a
