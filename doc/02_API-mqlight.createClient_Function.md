@@ -29,7 +29,7 @@ Creates an IBM MQ Light client instance in `starting` state.
      all). If you specify just the user property but no password property an
      `InvalidArgumentError` will be thrown.
   *  **password**, (String) (optional) password for authentication.
-     Alternatively, user name may be embedded in the URL passed via the service
+     Alternatively, a password can be embedded in the URL passed via the service
      property.
   *  **sslTrustCertificate**, (String) (optional) SSL trust certificate to use
      when authentication is required for the MQ Light server. Only used when
