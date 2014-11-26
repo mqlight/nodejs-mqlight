@@ -69,7 +69,7 @@ var fs = require('fs');
 var http = require('http');
 var https = require('https');
 
-var invalidClientIdRegex = /[^A-Za-z0-9%/\._]+/;
+var invalidClientIdRegex = /[^A-Za-z0-9%\/\._]+/;
 
 var HashMap = require('hashmap').HashMap;
 
