@@ -43,8 +43,10 @@ var testCase = require('nodeunit').testCase;
  */
 module.exports.test_successful_start_stop = function(test) {
   test.expect(9);
-  var client =
-      mqlight.createClient({service: 'amqp://host'}, function(err, c) {
+  var client =  mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_successful_start_stop'
+  }, function(err, c) {
     test.equals('started', client.state);
     test.ok(this === client);
     test.ok(c == client);
@@ -73,7 +75,10 @@ module.exports.test_successful_start_stop = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_listener_fired_on_subsequent_tick = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_listener_fired_on_subsequent_tick'
+  });
   client.on('started', function() {
     client.stop();
     test.done();
@@ -87,7 +92,10 @@ module.exports.test_listener_fired_on_subsequent_tick = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_start_argument_is_function = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_start_argument_is_function'
+  });
   test.throws(
       function() {
         client.start(1234);
@@ -105,7 +113,10 @@ module.exports.test_start_argument_is_function = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_start_method_returns_client = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_start_method_returns_client'
+  });
   var result = client.start(function() {client.stop();});
   test.ok(result === client);
   test.done();
@@ -119,7 +130,10 @@ module.exports.test_start_method_returns_client = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_start_when_already_started = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_start_when_already_started'
+  });
   client.start(function(err) {
     client.on('started', function(err) {
       test.ok(!err);
@@ -140,7 +154,10 @@ module.exports.test_start_when_already_started = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_start_too_many_arguments = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_start_too_many_arguments'
+  });
   client.start(function() {
     client.stop();
     test.done();
@@ -154,7 +171,10 @@ module.exports.test_start_too_many_arguments = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_start_retry = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_start_retry'
+  });
   var requiredConnectStatus = 2;
 
   client.on('error', function(err) {
@@ -181,7 +201,8 @@ module.exports.test_start_retry = function(test) {
 module.exports.test_start_multiple_endpoints = function(test) {
   var services = ['amqp://bad1', 'amqp://bad2', 'amqp://host', 'amqp://bad3'];
   var client = mqlight.createClient({
-    service: services
+    service: services,
+    id: 'test_start_multiple_endpoints'
   });
   client.start(function() {
     test.equals(client.service, 'amqp://host:5672');
@@ -209,7 +230,8 @@ module.exports.test_start_variable_endpoints = function(test) {
     callback(undefined, result);
   };
   var client = mqlight.createClient({
-    service: serviceFunction
+    service: serviceFunction,
+    id: 'test_start_variable_endpoints'
   });
   client.on('error', function(err) {
     test.ok(err.message.indexOf('amqp://bad') != -1);
@@ -229,7 +251,8 @@ module.exports.test_start_variable_endpoints = function(test) {
  */
 module.exports.test_start_stop_timing = function(test) {
   var client = mqlight.createClient({
-    service: 'amqp://host'
+    service: 'amqp://host',
+    id: 'test_start_stop_timing'
   });
   client.start(function() {
     stubproton.blockSendCompletion();
@@ -281,7 +304,8 @@ module.exports.test_start_http_changing_endpoint = function(test) {
     return req;
   };
   var client = mqlight.createClient({
-    service: 'http://127.0.0.1:9999'
+    service: 'http://127.0.0.1:9999',
+    id: 'test_start_http_changing_endpoint'
   });
   client.on('error', function(err) {
     test.ok(err.message.indexOf('amqp://bad1') != -1 ||
@@ -334,7 +358,8 @@ module.exports.test_start_http_multiple_endpoints = function(test) {
     return req;
   };
   var client = mqlight.createClient({
-    service: 'http://127.0.0.1:9999'
+    service: 'http://127.0.0.1:9999',
+    id: 'test_start_http_multiple_endpoints'
   });
   // error will be emitted for the last service in the returned endpoint list
   client.on('error', function(err) {
@@ -368,7 +393,8 @@ module.exports.test_start_http_connection_refused = function(test) {
     return req;
   };
   var client = mqlight.createClient({
-    service: 'http://127.0.0.1:9999'
+    service: 'http://127.0.0.1:9999',
+    id: 'test_start_http_connection_refused'
   }, function(err) {
     test.ok(err instanceof Error);
     test.ok(/connect ECONNREFUSED/.test(err));
@@ -406,7 +432,8 @@ module.exports.test_start_http_bad_json = function(test) {
     return req;
   };
   var client = mqlight.createClient({
-    service: 'http://127.0.0.1:9999'
+    service: 'http://127.0.0.1:9999',
+    id: 'test_start_http_bad_json'
   }, function(err) {
     test.ok(err instanceof Error);
     test.ok(/unparseable JSON/.test(err));
@@ -446,7 +473,8 @@ module.exports.test_start_http_bad_amqp_service = function(test) {
     return req;
   };
   var client = mqlight.createClient({
-    service: 'http://127.0.0.1:9999'
+    service: 'http://127.0.0.1:9999',
+    id: 'test_start_http_bad_amqp_service'
   }, function(err) {
     test.ok(err instanceof Error);
     test.ok(/Unsupported URL/.test(err));
@@ -475,7 +503,8 @@ module.exports.test_start_http_timeout = function(test) {
     return req;
   };
   var client = mqlight.createClient({
-    service: 'http://127.0.0.1:9999'
+    service: 'http://127.0.0.1:9999',
+    id: 'test_start_http_timeout'
   }, function(err) {
     test.ok(err instanceof Error);
     test.ok(/http request to http:\/\/127.0.0.1:9999\/ timed out/.test(err));
@@ -511,7 +540,8 @@ module.exports.test_start_http_bad_status = function(test) {
     return req;
   };
   var client = mqlight.createClient({
-    service: 'http://127.0.0.1:9999'
+    service: 'http://127.0.0.1:9999',
+    id: 'test_start_http_bad_status'
   }, function(err) {
     test.ok(err instanceof Error);
     test.ok(/failed with a status code of 404/.test(err));
@@ -550,7 +580,8 @@ module.exports.test_start_file_changing_endpoint = function(test) {
     }
   };
   var client = mqlight.createClient({
-    service: 'file:///tmp/filename.json'
+    service: 'file:///tmp/filename.json',
+    id: 'test_start_file_changing_endpoint'
   });
   client.on('error', function(err) {
     test.ok(err.message.indexOf('amqp://bad1') != -1 ||
@@ -596,7 +627,8 @@ module.exports.test_start_file_multiple_endpoints = function(test) {
     }
   };
   var client = mqlight.createClient({
-    service: 'file:///tmp/filename.json'
+    service: 'file:///tmp/filename.json',
+    id: 'test_start_file_multiple_endpoints'
   });
   // error will be emitted for the last service in the returned endpoint list
   client.on('error', function(err) {
@@ -621,7 +653,8 @@ module.exports.test_start_file_multiple_endpoints = function(test) {
  */
 module.exports.test_start_bad_file = function(test) {
   var client = mqlight.createClient({
-    service: 'file:///badfile.json'
+    service: 'file:///badfile.json',
+    id: 'test_start_bad_file'
   }, function(err) {
     test.ok(err instanceof Error);
     test.ok(/ENOENT/.test(err));
@@ -640,7 +673,8 @@ module.exports.test_start_bad_remote_file_uri = function(test) {
   test.throws(
       function() {
         mqlight.createClient({
-          service: 'file://remote.example.com/badfile.json'
+          service: 'file://remote.example.com/badfile.json',
+          id: 'test_start_bad_remote_file_uri'
         });
       },
       Error,
@@ -661,7 +695,8 @@ module.exports.test_start_windows_drive_letter_file_uri = function(test) {
     return 'win32';
   };
   var client = mqlight.createClient({
-    service: 'file:///D:/test/path/file.json'
+    service: 'file:///D:/test/path/file.json',
+    id: 'test_start_windows_drive_letter_file_uri'
   }, function(err) {
     test.ifError(err);
   });
@@ -697,7 +732,8 @@ module.exports.test_start_file_bad_json = function(test) {
     }
   };
   var client = mqlight.createClient({
-    service: 'file://localhost/badjson.json'
+    service: 'file://localhost/badjson.json',
+    id: 'test_start_file_bad_json'
   }, function(err) {
     test.ok(err instanceof Error);
     test.ok(/unparseable JSON/.test(err));
@@ -722,7 +758,10 @@ module.exports.test_start_heartbeat = function(test) {
   stubproton.setRemoteIdleTimeout(remoteIdleTimeout, function() {
     heartbeatCount++;
   });
-  var client = mqlight.createClient({service: 'amqp://host:1234'});
+  var client = mqlight.createClient({
+    service: 'amqp://host:1234',
+    id: 'test_start_heartbeat'
+  });
   client.start(function() {
     // Function to check for heartbeats. Invoked at half the rate of heartbeats
     // This is a little crude as it is not possible to get exact timings
@@ -737,7 +776,7 @@ module.exports.test_start_heartbeat = function(test) {
         test.done();
       // If too many heartbeats then fail (more a test to see if the heartbeat
       // is thrashing rather than an accurate attempt to count the expected
-      // heartbeats) 
+      // heartbeats)
       } else if (heartbeatCount / count > 10) {
         client.stop();
         stubproton.setRemoteIdleTimeout(-1);
@@ -770,161 +809,179 @@ module.exports.test_start_user_password_options = function(test) {
   var data = [
     { desc: '00: no user or password specified anywhere',
       service: 'amqp://host',
+      id: 'test_start_user_password_options.00',
       user: undefined,
       password: undefined,
       valid: true,
       expect_user: undefined,
-      expect_password: undefined
-    },
+      expect_password: undefined },
     { desc: '01: user specified as a property - but no password',
       service: 'amqp://host',
+      id: 'test_start_user_password_options.01',
       user: 'user',
       password: undefined,
       valid: false },
     { desc: '02: no user or password specified anywhere',
       service: 'amqp://host',
+      id: 'test_start_user_password_options.02',
       user: undefined,
       password: 'password',
       valid: false },
     { desc: '03: user in (String) URL, no properties set',
       service: 'amqp://user@host',
+      id: 'test_start_user_password_options.03',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '04: user/password in (String) URL, no properties set',
       service: 'amqp://user:pass@host',
+      id: 'test_start_user_password_options.04',
       user: undefined,
       password: undefined,
       valid: true,
       expect_user: 'user',
-      expect_password: 'pass'
-    },
+      expect_password: 'pass' },
     { desc: '05: user/password in (String) URL, user mismatches properties',
       service: 'amqp://user1:pass1@host',
+      id: 'test_start_user_password_options.05',
       user: 'user2',
       password: 'pass1',
       valid: false },
     { desc: '06: password in (String) URL does not match password property',
       service: 'amqp://user1:pass1@host',
+      id: 'test_start_user_password_options.06',
       user: 'user1',
       password: 'pass2',
       valid: false },
     { desc: '07: String URL and properties all specify matching values',
       service: 'amqp://user1:pass1@host',
+      id: 'test_start_user_password_options.07',
       user: 'user1',
       password: 'pass1',
       valid: true,
       expect_user: 'user1',
-      expect_password: 'pass1'
-    },
+      expect_password: 'pass1' },
     { desc: '08: Array URLs have mixture of embedded auth #1',
       service: ['amqp://user1:pass1@host', 'amqp://host'],
+      id: 'test_start_user_password_options.08',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '09: Array URLs have mixture of embedded auth #2',
       service: ['amqp://host', 'amqp://user1:pass1@host'],
+      id: 'test_start_user_password_options.09',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '10: Array URLs have matching users but different passwords',
       service: ['amqp://user1:pass1@host', 'amqp://user1:pass2@host'],
+      id: 'test_start_user_password_options.10',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '11: Array URLs have matching passwords but different users',
       service: ['amqp://user1:pass1@host', 'amqp://user2:pass1@host'],
+      id: 'test_start_user_password_options.11',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '12: Array URLs have matching user/passwords - no properties',
       service: ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'],
+      id: 'test_start_user_password_options.12',
       user: undefined,
       password: undefined,
       valid: true,
       expect_user: 'user1',
-      expect_password: 'pass1'
-    },
+      expect_password: 'pass1' },
     { desc: '13: Array URLs and properties all match',
       service: ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'],
+      id: 'test_start_user_password_options.13',
       user: 'user1',
       password: 'pass1',
       valid: true,
       expect_user: 'user1',
-      expect_password: 'pass1'
-    },
+      expect_password: 'pass1' },
     { desc: '14: Array URLs have same values but user property different',
       service: ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'],
+      id: 'test_start_user_password_options.14',
       user: 'user2',
       password: 'pass1',
       valid: false },
     { desc: '15: Array URLs have same values but password property different',
       service: ['amqp://user1:pass1@host', 'amqp://user1:pass1@host'],
+      id: 'test_start_user_password_options.15',
       user: 'user1',
       password: 'pass2',
       valid: false },
     { desc: '16: Func returns String value with user/password',
       service: function(cb) {cb(undefined, 'amqp://user1:pass1@host');},
+      id: 'test_start_user_password_options.16',
       user: undefined,
       password: undefined,
       valid: true,
       expect_user: 'user1',
-      expect_password: 'pass1'
-    },
+      expect_password: 'pass1' },
     { desc: '17: Func returns String without auth, user/pass props',
       service: function(cb) {cb(undefined, 'amqp://host');},
+      id: 'test_start_user_password_options.17',
       user: 'user1',
       password: 'pass1',
       valid: true,
       expect_user: 'user1',
-      expect_password: 'pass1'
-    },
+      expect_password: 'pass1' },
     { desc: '18: Func returns String with user/pass matches properties',
       service: function(cb) {cb(undefined, 'amqp://user1:pass1@host');},
+      id: 'test_start_user_password_options.18',
       user: 'user1',
       password: 'pass1',
       valid: true,
       expect_user: 'user1',
-      expect_password: 'pass1'
-    },
+      expect_password: 'pass1' },
     { desc: '19: Func returns URI with only user - no other values',
       service: function(cb) {cb(undefined, 'amqp://user1@host');},
+      id: 'test_start_user_password_options.19',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '20: Func returns Array with different credentials in URLs #1',
-      service: function(cb)
-      {cb(undefined, ['amqp://host', 'amqp://user1:pass1@host']);},
+      service: function(cb) {
+        cb(undefined, ['amqp://host', 'amqp://user1:pass1@host']);},
+      id: 'test_start_user_password_options.20',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '21: Func returns Array with different credentials in URLs #2',
-      service: function(cb)
-      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://host']);},
+      service: function(cb) {
+        cb(undefined, ['amqp://user1:pass1@host', 'amqp://host']);},
+      id: 'test_start_user_password_options.21',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '22: Func returns Array with users mismatching in URLs',
-      service: function(cb)
-      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://user2:pass1@host']);},
+      service: function(cb) {
+        cb(undefined, ['amqp://user1:pass1@host', 'amqp://user2:pass1@host']);},
+      id: 'test_start_user_password_options.22',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '23: Func returns URLs that mismatch on password',
-      service: function(cb)
-      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://user1:pass2@host']);},
+      service: function(cb) {
+        cb(undefined, ['amqp://user1:pass1@host', 'amqp://user1:pass2@host']);},
+      id: 'test_start_user_password_options.23',
       user: undefined,
       password: undefined,
       valid: false },
     { desc: '24: Func returns URLs that match each other but mismatch props',
-      service: function(cb)
-      {cb(undefined, ['amqp://user1:pass1@host', 'amqp://user1:pass1@host']);},
+      service: function(cb) {
+        cb(undefined, ['amqp://user1:pass1@host', 'amqp://user1:pass1@host']);},
+      id: 'test_start_user_password_options.24',
       user: 'user2',
       password: 'pass1',
       valid: false },
     { desc: '25: Func returns URLs with user/pass that match properties',
       service: function(cb)  // 25: Everything specified, everything matches
       {cb(undefined, ['amqp://user1:pass1@host', 'amqp://user1:pass1@host']);},
+      id: 'test_start_user_password_options.25',
       user: 'user1',
       password: 'pass1',
       valid: true,

@@ -59,7 +59,10 @@ module.exports.test_receive_message = function(test) {
   var originalReceiveMethod = mqlight.proton.messenger.receive;
   mqlight.proton.messenger.receive = function() {};
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_receive_message'}
+  );
 
   var first = true;
   client.start(function(err) {
@@ -112,7 +115,11 @@ module.exports.test_receive_topic_pattern = function(test) {
     return result;
   };
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_receive_topic_pattern'}
+  );
+
   client.start(function() {
     client.subscribe('/kittens/#');
   });
@@ -234,7 +241,11 @@ module.exports.test_malformed_message = function(test) {
     return result;
   };
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_malformed_message'}
+  );
+
   client.start(function() {
     client.subscribe('/kittens/#');
   });
@@ -295,7 +306,11 @@ module.exports.test_receive_ttl = function(test) {
     return messages;
   };
   var count = 0;
-  var client = mqlight.createClient({service: 'amqp://localhost'});
+  var client = mqlight.createClient({
+    service: 'amqp://localhost',
+    id: 'test_receive_ttl'}
+  );
+
   client.start(function() {
     client.subscribe('/public');
   }).on('message', function(data, delivery) {
@@ -323,11 +338,12 @@ module.exports.test_receive_ttl = function(test) {
  * due to a logic error in when new messages are requested.
  *
  * @param {object} test - the unittest interface
+ * @param {String} name - the test name
  * @param {Number} credit - the credit value to supply to client.subscribe(...)
  * @param {Number} qos - the qos level to use for the test
  * @param {Number} numMessages - the number of messages to simulate receiving
  */
-function run_receiver_credit_testcase(test, credit, qos, numMessages) {
+function run_receiver_credit_testcase(test, name, credit, qos, numMessages) {
 
   var savedReceiveMethod = mqlight.proton.messenger.receive;
   var savedFlowMethod = mqlight.proton.messenger.flow;
@@ -349,7 +365,7 @@ function run_receiver_credit_testcase(test, credit, qos, numMessages) {
             'maximum credit for link should never be exceeded');
   };
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({service: 'amqp://host', id: name});
 
   client.start(function(err) {
     var receiveCount = 0;
@@ -384,7 +400,8 @@ function run_receiver_credit_testcase(test, credit, qos, numMessages) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit10_qos0 = function(test) {
-  run_receiver_credit_testcase(test, 10, 0, 250);
+  run_receiver_credit_testcase(test, 'test_subscribe_credit10_qos0',
+                               10, 0, 250);
 };
 
 
@@ -395,7 +412,8 @@ module.exports.test_subscribe_credit10_qos0 = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit5000_qos0 = function(test) {
-  run_receiver_credit_testcase(test, 5000, 0, 20000);
+  run_receiver_credit_testcase(test, 'test_subscribe_credit5000_qos0',
+                               5000, 0, 20000);
 };
 
 
@@ -406,7 +424,8 @@ module.exports.test_subscribe_credit5000_qos0 = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit1_qos0 = function(test) {
-  run_receiver_credit_testcase(test, 1, 0, 50);
+  run_receiver_credit_testcase(test, 'test_subscribe_credit1_qos0',
+                               1, 0, 50);
 };
 
 
@@ -417,7 +436,8 @@ module.exports.test_subscribe_credit1_qos0 = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit10_qos1 = function(test) {
-  run_receiver_credit_testcase(test, 10, 0, 250);
+  run_receiver_credit_testcase(test, 'test_subscribe_credit10_qos1',
+                               10, 0, 250);
 };
 
 
@@ -428,7 +448,8 @@ module.exports.test_subscribe_credit10_qos1 = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit5000_qos1 = function(test) {
-  run_receiver_credit_testcase(test, 5000, 0, 20000);
+  run_receiver_credit_testcase(test, 'test_subscribe_credit5000_qos1',
+                               5000, 0, 20000);
 };
 
 
@@ -439,7 +460,8 @@ module.exports.test_subscribe_credit5000_qos1 = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_subscribe_credit1_qos1 = function(test) {
-  run_receiver_credit_testcase(test, 1, 0, 50);
+  run_receiver_credit_testcase(test, 'test_subscribe_credit1_qos1',
+                               1, 0, 50);
 };
 
 
@@ -473,7 +495,10 @@ module.exports.test_subscribe_credit_confirm = function(test) {
     currentCredit += credit;
   };
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_subscribe_credit_confirm'
+  });
   var deliveryArray = [];
   var interval = null;
   var confirmBatch = 0;
@@ -564,11 +589,11 @@ module.exports.test_client_replaced = function(test) {
 
 /**
  * Tests that the confirmDelivery() method is passed to the 'message' event when
- * a message is received as a result of subscribing using 
+ * a message is received as a result of subscribing using
  * {qos: 1, autoConfirm: false} options on the client.subscribe() method
  * <p>
  * Also check that the confirmDelivery() method is not passed to the 'message'
- * event when the delivery cannot be confirmed (e.g. qos: 0 OR 
+ * event when the delivery cannot be confirmed (e.g. qos: 0 OR
  * autoConfirm: true).
  *
  * @param {object} test the unittest interface
@@ -595,7 +620,10 @@ module.exports.test_presence_of_confirmDelivery_method = function(test) {
     return result;
   };
 
-  var client = mqlight.createClient({service: 'amqp://host'}, function() {
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_presence_of_confirmDelivery_method'
+  }, function() {
     client.subscribe('/kittens/#', testData[testCase].options);
     messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
   });
@@ -643,14 +671,17 @@ module.exports.test_presence_of_confirmDelivery_method = function(test) {
 module.exports.test_work_between_messages = function(test) {
   var originalReceiveMethod = mqlight.proton.messenger.receive;
   var originalWorkMethod = mqlight.proton.messenger.work;
-  
+
   mqlight.proton.messenger.receive = function() {};
 
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_work_between_messages'}
+  );
 
   var messageEvents = 0;
   var workCalls = 0;
-  
+
   client.start(function(err) {
     test.ifError(err);
     client.on('message', function(data, delivery) {
@@ -682,7 +713,7 @@ module.exports.test_work_between_messages = function(test) {
     messages = [];
     return result;
   };
-  
+
   mqlight.proton.messenger.work = function() {
     ++workCalls;
     return 0;

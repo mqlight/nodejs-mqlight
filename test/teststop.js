@@ -36,7 +36,10 @@ var testCase = require('nodeunit').testCase;
  * @param {object} test the unittest interface
  */
 module.exports.test_stop_callback_and_event = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_stop_callback_and_event'
+  });
   client.start(function() {
     var count = 0;
     client.on('stopped', function() {
@@ -67,7 +70,10 @@ module.exports.test_stop_callback_and_event = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_listener_fired_on_subsequent_tick = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_listener_fired_on_subsequent_tick'
+  });
   client.start();
   client.on('started', function() {
     client.stop();
@@ -84,7 +90,10 @@ module.exports.test_listener_fired_on_subsequent_tick = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_stop_argument_is_function = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_stop_argument_is_function'
+  });
   test.throws(
       function() {
         client.stop(1234);
@@ -102,7 +111,10 @@ module.exports.test_stop_argument_is_function = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_stop_method_returns_client = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_stop_method_returns_client'
+  });
   var result = client.stop();
   test.ok(result === client);
   test.done();
@@ -140,7 +152,10 @@ module.exports.test_stop_when_already_stopped = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_stop_too_many_arguments = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_stop_too_many_arguments'
+  });
   client.stop(function(err) {
     test.ok(!err);
     test.done();
@@ -155,7 +170,10 @@ module.exports.test_stop_too_many_arguments = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_stop_cleared_subscriptions = function(test) {
-  var client = mqlight.createClient({service: 'amqp://host'});
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_stop_cleared_subscriptions'
+  });
   client.on('started', function() {
     client.on('stopped', function() {
       test.deepEqual(client._subscriptions, [],
