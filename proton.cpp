@@ -102,6 +102,16 @@ void Proton::Exit(const char* lvl,
   scope.Close(Undefined());
 }
 
+void Proton::EntryTracer(const char* name, const char* message)
+{
+  Proton::Entry("entry_often", name, "proton");
+}
+
+void Proton::ExitTracer(const char* name, const char* message)
+{
+  Proton::Exit("exit_often", name, "proton", message);
+}
+
 void Proton::Log(const char* lvl,
                  const char* id,
                  const char* prefix,
@@ -234,6 +244,10 @@ void RegisterModule(Handle<Object> exports)
       Persistent<Function>::New(Local<Function>::Cast(ffdcFnc));
   Proton::loggerThrow =
       Persistent<Function>::New(Local<Function>::Cast(throwFnc));
+
+  // Enable qpid-proton function entry and exit tracing
+  pn_set_fnc_entry_tracer(Proton::EntryTracer);
+  pn_set_fnc_exit_tracer(Proton::ExitTracer);
 
   scope.Close(Undefined());
 }

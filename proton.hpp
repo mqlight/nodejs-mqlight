@@ -54,6 +54,8 @@ class Proton
                    const char* name,
                    const char* id,
                    const char* rc);
+  static void EntryTracer(const char* name, const char* message);
+  static void ExitTracer(const char* name, const char* message);
   static void Log(const char* lvl,
                   const char* id,
                   const char* prefix,
