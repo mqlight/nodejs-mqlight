@@ -1,4 +1,4 @@
-### mqlight.Client.stop([callback])
+### mqlight.Client.stop([`callback`])
 
 Stops the client from sending and/or receiving messages from the server. The
 client will automatically unsubscribe from all of the destinations that it is

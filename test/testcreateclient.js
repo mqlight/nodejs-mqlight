@@ -472,11 +472,12 @@ module.exports.test_invalid_ssl_options = function(test) {
       service: 'amqp://host',
       sslTrustCertificate: testData[count].sslTrustCertificate,
       sslVerifyName: testData[count].sslVerifyName,
-      id: 'test_invalid_ssl_options'
+      id: 'test_invalid_ssl_options'+count
     };
     var client = mqlight.createClient(opts);
     client.on('error', function(err) {
       test.ok(err);
+      test.equal('SecurityError', err.name, 'Expected a SecurityError');
       client.stop();
       ++count;
       if (count == testData.length) {
