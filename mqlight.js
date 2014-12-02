@@ -161,11 +161,11 @@ var STATE_RESTARTED = 'restarted';
 var STATE_RETRYING = 'retrying';
 
 
-/** Client state: becoming ready to do messaging */
+/** Client state: ready to do messaging */
 var STATE_STARTED = 'started';
 
 
-/** Client state: ready to do messaging */
+/** Client state: becoming ready to do messaging */
 var STATE_STARTING = 'starting';
 
 
@@ -487,7 +487,11 @@ exports.createClient = function(options, callback) {
       previousActiveClient.emit('error', error);
       process.nextTick(function() {
         client._performConnect(function(err) {
-          if (callback) callback.apply(client, [err, client]);
+          if (callback) {
+            logger.entry('createClient.callback', logger.NO_CLIENT_ID);
+            callback.apply(client, [err, client]);
+            logger.exit('createClient.callback', logger.NO_CLIENT_ID, null);
+          }
         }, true);
       });
     });
@@ -495,7 +499,11 @@ exports.createClient = function(options, callback) {
     activeClientList.add(client);
     process.nextTick(function() {
       client._performConnect(function(err) {
-        if (callback) callback.apply(client, [err, client]);
+        if (callback) {
+          logger.entry('createClient.callback', logger.NO_CLIENT_ID);
+          callback.apply(client, [err, client]);
+          logger.exit('createClient.callback', logger.NO_CLIENT_ID, null);
+        }
       }, true);
     });
   }
@@ -1021,7 +1029,8 @@ var Client = function(service, id, securityOptions) {
     if (!newClient) {
       var currentState = _state;
       // if we are not stopped or stopping state return with the client object
-      if (currentState !== STATE_STOPPED && currentState !== STATE_RETRYING) {
+      if (currentState !== STATE_STARTING && currentState !== STATE_STOPPED &&
+          currentState !== STATE_RETRYING) {
         if (currentState === STATE_STOPPING) {
           var stillDisconnecting = function(client, callback) {
             logger.entry('stillDisconnecting', _id);
@@ -1082,20 +1091,25 @@ var Client = function(service, id, securityOptions) {
     if (client._serviceFunction instanceof Function) {
       client._serviceFunction(function(err, service) {
         if (err) {
-          logger.entry('Client._serviceFunction.callback',
-                       _id);
-          callback.apply(client, [err]);
-          logger.exit('Client._serviceFunction.callback',
-              _id, null);
+          if (callback) {
+            logger.entry('Client._serviceFunction.callback',
+                         _id);
+            callback.apply(client, [err]);
+            logger.exit('Client._serviceFunction.callback',
+                        _id, null);
+          }
         } else {
           try {
             serviceList =
                 client._generateServiceList.apply(client, [service]);
             client._connectToService(serviceList, callback);
           } catch (err) {
-            logger.entry('Client._serviceFunction.callback', _id);
-            callback.apply(client, [err]);
-            logger.exit('Client._serviceFunction.callback', _id, null);
+            logger.caught('Client._serviceFunction', client.id, err);
+            if (callback) {
+              logger.entry('Client._serviceFunction.callback', _id);
+              callback.apply(client, [err]);
+              logger.exit('Client._serviceFunction.callback', _id, null);
+            }
           }
         }
       });
@@ -1104,6 +1118,7 @@ var Client = function(service, id, securityOptions) {
         serviceList = client._generateServiceList.apply(client, [service]);
         client._connectToService(serviceList, callback);
       } catch (err) {
+        logger.caught('Client._serviceFunction', client.id, err);
         if (callback) {
           process.nextTick(function() {
             logger.entry('Client.connect._performConnect.callback', _id);
@@ -1120,14 +1135,197 @@ var Client = function(service, id, securityOptions) {
   };
 
   /**
+  * Function to connect to a service. Callback happens once a successful
+  * connect/reconnect occurs.
+  *
+  * @this should be set to the client object.
+  * @param {Array} serviceList list of services to connect to.
+  * @param {connectCallback}
+  *  - callback called when connect/reconnect happens.
+  */
+  this._tryService = function(serviceList, callback) {
+    var client = this;
+    var error;
+
+    logger.entry('Client._tryService', _id);
+
+    if (serviceList.length === 0) {
+      logger.ffdc('Client._tryService', 'ffdc004', _id);
+    } else {
+      try {
+        var service = serviceList[0];
+        logger.log('data', _id, 'service:', service);
+
+        // check if we will be providing authentication information
+        var auth;
+        if (securityOptions.urlUser) {
+          auth = encodeURIComponent(String(securityOptions.urlUser));
+          auth += ':';
+          auth += encodeURIComponent(String(securityOptions.urlPassword));
+          auth += '@';
+        } else if (securityOptions.propertyUser) {
+          auth = encodeURIComponent(String(securityOptions.propertyUser));
+          auth += ':';
+          auth +=
+              encodeURIComponent(String(securityOptions.propertyPassword));
+          auth += '@';
+        } else {
+          auth = null;
+        }
+        var logUrl;
+        // reparse the service url to prepend authentication information
+        // back on as required
+        if (auth) {
+          var serviceUrl = url.parse(service);
+          service = serviceUrl.protocol + '//' + auth + serviceUrl.host;
+          logUrl = serviceUrl.protocol + '//' +
+                   auth.replace(/:[^\/:]+@/g, ':********@') + serviceUrl.host;
+        } else {
+          logUrl = service;
+        }
+        logger.log('data', _id, 'attempting to connect to: ' + logUrl);
+
+        var connectUrl = url.parse(service);
+        // remove any path elements from the URL (for ipv6 which appends /)
+        if (connectUrl.path) {
+          var hrefLength = connectUrl.href.length - connectUrl.path.length;
+          connectUrl.href = connectUrl.href.substr(0, hrefLength);
+          connectUrl.pathname = connectUrl.path = null;
+        }
+        try {
+          client._messenger.connect(connectUrl,
+                                    securityOptions.sslTrustCertificate,
+                                    securityOptions.sslVerifyName,
+                                    null);
+          logger.log('data', _id, 'successfully connected to: ' +
+              logUrl);
+          _service = serviceList[0];
+
+          // Indicate that we're started
+          _state = STATE_STARTED;
+          var eventToEmit;
+          if (client._firstStart) {
+            eventToEmit = STATE_STARTED;
+            client._firstStart = false;
+            client._retryCount = 0;
+            // could be queued actions so need to process those here. On
+            // reconnect this would be done via the callback we set, first
+            // connect its the users callback so won't process anything.
+            logger.log('data', _id, 'first start since being stopped');
+            processQueuedActions.apply(client);
+          } else {
+            client._retryCount = 0;
+            eventToEmit = STATE_RESTARTED;
+          }
+          ++client._connectionId;
+
+          process.nextTick(function() {
+            logger.log('emit', _id, eventToEmit);
+            client.emit(eventToEmit);
+          });
+
+          if (callback) {
+            process.nextTick(function() {
+              logger.entry('Client._tryService.callback', _id);
+              callback.apply(client);
+              logger.exit('Client._tryService.callback', _id, null);
+            });
+          }
+
+          // Setup heartbeat timer to ensure that while connected we send
+          // heartbeat frames to keep the connection alive, when required.
+          var remoteIdleTimeout =
+              client._messenger.getRemoteIdleTimeout(_service);
+          var heartbeatInterval = remoteIdleTimeout > 0 ?
+              remoteIdleTimeout / 2 : remoteIdleTimeout;
+          logger.log('data', _id, 'set heartbeatInterval to: ',
+                     heartbeatInterval);
+          if (heartbeatInterval > 0) {
+            var performHeartbeat = function(client, heartbeatInterval) {
+              logger.entry('Client._tryService.performHeartbeat', _id);
+              if (client._messenger) {
+                client._messenger.work(0);
+                client.heartbeatTimeout = setTimeout(performHeartbeat,
+                    heartbeatInterval, client, heartbeatInterval);
+              }
+              logger.exit('Client._tryService.performHeartbeat',
+                          _id, null);
+            };
+            client.heartbeatTimeout = setTimeout(performHeartbeat,
+                                                 heartbeatInterval,
+                                                 client, heartbeatInterval);
+          }
+
+          logger.exit('Client._tryService', _id, null);
+          return;
+        } catch (err) {
+          error = getNamedError(err);
+          logger.caught('Client._tryService', _id, error);
+          logger.log('data', _id, 'failed to connect to: ' + logUrl +
+                     ' due to error: ' + error);
+        }
+      } catch (err) {
+        // should never get here, as it means that messenger.connect has been
+        // called in an invalid way, so FFDC
+        error = err;
+        logger.caught('Client._tryService', _id, err);
+        logger.ffdc('Client._tryService', 'ffdc002', _id, err);
+        logger.throw('Client._tryService', _id, err);
+        throw err;
+      }
+
+      if (serviceList.length === 1) {
+        // We've tried all services without success. Pause for a while before
+        // trying again
+        logger.log('data', _id, 'End of service list');
+
+        _state = STATE_RETRYING;
+        var retry = function() {
+          logger.entryLevel('entry_often', 'retry', _id);
+          if (!client.isStopped()) {
+            client._performConnect.apply(client, [callback, false]);
+          }
+          logger.exitLevel('exit_often', 'retry', _id);
+        };
+
+        client._retryCount++;
+        var retryCap = 60000;
+        //limit to the power of 8 as anything above this will put the interval
+        //higher than the cap straight away.
+        var exponent = (client._retryCount <= 8) ? client._retryCount : 8;
+        var upperBound = Math.pow(2, exponent);
+        var lowerBound = 0.75 * upperBound;
+        var jitter = Math.random() * (0.25 * upperBound);
+        var interval = Math.min(retryCap, (lowerBound + jitter) * 1000);
+        //times by CONNECT_RETRY_INTERVAL for unittest purposes
+        interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
+        logger.log('data', _id, 'trying to connect again ' +
+                   'after ' + interval / 1000 + ' seconds');
+        setTimeout(retry, interval);
+        if (error) {
+          logger.log('emit', _id, 'error', error);
+          client.emit('error', error);
+        }
+      } else {
+        // Try the next service in the list
+        logger.log('data', _id, 'Trying next service');
+        client._tryService.apply(client, [serviceList.slice(1), callback]);
+      }
+    }
+
+    logger.exit('Client._tryService', _id, null);
+  };
+
+  /**
   * Function to connect to the service, trys each available service
   * in turn. If none can connect it emits an error, waits and
   * attempts to connect again. Callback happens once a successful
   * connect/reconnect occurs.
-  * @constructor
+  *
+  * @this should be set to the client object.
   * @param {Array} serviceList list of services to connect to.
   * @param {connectCallback}
-  *  - callback called when connect/reconnect happens
+  *  - callback called when connect/reconnect happens.
   */
   this._connectToService = function(serviceList, callback) {
     var client = this;
@@ -1144,165 +1342,7 @@ var Client = function(service, id, securityOptions) {
       return;
     }
 
-    var connected = false;
-    var error;
-
-    // Try each service in turn until we can successfully connect, or exhaust
-    // the list
-    if (!error) {
-      for (var i = 0; i < serviceList.length; i++) {
-        try {
-          var service = serviceList[i];
-          // check if we will be providing authentication information
-          var auth;
-          if (securityOptions.urlUser) {
-            auth = encodeURIComponent(String(securityOptions.urlUser));
-            auth += ':';
-            auth += encodeURIComponent(String(securityOptions.urlPassword));
-            auth += '@';
-          } else if (securityOptions.propertyUser) {
-            auth = encodeURIComponent(String(securityOptions.propertyUser));
-            auth += ':';
-            auth +=
-                encodeURIComponent(String(securityOptions.propertyPassword));
-            auth += '@';
-          } else {
-            auth = null;
-          }
-          var logUrl;
-          // reparse the service url to prepend authentication information
-          // back on as required
-          if (auth) {
-            var serviceUrl = url.parse(service);
-            service = serviceUrl.protocol + '//' + auth + serviceUrl.host;
-            logUrl = serviceUrl.protocol + '//' +
-                     auth.replace(/:[^\/:]+@/g, ':********@') + serviceUrl.host;
-          } else {
-            logUrl = service;
-          }
-          logger.log('data', _id, 'attempting to connect to: ' + logUrl);
-
-          var connectUrl = url.parse(service);
-          // remove any path elements from the URL (for ipv6 which appends /)
-          if (connectUrl.path) {
-            var hrefLength = connectUrl.href.length - connectUrl.path.length;
-            connectUrl.href = connectUrl.href.substr(0, hrefLength);
-            connectUrl.pathname = connectUrl.path = null;
-          }
-          try {
-            client._messenger.connect(connectUrl,
-                                      securityOptions.sslTrustCertificate,
-                                      securityOptions.sslVerifyName);
-            logger.log('data', _id, 'successfully connected to: ' +
-                logUrl);
-            _service = serviceList[i];
-            connected = true;
-            break;
-          } catch (err) {
-            error = getNamedError(err);
-            logger.log('data', _id, 'failed to connect to: ' + logUrl +
-                       ' due to error: ' + error);
-          }
-        } catch (err) {
-          // should never get here, as it means that messenger.connect has been
-          // called in an invalid way, so FFDC
-          error = err;
-          logger.caught('Client._connectToService', _id, err);
-          logger.ffdc('Client._connectToService', 'ffdc002', _id, err);
-          logger.throw('Client._connectToService', _id, err);
-          throw err;
-        }
-      }
-    }
-
-    // If we've successfully connected then we're done, otherwise we'll retry
-    if (connected) {
-      // Indicate that we're started
-      _state = STATE_STARTED;
-      var eventToEmit;
-      if (client._firstStart) {
-        eventToEmit = STATE_STARTED;
-        client._firstStart = false;
-        client._retryCount = 0;
-        // could be queued actions so need to process those here. On reconnect
-        // this would be done via the callback we set, first connect its the
-        // users callback so won't process anything.
-        logger.log('data', _id, 'first start since being stopped');
-        processQueuedActions.apply(client);
-      } else {
-        client._retryCount = 0;
-        eventToEmit = STATE_RESTARTED;
-      }
-      ++client._connectionId;
-
-      process.nextTick(function() {
-        logger.log('emit', _id, eventToEmit);
-        client.emit(eventToEmit);
-      });
-
-      if (callback) {
-        process.nextTick(function() {
-          logger.entry('Client._connectToService.callback', _id);
-          callback.apply(client);
-          logger.exit('Client._connectToService.callback', _id, null);
-        });
-      }
-
-      // Setup heartbeat timer to ensure that while connected we send heartbeat
-      // frames to keep the connection alive, when required.
-      var remoteIdleTimeout =
-          client._messenger.getRemoteIdleTimeout(_service);
-      var heartbeatInterval = remoteIdleTimeout > 0 ?
-          remoteIdleTimeout / 2 : remoteIdleTimeout;
-      logger.log('data', _id, 'set heartbeatInterval to: ',
-                 heartbeatInterval);
-      if (heartbeatInterval > 0) {
-        var performHeartbeat = function(client, heartbeatInterval) {
-          logger.entry('Client._connectToService.performHeartbeat', _id);
-          if (client._messenger) {
-            client._messenger.work(0);
-            client.heartbeatTimeout = setTimeout(performHeartbeat,
-                heartbeatInterval, client, heartbeatInterval);
-          }
-          logger.exit('Client._connectToService.performHeartbeat',
-                      _id, null);
-        };
-        client.heartbeatTimeout = setTimeout(performHeartbeat,
-                                             heartbeatInterval,
-                                             client, heartbeatInterval);
-      }
-
-    } else {
-      // We've tried all services without success. Pause for a while before
-      // trying again
-      _state = STATE_RETRYING;
-      var retry = function() {
-        logger.entryLevel('entry_often', 'retry', _id);
-        if (!client.isStopped()) {
-          client._performConnect.apply(client, [callback, false]);
-        }
-        logger.exitLevel('exit_often', 'retry', _id);
-      };
-
-      client._retryCount++;
-      var retryCap = 60000;
-      //limit to the power of 8 as anything above this will put the interval
-      //higher than the cap straight away.
-      var exponent = (client._retryCount <= 8) ? client._retryCount : 8;
-      var upperBound = Math.pow(2, exponent);
-      var lowerBound = 0.75 * upperBound;
-      var jitter = Math.random() * (0.25 * upperBound);
-      var interval = Math.min(retryCap, (lowerBound + jitter) * 1000);
-      //times by CONNECT_RETRY_INTERVAL for unittest purposes
-      interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
-      logger.log('data', _id, 'trying to connect again ' +
-                 'after ' + interval / 1000 + ' seconds');
-      setTimeout(retry, interval);
-      if (error) {
-        logger.log('emit', _id, 'error', error);
-        client.emit('error', error);
-      }
-    }
+    this._tryService(serviceList, callback);
 
     logger.exit('Client._connectToService', _id, null);
     return;
@@ -1732,12 +1772,12 @@ var processQueuedActions = function(err) {
         // no-op, so just trigger the callback without actually subscribing
         if (sub.callback) {
           process.nextTick(function() {
-            logger.entry('Client.subscribe.callback', client.id);
+            logger.entry('processQueuedActions.callback', client.id);
             logger.log('parms', client.id, 'err:', err, ', topicPattern:',
                        sub.topicPattern, ', originalShareValue:', sub.share);
             sub.callback.apply(client,
                 [err, sub.topicPattern, sub.originalShareValue]);
-            logger.exit('Client.subscribe.callback', client.id, null);
+            logger.exit('processQueuedActions.callback', client.id, null);
           });
         }
       } else {
@@ -1753,7 +1793,9 @@ var processQueuedActions = function(err) {
       if (rm.noop) {
         // no-op, so just trigger the callback without actually unsubscribing
         if (rm.callback) {
+          logger.entry('processQueuedActions.callback', client.id);
           rm.callback.apply(client, [null, rm.topicPattern, rm.share]);
+          logger.exit('processQueuedActions.callback', client.id, null);
         }
       } else {
         client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
