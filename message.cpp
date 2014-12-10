@@ -278,7 +278,7 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
         Local<Object> global = Context::GetCurrent()->Global();
         Local<Function> constructor =
             Local<Function>::Cast(global->Get(String::New("Buffer")));
-        Handle<Value> args[1] = {v8::Integer::New(buffsize)};
+        Handle<Value> args[1] = {v8::Integer::New((int)buffsize)};
         result = constructor->NewInstance(1, args);
         memcpy(Buffer::Data(result), buffer, buffsize);
         break;
@@ -569,9 +569,9 @@ void ProtonMessage::SetTimeToLive(Local<String> property,
   if (msg && msg->message) {
     unsigned int numberValue = 4294967295;
     if (value->ToNumber()->NumberValue() < 4294967295) {
-      numberValue = value->ToNumber()->NumberValue();
+      numberValue = (unsigned int)value->ToNumber()->NumberValue();
     }
-    Proton::Log("parms", name, "value:", numberValue);
+    Proton::Log("parms", name, "value:", (int)numberValue);
 
     pn_message_set_ttl(msg->message, numberValue);
   }

@@ -511,7 +511,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
     const char* err = GetErrorName(text);
-    // clonse to std::string before free'ing messenger
+    // clone to std::string before free'ing messenger
     std::string msg = text;
     pn_messenger_free(obj->messenger);
     obj->messenger = NULL;
@@ -603,7 +603,7 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("parms", name, "qos:", qos);
   Proton::Log("parms", name, "ttl:", ttl);
-  Proton::Log("parms", name, "credit:", credit);
+  Proton::Log("parms", name, "credit:", (int)credit);
 
   // throw Error if not connected
   if (!obj->messenger) {
@@ -1129,7 +1129,7 @@ Handle<Value> ProtonMessenger::Flow(const Arguments& args)
   unsigned int credit = (unsigned int)creditLong;
 
   Proton::Log("parms", name, "address:", address.c_str());
-  Proton::Log("parms", name, "credit:", credit);
+  Proton::Log("parms", name, "credit:", (int)credit);
 
   // throw exception if not connected
   if (!obj->messenger) {
