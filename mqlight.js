@@ -1263,6 +1263,44 @@ var Client = function(service, id, securityOptions) {
           logger.caught('Client._tryService', _id, error);
           logger.log('data', _id, 'failed to connect to: ' + logUrl +
                      ' due to error: ' + error);
+
+          if (serviceList.length === 1) {
+            // We've tried all services without success. Pause for a while
+            // before trying again
+            logger.log('data', _id, 'End of service list');
+
+            _state = STATE_RETRYING;
+            var retry = function() {
+              logger.entryLevel('entry_often', 'retry', _id);
+              if (!client.isStopped()) {
+                client._performConnect.apply(client, [callback, false]);
+              }
+              logger.exitLevel('exit_often', 'retry', _id);
+            };
+
+            client._retryCount++;
+            var retryCap = 60000;
+            // Limit to the power of 8 as anything above this will put the
+            // interval higher than the cap straight away.
+            var exponent = (client._retryCount <= 8) ? client._retryCount : 8;
+            var upperBound = Math.pow(2, exponent);
+            var lowerBound = 0.75 * upperBound;
+            var jitter = Math.random() * (0.25 * upperBound);
+            var interval = Math.min(retryCap, (lowerBound + jitter) * 1000);
+            // times by CONNECT_RETRY_INTERVAL for unittest purposes
+            interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
+            logger.log('data', _id, 'trying to connect again ' +
+                       'after ' + interval / 1000 + ' seconds');
+            setTimeout(retry, interval);
+            if (error) {
+              logger.log('emit', _id, 'error', error);
+              client.emit('error', error);
+            }
+          } else {
+            // Try the next service in the list
+            logger.log('data', _id, 'Trying next service');
+            client._tryService.apply(client, [serviceList.slice(1), callback]);
+          }
         }
       } catch (err) {
         // should never get here, as it means that messenger.connect has been
@@ -1272,44 +1310,6 @@ var Client = function(service, id, securityOptions) {
         logger.ffdc('Client._tryService', 'ffdc002', _id, err);
         logger.throw('Client._tryService', _id, err);
         throw err;
-      }
-
-      if (serviceList.length === 1) {
-        // We've tried all services without success. Pause for a while before
-        // trying again
-        logger.log('data', _id, 'End of service list');
-
-        _state = STATE_RETRYING;
-        var retry = function() {
-          logger.entryLevel('entry_often', 'retry', _id);
-          if (!client.isStopped()) {
-            client._performConnect.apply(client, [callback, false]);
-          }
-          logger.exitLevel('exit_often', 'retry', _id);
-        };
-
-        client._retryCount++;
-        var retryCap = 60000;
-        //limit to the power of 8 as anything above this will put the interval
-        //higher than the cap straight away.
-        var exponent = (client._retryCount <= 8) ? client._retryCount : 8;
-        var upperBound = Math.pow(2, exponent);
-        var lowerBound = 0.75 * upperBound;
-        var jitter = Math.random() * (0.25 * upperBound);
-        var interval = Math.min(retryCap, (lowerBound + jitter) * 1000);
-        //times by CONNECT_RETRY_INTERVAL for unittest purposes
-        interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
-        logger.log('data', _id, 'trying to connect again ' +
-                   'after ' + interval / 1000 + ' seconds');
-        setTimeout(retry, interval);
-        if (error) {
-          logger.log('emit', _id, 'error', error);
-          client.emit('error', error);
-        }
-      } else {
-        // Try the next service in the list
-        logger.log('data', _id, 'Trying next service');
-        client._tryService.apply(client, [serviceList.slice(1), callback]);
       }
     }
 
@@ -1621,9 +1621,9 @@ Client.prototype.stop = function(callback) {
         var activeClient = activeClientList.get(client.id);
         if (client === activeClient) activeClientList.remove(client.id);
         process.nextTick(function() {
-          logger.log('emit', client.id, STATE_STOPPED);
           if (!client._firstStart) {
             client._firstStart = true;
+            logger.log('emit', client.id, STATE_STOPPED);
             client.emit(STATE_STOPPED);
           }
         });

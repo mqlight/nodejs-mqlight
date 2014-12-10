@@ -467,7 +467,8 @@ module.exports.test_invalid_ssl_options = function(test) {
   var badCertificateFd = fs.openSync('BadCertificate', 'w');
   var badVerifyFd = fs.openSync('BadVerify', 'w');
   var count = 0;
-  var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
+  var invalidSSLTest = function(sslTrustCertificate, sslVerifyName) {
+    var firstError = true;
     var opts = {
       service: 'amqp://host',
       sslTrustCertificate: testData[count].sslTrustCertificate,
@@ -478,15 +479,19 @@ module.exports.test_invalid_ssl_options = function(test) {
     client.on('error', function(err) {
       test.ok(err);
       test.equal('SecurityError', err.name, 'Expected a SecurityError');
-      client.stop();
-      ++count;
-      if (count == testData.length) {
-        test.done();
-        fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
-        fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
-      } else {
-        validSSLTest(testData[count].sslTrustCertificate,
-            testData[count].sslVerifyName);
+      if(firstError) {
+        firstError = false;
+        client.stop(function () {
+          ++count;
+          if (count == testData.length) {
+            test.done();
+            fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
+            fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
+          } else {
+            invalidSSLTest(testData[count].sslTrustCertificate,
+                testData[count].sslVerifyName);
+          }
+        });
       }
     });
     client.on('started', function(err) {
@@ -499,7 +504,7 @@ module.exports.test_invalid_ssl_options = function(test) {
     client.start();
   };
 
-  validSSLTest(testData[count].sslTrustCertificate,
+  invalidSSLTest(testData[count].sslTrustCertificate,
       testData[count].sslVerifyName);
 };
 

@@ -97,10 +97,10 @@ var header = function(lvl, clientId, options) {
       write(lvl, clientId, '| Probe Id          :-', options.probeId);
     }
     if ('ffdcSequence' in options) {
-      write(lvl, clientId, '| FFDCSequenceNumber :-', options.ffdcSequence++);
+      write(lvl, clientId, '| FFDCSequenceNumber:-', options.ffdcSequence++);
     }
     if (potentialUnwinds !== 0) {
-      write(lvl, clientId, '| potentialUnwinds :-', potentialUnwinds);
+      write(lvl, clientId, '| potentialUnwinds  :-', potentialUnwinds);
     }
     write(lvl, clientId, HEADER_BANNER);
     write(lvl, clientId, '');

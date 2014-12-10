@@ -324,6 +324,11 @@ module.exports.test_queue_sends_retrying = function(test) {
     test.done();
   });
 
+  client.on('error', function(err) {
+    test.deepEqual(client.state, 'retrying',
+        'client in retrying state after error');
+  });
+
   client.start(function(err) {
     stubproton.setConnectStatus(1);
     mqlight.reconnect(client);
