@@ -1192,6 +1192,53 @@ var Client = function(service, id, securityOptions) {
           connectUrl.href = connectUrl.href.substr(0, hrefLength);
           connectUrl.pathname = connectUrl.path = null;
         }
+
+        // Try and connect to the next service in the list, or retry from the
+        // beginning if we've run out of services.
+        var tryNextService = function(error) {
+          logger.entry('Client._tryService.tryNextService', _id);
+
+          if (serviceList.length === 1) {
+            // We've tried all services without success. Pause for a while
+            // before trying again
+            logger.log('data', _id, 'End of service list');
+
+            _state = STATE_RETRYING;
+            var retry = function() {
+              logger.entryLevel('entry_often', 'retry', _id);
+              if (!client.isStopped()) {
+                client._performConnect.apply(client, [callback, false]);
+              }
+              logger.exitLevel('exit_often', 'retry', _id);
+            };
+
+            client._retryCount++;
+            var retryCap = 60000;
+            // Limit to the power of 8 as anything above this will put the
+            // interval higher than the cap straight away.
+            var exponent = (client._retryCount <= 8) ? client._retryCount : 8;
+            var upperBound = Math.pow(2, exponent);
+            var lowerBound = 0.75 * upperBound;
+            var jitter = Math.random() * (0.25 * upperBound);
+            var interval = Math.min(retryCap, (lowerBound + jitter) * 1000);
+            // times by CONNECT_RETRY_INTERVAL for unittest purposes
+            interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
+            logger.log('data', _id, 'trying to connect again ' +
+                       'after ' + interval / 1000 + ' seconds');
+            setTimeout(retry, interval);
+            if (error) {
+              logger.log('emit', _id, 'error', error);
+              client.emit('error', error);
+            }
+          } else {
+            // Try the next service in the list
+            logger.log('data', _id, 'Trying next service');
+            client._tryService.apply(client, [serviceList.slice(1), callback]);
+          }
+
+          logger.exit('Client._tryService.tryNextService', _id);
+        };
+
         try {
           client._messenger.connect(connectUrl,
                                     securityOptions.sslTrustCertificate,
@@ -1264,43 +1311,8 @@ var Client = function(service, id, securityOptions) {
           logger.log('data', _id, 'failed to connect to: ' + logUrl +
                      ' due to error: ' + error);
 
-          if (serviceList.length === 1) {
-            // We've tried all services without success. Pause for a while
-            // before trying again
-            logger.log('data', _id, 'End of service list');
-
-            _state = STATE_RETRYING;
-            var retry = function() {
-              logger.entryLevel('entry_often', 'retry', _id);
-              if (!client.isStopped()) {
-                client._performConnect.apply(client, [callback, false]);
-              }
-              logger.exitLevel('exit_often', 'retry', _id);
-            };
-
-            client._retryCount++;
-            var retryCap = 60000;
-            // Limit to the power of 8 as anything above this will put the
-            // interval higher than the cap straight away.
-            var exponent = (client._retryCount <= 8) ? client._retryCount : 8;
-            var upperBound = Math.pow(2, exponent);
-            var lowerBound = 0.75 * upperBound;
-            var jitter = Math.random() * (0.25 * upperBound);
-            var interval = Math.min(retryCap, (lowerBound + jitter) * 1000);
-            // times by CONNECT_RETRY_INTERVAL for unittest purposes
-            interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
-            logger.log('data', _id, 'trying to connect again ' +
-                       'after ' + interval / 1000 + ' seconds');
-            setTimeout(retry, interval);
-            if (error) {
-              logger.log('emit', _id, 'error', error);
-              client.emit('error', error);
-            }
-          } else {
-            // Try the next service in the list
-            logger.log('data', _id, 'Trying next service');
-            client._tryService.apply(client, [serviceList.slice(1), callback]);
-          }
+          // This service failed to connect. Try the next one.
+          tryNextService(error);
         }
       } catch (err) {
         // should never get here, as it means that messenger.connect has been
