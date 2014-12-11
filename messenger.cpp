@@ -511,7 +511,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
     const char* err = GetErrorName(text);
-    // clone to std::string before free'ing messenger
+    // clonse to std::string before free'ing messenger
     std::string msg = text;
     pn_messenger_free(obj->messenger);
     obj->messenger = NULL;
@@ -603,7 +603,7 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("parms", name, "qos:", qos);
   Proton::Log("parms", name, "ttl:", ttl);
-  Proton::Log("parms", name, "credit:", (int)credit);
+  Proton::Log("parms", name, "credit:", credit);
 
   // throw Error if not connected
   if (!obj->messenger) {
@@ -763,33 +763,24 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
       }
     }
   } else {
-    // otherwise, all we can do is keep calling work until our close request
-    // has been pushed over the network connection as we won't get an ACK
+    // otherwise, keep calling work until we get the remote ack for detachment
     Proton::Entry("pn_link_detach", name);
     pn_link_detach(link);
     Proton::Exit("pn_link_detach", name, 0);
-    pn_session_t* session = pn_link_session(link);
-    if (session) {
-      pn_connection_t* connection = pn_session_connection(session);
-      if (connection) {
-        pn_transport_t* transport = pn_connection_transport(connection);
-        if (transport) {
-          while (!pn_transport_quiesced(transport)) {
-            Proton::Entry("pn_messenger_work", name);
-            pn_messenger_work(obj->messenger, 0);
-            int error = pn_messenger_errno(obj->messenger);
-            Proton::Exit("pn_messenger_work", name, error);
-            if (error) {
-              const char* text =
-                  pn_error_text(pn_messenger_error(obj->messenger));
-              const char* err = GetErrorName(text);
-              THROW_NAMED_EXCEPTION(
-                  err, text, "ProtonMessenger::Unsubscribe", name)
-            }
-          }
-        }
+    while (!pn_link_remote_detached(link)) {
+      Proton::Entry("pn_messenger_work", name);
+      pn_messenger_work(obj->messenger, 0);
+      int error = pn_messenger_errno(obj->messenger);
+      Proton::Exit("pn_messenger_work", name, error);
+      if (error) {
+        const char* text =
+          pn_error_text(pn_messenger_error(obj->messenger));
+        const char* err = GetErrorName(text);
+        THROW_NAMED_EXCEPTION(
+            err, text, "ProtonMessenger::Unsubscribe", name)
       }
     }
+    pn_link_free(link);
   }
 
   Proton::Exit("ProtonMessenger::Unsubscribe", name, true);
@@ -1129,7 +1120,7 @@ Handle<Value> ProtonMessenger::Flow(const Arguments& args)
   unsigned int credit = (unsigned int)creditLong;
 
   Proton::Log("parms", name, "address:", address.c_str());
-  Proton::Log("parms", name, "credit:", (int)credit);
+  Proton::Log("parms", name, "credit:", credit);
 
   // throw exception if not connected
   if (!obj->messenger) {
