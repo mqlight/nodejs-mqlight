@@ -497,7 +497,7 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   }
 
   // Indicate that the route should be validated
-  if (pn_messenger_set_flags(obj->messenger, PN_FLAGS_CHECK_ROUTES|PN_FLAGS_EXTERNAL_SOCKET)) {
+  if (pn_messenger_set_flags(obj->messenger, PN_FLAGS_CHECK_ROUTES)) {
     pn_messenger_free(obj->messenger);
     obj->messenger = NULL;
     // throw TypeError if unable to set flags
