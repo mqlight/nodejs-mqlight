@@ -70,7 +70,7 @@ module.exports.test_golden_path = function(test) {
  */
 module.exports.test_service_not_a_string = function(test) {
   test.throws(function() {
-    mqlight.createClient({service: 123});
+    mqlight.createClient({service: 123, id: 'test_service_not_a_string'});
   }, function(err) {
     if ((err instanceof TypeError) &&
         /service must be a string or array type/.test(err)) {
@@ -116,7 +116,9 @@ module.exports.test_createClient_must_have_a_value = function(test) {
  */
 module.exports.test_createClient_callback_must_be_function = function(test) {
   test.throws(function() {
-    mqlight.createClient({}, 1);
+    mqlight.createClient({
+      id: 'test_createClient_callback_must_be_function'
+    }, 1);
   }, function(err) {
     if ((err instanceof TypeError) &&
         /Callback argument must be a function/.test(err)) {
@@ -153,6 +155,7 @@ module.exports.test_createClient_must_have_service_value = function(test) {
 module.exports.test_createClient_ignores_unknown_properties = function(test) {
   var oddOpts = {};
   oddOpts.service = 'amqp://localhost';
+  oddOpts.id = 'test_createClient_ignores_unknown_properties';
   oddOpts.fruit = 'avocado';
   oddOpts.size = 3;
   mqlight.createClient(oddOpts, function(err, client) {
@@ -239,6 +242,7 @@ module.exports.test_user_password_types_values = function(test) {
     try {
       var opts = {
         service: 'amqp://localhost:5672',
+        id: 'test_user_password_types_values'+i,
         user: testData[i].user,
         password: testData[i].password
       };
@@ -275,12 +279,14 @@ module.exports.test_user_password_types_values = function(test) {
 module.exports.test_password_hidden = function(test) {
   var opts = {
     service: 'amqp://localhost:5672',
+    id: 'test_password_hidden',
     user: 'bob',
     password: 's3cret'
   };
   var client = mqlight.createClient(opts);
   var inspectedClient = require('util').inspect(client);
   test.ok(!/s3cret/.test(inspectedClient), inspectedClient);
+  client.stop();
   test.done();
 };
 
@@ -302,7 +308,7 @@ module.exports.test_invalid_URIs = function(test) {
     test.throws(function() {
       var opts = {
         service: invalidUris[i],
-        id: 'test_invalid_URIs'
+        id: 'test_invalid_URIs'+i
       };
       mqlight.createClient(opts);
     }, function(err) {
@@ -333,7 +339,10 @@ module.exports.test_valid_URIs = function(test) {
                     expected: 'amqp://host:1234'}];
   var count = 0;
   var clientTest = function(uri, expected) {
-    var client = mqlight.createClient({service: uri});
+    var client = mqlight.createClient({
+      service: uri,
+      id: 'test_valid_URIs'+count
+    });
     client.start(function(err) {
       test.ok(!err);
       test.equals(expected, client.service);
@@ -357,7 +366,12 @@ module.exports.test_valid_URIs = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_createClient_too_many_arguments = function(test) {
-  mqlight.createClient({service: 'amqp://host'}, function() {}, 'wallflower');
+  mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_createClient_too_many_arguments'
+  }, function(err) {
+    test.ok(!err);
+  }, 'wallflower').stop();
   test.done();
 };
 

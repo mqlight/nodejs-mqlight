@@ -403,7 +403,7 @@ module.exports.test_send_qos_function = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_clear_queuedsends_disconnect = function(test) {
-  //test.expect(3);
+  test.expect(3);
   var client = mqlight.createClient({id: 'test_clear_queuedsends_disconnect',
     service: 'amqp://host'});
   var savedSendFunction = mqlight.proton.messenger.send;
@@ -559,7 +559,7 @@ module.exports.test_message_rejected = function(test) {
     service: 'amqp://host'});
 
   client.on('started', function() {
-  
+
     test.doesNotThrow(function() {
       // Test that a message being rejected result in the send(...) method's
       // callback being run.
@@ -572,7 +572,7 @@ module.exports.test_message_rejected = function(test) {
         mqlight.proton.messenger.statusError = savedStatusErrorMethod;
         client.stop();
         test.done();
-        
+
       });
     });
   });
@@ -586,10 +586,10 @@ module.exports.test_message_rejected = function(test) {
  *
  * @param {object} test the unittest interface
  */
-module.exports.test_client_replaced = function(test) {
+module.exports.test_send_client_replaced = function(test) {
   var client = mqlight.createClient({
     service: 'amqp://host',
-    id: 'test_client_replaced'
+    id: 'test_send_client_replaced'
   });
 
   var savedSendFunction = mqlight.proton.messenger.send;
@@ -611,6 +611,7 @@ module.exports.test_client_replaced = function(test) {
       test.ok(err instanceof mqlight.ReplacedError);
       test.ok(/ReplacedError: /.test(err.toString()));
       mqlight.proton.messenger.send = savedSendFunction;
+      client.stop();
       test.done();
     });
   });

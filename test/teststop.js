@@ -101,6 +101,7 @@ module.exports.test_stop_argument_is_function = function(test) {
       TypeError,
       'stop should throw TypeError if argument is not a function'
   );
+  client.stop();
   test.done();
 };
 
@@ -143,6 +144,30 @@ module.exports.test_stop_when_already_stopped = function(test) {
       });
     });
   });
+};
+
+
+/**
+ * Tests that when calling stop multiple times, all callbacks
+ * get invoked.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_stop_all_callbacks_called = function(test) {
+  var count = 0;
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_start_all_callbacks_called'
+  });
+  var stopped = function(err) {
+    test.ok(!err);
+    count++;
+    if (count == 3) {
+      test.done();
+    }
+  };
+  client.stop(stopped);
+  client.stop(stopped);
+  client.stop(stopped);
 };
 
 

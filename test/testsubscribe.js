@@ -653,10 +653,10 @@ module.exports.test_subscribe_credit_values = function(test) {
  *
  * @param {object} test the unittest interface
  */
-module.exports.test_client_replaced = function(test) {
+module.exports.test_subscribe_client_replaced = function(test) {
   var client = mqlight.createClient({
     service: 'amqp://host',
-    id: 'test_client_replaced'
+    id: 'test_subscribe_client_replaced'
   });
 
   var savedSubscribeFunction = mqlight.proton.messenger.subscribe;
@@ -678,6 +678,7 @@ module.exports.test_client_replaced = function(test) {
       test.ok(err instanceof mqlight.ReplacedError);
       test.ok(/ReplacedError: /.test(err.toString()));
       mqlight.proton.messenger.subscribe = savedSubscribeFunction;
+      client.stop();
       test.done();
     });
   });

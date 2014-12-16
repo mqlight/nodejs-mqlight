@@ -199,6 +199,7 @@ module.exports.test_resubscribe_on_restart = function(test) {
         actual.callback = undefined;
         test.deepEqual(actual, expected, 'sub list objects do not match');
       }
+      client.stop();
       test.done();
       clearTimeout(timeout);
     });
@@ -305,7 +306,7 @@ module.exports.test_single_queued_send = function(test) {
  *
  * @param {object} test the unittest interface.
  */
-module.exports.test_queue_sends_retrying = function(test) {
+module.exports.test_queued_sends_retrying = function(test) {
   test.expect();
   var client = mqlight.createClient({id: 'test_queued_sends_retrying', service:
         'amqp://host'});

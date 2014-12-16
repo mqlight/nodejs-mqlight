@@ -103,6 +103,7 @@ module.exports.test_start_argument_is_function = function(test) {
       TypeError,
       'start should throw TypeError if argument is not a function'
   );
+  client.stop();
   test.done();
 };
 
@@ -124,9 +125,9 @@ module.exports.test_start_method_returns_client = function(test) {
 
 
 /**
- * Tests that calling start on an already start client has no effect
- * other than to callback any supplied callback function to indicate
- * success.
+ * Tests that calling start on an already started client has no
+ * effect other than to callback any supplied callback function
+ * to indicate success.
  * @param {object} test the unittest interface
  */
 module.exports.test_start_when_already_started = function(test) {
@@ -145,6 +146,31 @@ module.exports.test_start_when_already_started = function(test) {
       test.done();
     });
   });
+};
+
+
+/**
+ * Tests that when calling start multiple times, all callbacks
+ * get invoked.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_start_all_callbacks_called = function(test) {
+  var count = 0;
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_start_all_callbacks_called'
+  });
+  var started = function(err) {
+    test.ok(!err);
+    count++;
+    if (count == 3) {
+      client.stop();
+      test.done();
+    }
+  };
+  client.start(started);
+  client.start(started);
+  client.start(started);
 };
 
 
@@ -704,6 +730,8 @@ module.exports.test_start_windows_drive_letter_file_uri = function(test) {
   fs.readFile = function(filename, options, callback) {
     test.equals(filename, 'D:/test/path/file.json',
                 'Incorrect filename passed: ' + filename);
+    var data = '{"service":' + JSON.stringify('amqp://host') + '}';
+    if (callback) callback(undefined, data);
     client.stop();
     test.done();
     fs.readFile = originalReadFileMethod;

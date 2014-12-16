@@ -553,10 +553,10 @@ module.exports.test_subscribe_credit_confirm = function(test) {
  *
  * @param {object} test the unittest interface
  */
-module.exports.test_client_replaced = function(test) {
+module.exports.test_receive_client_replaced = function(test) {
   var client = mqlight.createClient({
     service: 'amqp://host',
-    id: 'test_client_replaced'
+    id: 'test_subscribe_client_replaced'
   });
 
   var savedReceiveMethod = mqlight.proton.messenger.receive;
