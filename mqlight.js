@@ -1021,7 +1021,7 @@ var Client = function(service, id, securityOptions) {
         logger.entry('Client._invokeStartedCallbacks.callback',
                      client.id, invocation.create);
         if (invocation.create) {
-          invocation.callback.apply(client, [err, client]);
+          invocation.callback.apply(client, [err ? err : null, client]);
         } else {
           invocation.callback.apply(client, [err]);
         }

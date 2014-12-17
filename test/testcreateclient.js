@@ -598,7 +598,7 @@ module.exports.test_createClient_multiple_with_same_id_retry = function(test) {
         firstTime = false;
         test.equal('TypeError', err.name, 'expected a TypeError');
         var clientB2 = mqlight.createClient(optsB2, function(err) {
-          test.equal(undefined, err);
+          test.deepEqual(null, err);
           test.equal('started', clientA.state);
           test.equal('stopped', clientB1.state);
           test.equal('started', clientB2.state);
