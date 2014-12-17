@@ -30,6 +30,7 @@ var os = require('os');
 var fs = require('fs');
 var url = require('url');
 var http = require('http');
+var https = require('https');
 var EventEmitter = require('events').EventEmitter;
 var testCase = require('nodeunit').testCase;
 
@@ -271,6 +272,42 @@ module.exports.test_start_variable_endpoints = function(test) {
 
 
 /**
+ * Tests that when calling start with a function to specify the
+ * endpoints invalid services are detected.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_start_bad_endpoints = function(test) {
+  var services = [
+    {service: 123, error: 'TypeError: service must be a string or array type'},
+    {service: [], error: 'TypeError: service array is empty'},
+    {service: function() {}, error: 'TypeError: service cannot be a function'}
+  ];
+  var index = 0;
+  var serviceFunction = function(callback) {
+    test.ok(index < services.length);
+    var result = services[index];
+    callback(undefined, result.service);
+  };
+  var startCallback = function(err) {
+    test.ok(err instanceof TypeError);
+    test.equal(err, services[index++].error, 'Incorrect error message');
+    if(index === services.length) {
+      this.stop();
+      test.done();
+    } else {
+      test.equals('stopped', this.state);
+      this.start(startCallback);
+    }
+  };
+  mqlight.createClient({
+    service: serviceFunction,
+    id: 'test_start_bad_endpoints'
+  }, startCallback);
+};
+
+
+/**
  * Tests that calling start whilst still stopping will be
  * successful only when the stop completes
  * @param {object} test the unittest interface
@@ -432,6 +469,35 @@ module.exports.test_start_http_connection_refused = function(test) {
 
 
 /**
+ * Tests that calling start with a bad HTTPS URI returns the
+ * underlying http error message to the start callback.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_start_https_connection_refused = function(test) {
+  var originalHttpsRequestMethod = https.request;
+  https.request = function(url, callback) {
+    var req = new EventEmitter();
+    req.setTimeout = function() {};
+    req.end = function() {
+      req.emit('error', new Error('connect ECONNREFUSED'));
+    };
+    return req;
+  };
+  var client = mqlight.createClient({
+    service: 'https://127.0.0.1:9999',
+    id: 'test_start_https_connection_refused'
+  }, function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/connect ECONNREFUSED/.test(err));
+    client.stop();
+    test.done();
+    https.request = originalHttpsRequestMethod;
+  });
+};
+
+
+/**
  * Tests that the HTTP URI returning malformed JSON is coped with.
  *
  * @param {object} test the unittest interface
@@ -547,6 +613,7 @@ module.exports.test_start_http_timeout = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_start_http_bad_status = function(test) {
+  var firstTime = true;
   var originalHttpRequestMethod = http.request;
   http.request = function(url, callback) {
     var req = new EventEmitter();
@@ -557,6 +624,10 @@ module.exports.test_start_http_bad_status = function(test) {
       res.statusCode = 404;
       try {
         if (callback) callback(res);
+        if (firstTime) {
+          firstTime = false;
+          res.emit('data', 'STATUSDATA');
+        }
         res.emit('end');
       } catch (e) {
         console.error(e);
@@ -567,11 +638,19 @@ module.exports.test_start_http_bad_status = function(test) {
   };
   var client = mqlight.createClient({
     service: 'http://127.0.0.1:9999',
-    id: 'test_start_http_bad_status'
+    id: 'test_start_http_bad_status1'
   }, function(err) {
     test.ok(err instanceof Error);
-    test.ok(/failed with a status code of 404/.test(err));
+    test.ok(/failed with a status code of 404: STATUSDATA$/.test(err));
     client.stop();
+  });
+  var client2 = mqlight.createClient({
+    service: 'http://127.0.0.1:9999',
+    id: 'test_start_http_bad_status2'
+  }, function(err) {
+    test.ok(err instanceof Error);
+    test.ok(/failed with a status code of 404$/.test(err));
+    client2.stop();
     test.done();
     http.request = originalHttpRequestMethod;
   });

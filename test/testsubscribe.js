@@ -684,3 +684,25 @@ module.exports.test_subscribe_client_replaced = function(test) {
   });
 };
 
+
+/**
+ * Test that an attempt to subscribe twice results in a
+ * SubscribedError being thrown.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_subscribe_client_twice = function(test) {
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_subscribe_client_twice'
+  }, function(err) {
+    test.ok(!err);
+    client.subscribe('topic', function(err) {
+      test.ok(!err);
+      test.throws(function () {
+        client.subscribe('topic');
+      }, mqlight.SubscribedError);
+      test.done();
+    });
+  });
+};

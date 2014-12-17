@@ -16,11 +16,11 @@ Creates an IBM MQ Light client instance in `starting` state.
      server at a given point in time. If another instance of the same client
      connects, then the previously connected instance will be disconnected.
      This is reported, to the first client, as a `ReplacedError` being
-     emitted as an error event and the client transitioning into `stopped` 
-     state. If the id property is not a valid client identifier (for example, it 
-     contains a colon, it is too long, or it contains some other forbidden 
+     emitted as an error event and the client transitioning into `stopped`
+     state. If the id property is not a valid client identifier (for example, it
+     contains a colon, it is too long, or it contains some other forbidden
      character) then the function will throw an `InvalidArgumentError`
-  *  **user**, (String) (optional) user name for authentication. 
+  *  **user**, (String) (optional) user name for authentication.
      Alternatively, the user name may be embedded in the URL passed via the
      service property. If you choose to specify a user name via this property
      and also embed a user name in the URL passed via the surface argument then
@@ -48,5 +48,5 @@ Creates an IBM MQ Light client instance in `starting` state.
 
 Returns a `Client` object representing the client instance. The client is an
 event emitter and listeners can be registered for the following events:
-`started`, `stopped`, `restarted`, `error`, `drain`, and `message`.
+`started`, `stopped`, `restarted`, `error`, `drain`, `malformed` and `message`.
 

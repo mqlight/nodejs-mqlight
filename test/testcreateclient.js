@@ -529,6 +529,7 @@ module.exports.test_invalid_ssl_options = function(test) {
  * @param {object} test - test case.
  */
 module.exports.test_createClient_multiple_with_same_id = function(test) {
+  test.expect(14);
   var optsA = { service: 'amqp://localhost', id: 'Aname' };
   var optsB = { service: 'amqp://localhost', id: 'Bname' };
 
@@ -572,6 +573,47 @@ module.exports.test_createClient_multiple_with_same_id = function(test) {
       clientB2.on('error', function(err) {
         test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
       });
+    });
+  });
+};
+
+
+/**
+ * Test that, calling createClient a second time with the same id is
+ * successful, replacing (invalidating) the previous instance,
+ * even when it's in retrying state.
+ * @param {object} test - test case.
+ */
+module.exports.test_createClient_multiple_with_same_id_retry = function(test) {
+  var optsA  = { service: 'amqp://localhost', id: 'Aname2' };
+  var optsB1 = { service: 'amqp://bad', id: 'Bname2' };
+  var optsB2 = { service: 'amqp://localhost', id: 'Bname2' };
+
+  var clientA = mqlight.createClient(optsA, function(err) {
+    var firstTime = true;
+    var clientB1 = mqlight.createClient(optsB1, function(err) {
+      test.ok(err);
+    }).on('error', function(err) {
+      if (firstTime) {
+        firstTime = false;
+        test.equal('TypeError', err.name, 'expected a TypeError');
+        var clientB2 = mqlight.createClient(optsB2, function(err) {
+          test.equal(undefined, err);
+          test.equal('started', clientA.state);
+          test.equal('stopped', clientB1.state);
+          test.equal('started', clientB2.state);
+
+          clientA.stop(function() {
+            clientB2.stop(function() {
+              test.done();
+            });
+          });
+        }).on('error', function(err) {
+          test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
+        });
+      } else {
+        test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
+      }
     });
   });
 };

@@ -55,7 +55,7 @@ module.exports.test_send_too_few_arguments = function(test) {
 
 /**
  * Test that if too many arguments are supplied to client.send(...) then the
- * additional arguments are ignore.
+ * additional arguments are ignored.
  * @param {object} test the unittest interface
  */
 module.exports.test_send_too_many_arguments = function(test) {
@@ -65,6 +65,29 @@ module.exports.test_send_too_many_arguments = function(test) {
     test.doesNotThrow(
         function() {
           client.send('topic', 'message', {}, function() {}, 'interloper');
+        }
+    );
+    client.stop(function() {
+      test.done();
+    });
+  });
+};
+
+
+/**
+ * Test that if a bad callback is specified then an exception is
+ * thrown.
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_send_callback_must_be_a_function = function(test) {
+  var client = mqlight.createClient({
+    id: 'test_send_callback_must_be_a_function',
+    service: 'amqp://host'});
+  client.on('started', function() {
+    test.throws(
+        function() {
+          client.send('topic', 'message', {}, 123);
         }
     );
     client.stop(function() {

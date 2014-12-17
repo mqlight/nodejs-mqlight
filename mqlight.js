@@ -537,6 +537,7 @@ var getFileServiceFunction = function(fileUrl) {
 
   if (typeof fileUrl !== 'string') {
     var err = new TypeError('fileUrl must be a string type');
+    logger.ffdc('getFileServiceFunction', 'ffdc001', null, err);
     logger.throw('getFileServiceFunction', logger.NO_CLIENT_ID, err);
     throw err;
   }
@@ -622,6 +623,7 @@ var getHttpServiceFunction = function(serviceUrl) {
   var serviceHref = serviceUrl.href;
   if (typeof serviceHref !== 'string') {
     var err = new TypeError('serviceUrl must be a string type');
+    logger.ffdc('getHttpServiceFunction', 'ffdc001', null, err);
     logger.throw('getHttpServiceFunction', logger.NO_CLIENT_ID, err);
     throw err;
   }
@@ -1024,6 +1026,9 @@ var Client = function(service, id, securityOptions) {
           invocation.callback.apply(client, [err]);
         }
         logger.exit('Client._invokeStartedCallbacks.callback', client.id, null);
+      } else {
+        logger.ffdc('Client._invokeStartedCallbacks', 'ffdc001', client,
+                    'No callback provided');
       }
     }
 
@@ -1110,6 +1115,7 @@ var Client = function(service, id, securityOptions) {
     // services, retrying until a connection can be established
     var serviceList;
     if (client._serviceFunction instanceof Function) {
+      logger.entry('_serviceFunction', client.id);
       client._serviceFunction(function(err, service) {
         if (err) {
           client._setState(STATE_STOPPED);
@@ -1120,18 +1126,19 @@ var Client = function(service, id, securityOptions) {
                 client._generateServiceList.apply(client, [service]);
             client._connectToService(serviceList);
           } catch (err) {
-            logger.caught('Client._serviceFunction', client.id, err);
+            logger.caught('_serviceFunction', client.id, err);
             client._setState(STATE_STOPPED);
             client._invokeStartedCallbacks.call(client, err);
           }
         }
       });
+      logger.exit('_serviceFunction', client.id, null);
     } else {
       try {
         serviceList = client._generateServiceList.apply(client, [service]);
         client._connectToService(serviceList);
       } catch (err) {
-        logger.caught('Client._serviceFunction', client.id, err);
+        logger.caught('Client._performConnect', client.id, err);
         client._setState(STATE_STOPPED);
         client._invokeStartedCallbacks.call(client, err);
       }

@@ -514,6 +514,13 @@ logger.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
     write('ffdc', opts.clientId, '');
   }
 
+  // In a unit testing environment we expect to get no ffdcs.
+  if (process.env.NODE_ENV === 'unittest') {
+    var err = new Error('No ffdcs expected during unit tests');
+    logger.throw('logger.ffdc', opts.clientId, err);
+    throw err;
+  }
+
   logger.exit('logger.ffdc', opts.clientId, null);
 };
 
