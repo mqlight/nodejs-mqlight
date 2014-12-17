@@ -198,6 +198,8 @@ function setupError(obj, name, message) {
       value: message,
       enumerable: false
     });
+  } else {
+    logger.ffdc('setupError', 'ffdc001', null, 'Client object not provided');
   }
 }
 
@@ -1047,10 +1049,10 @@ var Client = function(service, id, securityOptions) {
       logger.log('debug', _id,
           'Not connecting because client has been replaced');
       if (!client.isStopping()) {
-        logger.ffdc('Client._performConnect', 'ffdc005', _id,
+        logger.ffdc('Client._performConnect', 'ffdc005', client,
                     'Replaced client not in stopped state');
       }
-      client._invokeStartedCallbacks(new LocalReplacedError(_id));
+      client._invokeStartedCallbacks.call(client, new LocalReplacedError(_id));
       logger.exit('Client._performConnect', _id, null);
       return;
     }
@@ -1096,8 +1098,7 @@ var Client = function(service, id, securityOptions) {
       // If the messenger is not already stopped then something has gone wrong
       if (client._messenger && !client._messenger.stopped) {
         err = new Error('messenger is not stopped');
-        logger.ffdc('Client._performConnect', 'ffdc001', _id,
-            err);
+        logger.ffdc('Client._performConnect', 'ffdc001', client, err);
         logger.throw('Client._performConnect', _id, err);
         throw err;
       }
@@ -1112,7 +1113,7 @@ var Client = function(service, id, securityOptions) {
       client._serviceFunction(function(err, service) {
         if (err) {
           client._setState(STATE_STOPPED);
-          client._invokeStartedCallbacks(err);
+          client._invokeStartedCallbacks.call(client, err);
         } else {
           try {
             serviceList =
@@ -1121,7 +1122,7 @@ var Client = function(service, id, securityOptions) {
           } catch (err) {
             logger.caught('Client._serviceFunction', client.id, err);
             client._setState(STATE_STOPPED);
-            client._invokeStartedCallbacks(err);
+            client._invokeStartedCallbacks.call(client, err);
           }
         }
       });
@@ -1132,7 +1133,7 @@ var Client = function(service, id, securityOptions) {
       } catch (err) {
         logger.caught('Client._serviceFunction', client.id, err);
         client._setState(STATE_STOPPED);
-        client._invokeStartedCallbacks(err);
+        client._invokeStartedCallbacks.call(client, err);
       }
     }
 
@@ -1154,7 +1155,7 @@ var Client = function(service, id, securityOptions) {
     logger.entry('Client._tryService', _id);
 
     if (serviceList.length === 0) {
-      logger.ffdc('Client._tryService', 'ffdc004', _id);
+      logger.ffdc('Client._tryService', 'ffdc004', client);
     } else {
       try {
         var service = serviceList[0];
@@ -1300,7 +1301,7 @@ var Client = function(service, id, securityOptions) {
           process.nextTick(function() {
             logger.log('emit', _id, eventToEmit);
             client.emit(eventToEmit);
-            client._invokeStartedCallbacks(null);
+            client._invokeStartedCallbacks.call(client, null);
           });
 
           // Setup heartbeat timer to ensure that while connected we send
@@ -1339,7 +1340,7 @@ var Client = function(service, id, securityOptions) {
         // called in an invalid way, so FFDC
         error = err;
         logger.caught('Client._tryService', _id, err);
-        logger.ffdc('Client._tryService', 'ffdc002', _id, err);
+        logger.ffdc('Client._tryService', 'ffdc002', client, err);
         client._setState(STATE_STOPPED);
         logger.throw('Client._tryService', _id, err);
         throw err;
@@ -1363,7 +1364,7 @@ var Client = function(service, id, securityOptions) {
     logger.entry('Client._connectToService', _id);
 
     if (client.isStopped()) {
-      client._invokeStartedCallbacks(
+      client._invokeStartedCallbacks.call(client,
           new StoppedError('connect aborted due to stop')
       );
       logger.exit('Client._connectToService', _id, null);
@@ -2450,8 +2451,7 @@ var processMessage = function(client, protonMsg) {
   if (matchedSubs.length > 1) {
     err = new Error('received message matched more than one ' +
         'subscription');
-    logger.ffdc('processMessage', 'ffdc003', client.id,
-        err);
+    logger.ffdc('processMessage', 'ffdc003', client, err);
   }
   var subscription = matchedSubs[0];
   if (typeof subscription !== 'undefined') {
