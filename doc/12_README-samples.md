@@ -17,11 +17,10 @@ Options:
                         amqps://host:5671 to use SSL/TLS
                         (default: amqp://localhost)
   -c FILE, --trust-certificate=FILE
-                        use the certificate contained in FILE (in
-                        PEM or DER format) to validate the
-                        identify of the server. The connection must
-                        be secured with SSL/TLS (e.g. the service
-                        URL must start 'amqps://')
+                        use the certificate contained in FILE (in PEM format) to
+                        validate the identity of the server. The connection must
+                        be secured with SSL/TLS (e.g. the service URL must start
+                        with 'amqps://')
   -t TOPICPATTERN, --topic-pattern=TOPICPATTERN
                         subscribe to receive messages matching TOPICPATTERN
                         (default: public)
@@ -51,11 +50,10 @@ Options:
                         amqps://host:5671 to use SSL/TLS
                         (default: amqp://localhost)
   -c FILE, --trust-certificate=FILE
-                        use the certificate contained in FILE (in
-                        PEM or DER format) to validate the
-                        identify of the server. The connection must
-                        be secured with SSL/TLS (e.g. the service
-                        URL must start 'amqps://')
+                        use the certificate contained in FILE (in PEM format) to
+                        validate the identity of the server. The connection must
+                        be secured with SSL/TLS (e.g. the service URL must start
+                        with 'amqps://')
   -t TOPIC, --topic=TOPIC
                         send messages to topic TOPIC
                         (default: public)

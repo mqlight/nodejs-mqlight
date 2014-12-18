@@ -62,11 +62,13 @@ var showUsage = function() {
        '                        amqps://host:5671 to use SSL/TLS\n' +
        '                        (default: amqp://localhost)');
   puts('  -c FILE, --trust-certificate=FILE\n' +
-       '                        use the certificate contained in FILE (in\n' +
-       '                        PEM or DER format) to validate the\n' +
-       '                        identify of the server. The connection must\n' +
-       '                        be secured with SSL/TLS (e.g. the service\n' +
-       "                        URL must start with 'amqps://')");
+       '                        use the certificate contained in FILE (in PEM' +
+       ' format) to\n' +
+       '                        validate the identity of the server. The' +
+       ' connection must\n' +
+       '                        be secured with SSL/TLS (e.g. the service URL' +
+       ' must start\n' +
+       "                        with 'amqps://')");
   puts('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN\n' +
        '                        subscribe to receive messages matching' +
        ' TOPICPATTERN');
