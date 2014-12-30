@@ -534,9 +534,14 @@ logger.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
 logger.NO_CLIENT_ID = '*';
 
 npmlog.addLevel('all', -Infinity, styles.inverse, 'all   ');
-npmlog.addLevel('data_often', -Infinity, styles.green, 'data  ');
-npmlog.addLevel('exit_often', -Infinity, styles.yellow, 'exit  ');
-npmlog.addLevel('entry_often', -Infinity, styles.yellow, 'entry ');
+npmlog.addLevel('proton_data', -Infinity, styles.green, 'data  ');
+npmlog.addLevel('proton_exit', -Infinity, styles.yellow, 'exit  ');
+npmlog.addLevel('proton_entry', -Infinity, styles.yellow, 'entry ');
+npmlog.addLevel('proton', -Infinity, styles.yellow, 'func  ');
+npmlog.addLevel('data_often', 100, styles.green, 'data  ');
+npmlog.addLevel('exit_often', 100, styles.yellow, 'exit  ');
+npmlog.addLevel('entry_often', 100, styles.yellow, 'entry ');
+npmlog.addLevel('often', 100, styles.yellow, 'func  ');
 npmlog.addLevel('raw', 200, styles.inverse, 'raw   ');
 npmlog.addLevel('detail', 300, styles.green, 'detail');
 npmlog.addLevel('debug', 500, styles.inverse, 'debug ');

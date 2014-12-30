@@ -104,17 +104,17 @@ void Proton::Exit(const char* lvl,
 
 void Proton::EntryTracer(const char* name, const char* message)
 {
-  Proton::Entry("entry_often", name, "proton");
+  Proton::Entry("proton_entry", name, "proton");
 }
 
 void Proton::DataTracer(const char* prefix, const char* data)
 {
-  Proton::Log("data_often", "proton", prefix, data);
+  Proton::Log("proton_data", "proton", prefix, data);
 }
 
 void Proton::ExitTracer(const char* name, const char* message)
 {
-  Proton::Exit("exit_often", name, "proton", message);
+  Proton::Exit("proton_exit", name, "proton", message);
 }
 
 void Proton::Log(const char* lvl,
