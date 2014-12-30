@@ -64,12 +64,15 @@ class ProtonMessenger : public node::ObjectWrap
                                        const v8::AccessorInfo& info);
   static v8::Handle<v8::Value> Connect(const v8::Arguments& args);
   static v8::Handle<v8::Value> Subscribe(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Subscribed(const v8::Arguments& args);
   static v8::Handle<v8::Value> Unsubscribe(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Unsubscribed(const v8::Arguments& args);
   static v8::Handle<v8::Value> Receive(const v8::Arguments& args);
   static v8::Handle<v8::Value> Status(const v8::Arguments& args);
   static v8::Handle<v8::Value> StatusError(const v8::Arguments& args);
   static v8::Handle<v8::Value> Accept(const v8::Arguments& args);
   static v8::Handle<v8::Value> Settle(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Settled(const v8::Arguments& args);
   static v8::Handle<v8::Value> GetRemoteIdleTimeout(const v8::Arguments& args);
   static v8::Handle<v8::Value> Work(const v8::Arguments& args);
   static v8::Handle<v8::Value> Flow(const v8::Arguments& args);

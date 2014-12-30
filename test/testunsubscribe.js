@@ -61,11 +61,12 @@ module.exports.test_unsubscribe_too_many_arguments = function(test) {
   };
   var client = mqlight.createClient(opts, function() {
     test.doesNotThrow(function() {
-      client.subscribe('/foo', 'share1');
-      client.unsubscribe('/foo', 'share1', {}, function() {}, 'stowaway');
-    });
-    client.stop(function() {
-      test.done();
+      client.subscribe('/foo', 'share1', function() {
+        client.unsubscribe('/foo', 'share1', {}, function() {}, 'stowaway');
+        client.stop(function() {
+          test.done();
+        });
+      });
     });
   });
 };
@@ -84,23 +85,24 @@ module.exports.test_unsubscribe_callback_must_be_function = function(test) {
   };
   var client = mqlight.createClient(opts, function() {
     test.throws(function() {
-      client.subscribe('/foo1', 'share');
       client.unsubscribe('/foo1', 'share', {}, 7);
     }, TypeError);
     test.doesNotThrow(function() {
-      client.subscribe('/foo2');
-      client.unsubscribe('/foo2', function() {});
-    });
-    test.doesNotThrow(function() {
-      client.subscribe('/foo3', 'share');
-      client.unsubscribe('/foo3', 'share', function() {});
-    });
-    test.doesNotThrow(function() {
-      client.subscribe('/foo4', 'share');
-      client.unsubscribe('/foo4', 'share', {}, function() {});
-    });
-    client.stop(function() {
-      test.done();
+      client.subscribe('/foo2', function() {
+        client.unsubscribe('/foo2', function() {
+          client.subscribe('/foo3', 'share', function() {
+            client.unsubscribe('/foo3', 'share', function() {
+              client.subscribe('/foo4', 'share', function() {
+                client.unsubscribe('/foo4', 'share', {}, function() {
+                  client.stop(function() {
+                    test.done();
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
     });
   });
 };
@@ -115,6 +117,7 @@ module.exports.test_unsubscribe_callback_must_be_function = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_unsubscribe_parameters = function(test) {
+  var client;
   var service = 'amqp://host:5672';
   var pattern = '/pattern';
   var currentCallbackInvocations = 0;
@@ -124,24 +127,26 @@ module.exports.test_unsubscribe_parameters = function(test) {
   };
   var share = 'share';
   var object = {};
+  var testNum = 0;
 
   // Data to drive the test with. 'args' is the argument list to pass into
   // the unsubscribe function.  The 'share', 'object' and 'callback' properties
   // indicate the expected interpretation of 'args'.
-  var data = [{args: [pattern]},
-              {args: [pattern, cb], callback: cb},
-              {args: [pattern, share], share: share},
-              {args: [pattern, object], object: object},
-              {args: [pattern, share, cb], share: share, callback: cb},
-              {args: [pattern, object, cb], object: object, callback: cb},
-              {args: [pattern, share, object], share: share, object: object},
-              {args: [pattern, 7], share: 7},
-              {args: [pattern, 'boo'], share: 'boo'},
-              {args: [pattern, {}], object: {}},
-              {args: [pattern, 7, cb], share: 7, callback: cb},
-              {args: [pattern, {}, cb], object: {}, callback: cb},
-              {args: [pattern, [], []], share: [], object: []},
-              {args: [pattern, share, object, cb],
+  var data = [{args: [pattern + '0']},
+              {args: [pattern + '1', cb], callback: cb},
+              {args: [pattern + '2', share], share: share},
+              {args: [pattern + '3', object], object: object},
+              {args: [pattern + '4', share, cb], share: share, callback: cb},
+              {args: [pattern + '5', object, cb], object: object, callback: cb},
+              {args: [pattern + '6', share, object],
+                share: share, object: object},
+              {args: [pattern + '7', 7], share: 7},
+              {args: [pattern + '8', 'boo'], share: 'boo'},
+              {args: [pattern + '9', {}], object: {}},
+              {args: [pattern + '10', 7, cb], share: 7, callback: cb},
+              {args: [pattern + '11', {}, cb], object: {}, callback: cb},
+              {args: [pattern + '12', [], []], share: [], object: []},
+              {args: [pattern + '13', share, object, cb],
                 share: share, object: object, callback: cb}];
 
   // Count up the expected number of callback invocations, so the test can
@@ -156,38 +161,49 @@ module.exports.test_unsubscribe_parameters = function(test) {
   var savedUnsubscribe = mqlight.proton.messenger.unsubscribe;
   mqlight.proton.messenger.unsubscribe = function(address) {
     lastUnsubscribedAddress = address;
+
+    var expectedAddress =
+        service + '/' +
+        ((data[testNum].share) ?
+            ('share:' + data[testNum].share + ':') : 'private:') +
+        pattern + testNum;
+
+    test.deepEqual(lastUnsubscribedAddress, expectedAddress);
+
+    if(testNum < data.length - 1) {
+      process.nextTick(function() {
+        runTests(++testNum);
+      });
+    } else {
+      // Restore the saved messenger unsubscribe implementation
+      mqlight.proton.messenger.unsubscribe = savedUnsubscribe;
+      client.stop();
+    }
   };
 
-  var client = mqlight.createClient({
+  var runTests = function(i) {
+    var clientUnsubscribeMethod = client.unsubscribe;
+    var clientSubscribeMethod = client.subscribe;
+    lastUnsubscribedAddress = undefined;
+    clientSubscribeMethod.apply(client, [pattern + i,
+      ('share' in data[i]) ? data[i].args[1] : undefined, {}, function() {
+        clientUnsubscribeMethod.apply(client, data[i].args);
+      }]
+    );
+  };
+
+  client = mqlight.createClient({
     id: 'test_unsubscribe_parameters',
     service: service
   }, function() {
-    for (var i = 0; i < data.length; ++i) {
-      var clientUnsubscribeMethod = client.unsubscribe;
-      var clientSubscribeMethod = client.subscribe;
-      lastUnsubscribedAddress = undefined;
-      clientSubscribeMethod.apply(client, data[i].args);
-      clientUnsubscribeMethod.apply(client, data[i].args);
-
-      var expectedAddress =
-          service + '/' +
-          ((data[i].share) ? ('share:' + data[i].share + ':') : 'private:') +
-          pattern;
-
-      test.deepEqual(lastUnsubscribedAddress, expectedAddress);
-    }
-
-    // Restore the saved messenger unsubscribe implementation
-    mqlight.proton.messenger.unsubscribe = savedUnsubscribe;
-    client.stop();
-
+    runTests(testNum);
   });
 
   // Callbacks passed into unsubscribe(...) are scheduled to be run once
   // outside of the main loop - so use setImmediate(...) to schedule checking
   // for test completion.
   var testIsDone = function() {
-    if (currentCallbackInvocations === 2*expectedCallbackInvocations) {
+    if (currentCallbackInvocations === expectedCallbackInvocations) {
       test.done();
     } else {
       setImmediate(testIsDone);
@@ -210,21 +226,23 @@ module.exports.test_unsubscribe_ok_callback = function(test) {
     service: 'amqp://host'
   });
   client.on('started', function() {
-    client.subscribe('/foo');
-    client.unsubscribe('/foo', function() {
-      test.equals(arguments.length, 3);
-      test.deepEqual(arguments[0], null);       // error argument
-      test.deepEqual(arguments[1], '/foo');     // topic pattern argument
-      test.deepEqual(arguments[2], undefined);  // share argument
-      test.ok(this === client);
-      client.subscribe('/foo2', 'share');
-      client.unsubscribe('/foo2', 'share', function() {
+    client.subscribe('/foo', function() {
+      client.unsubscribe('/foo', function() {
         test.equals(arguments.length, 3);
         test.deepEqual(arguments[0], null);       // error argument
-        test.deepEqual(arguments[1], '/foo2');    // topic pattern argument
-        test.deepEqual(arguments[2], 'share');    // share argument
+        test.deepEqual(arguments[1], '/foo');     // topic pattern argument
+        test.deepEqual(arguments[2], undefined);  // share argument
         test.ok(this === client);
-        client.stop();
+        client.subscribe('/foo2', 'share', function() {
+          client.unsubscribe('/foo2', 'share', function() {
+            test.equals(arguments.length, 3);
+            test.deepEqual(arguments[0], null);       // error argument
+            test.deepEqual(arguments[1], '/foo2');    // topic pattern argument
+            test.deepEqual(arguments[2], 'share');    // share argument
+            test.ok(this === client);
+            client.stop();
+          });
+        });
       });
     });
   });
@@ -280,10 +298,11 @@ module.exports.test_unsubscribe_returns_client = function(test) {
   var client = mqlight.createClient({id: 'test_unsubscribe_returns_client',
     service: 'amqp://host'},
   function() {
-    client.subscribe('/foo');
-    test.deepEqual(client.unsubscribe('/foo'), client);
-    client.stop(function(){
-      test.done();
+    client.subscribe('/foo', function() {
+      test.deepEqual(client.unsubscribe('/foo'), client);
+      client.stop(function(){
+        test.done();
+      });
     });
   });
 };
@@ -308,23 +327,34 @@ module.exports.test_unsubscribe_topics = function(test) {
               {valid: true, pattern: '/+'}];
 
   var client = mqlight.createClient({id: 'test_unsubscribe_topics', service:
-        'amqp://host'},
-  function() {
-    for (var i = 0; i < data.length; ++i) {
-      if (data[i].valid) {
-        test.doesNotThrow(function() {
-          client.subscribe(data[i].pattern);
-          client.unsubscribe(data[i].pattern);
-        });
-      } else {
-        test.throws(function() {
-          client.unsubscribe(data[i].pattern);
-        }, TypeError, 'pattern should have been rejected: ' + data[i].pattern);
-      }
+        'amqp://host'});
+
+  var runTests = function (i) {
+    if (i === data.length) {
+      client.stop(function(){
+        test.done();
+      });
+      return;
     }
-    client.stop(function(){
-      test.done();
-    });
+
+    if (data[i].valid) {
+      test.doesNotThrow(function() {
+        client.subscribe(data[i].pattern, function() {
+          client.unsubscribe(data[i].pattern, function() {
+            runTests(i + 1);
+          });
+        });
+      });
+    } else {
+      test.throws(function() {
+        client.unsubscribe(data[i].pattern);
+      }, TypeError, 'pattern should have been rejected: ' + data[i].pattern);
+      runTests(i + 1);
+    }
+  };
+
+  client.once('started', function() {
+    runTests(0);
   });
 };
 
@@ -345,22 +375,33 @@ module.exports.test_unsubscribe_share_names = function(test) {
     id: 'test_unsubscribe_share_names',
     service: 'amqp://host'
   });
-  client.on('started', function() {
-    for (var i = 0; i < data.length; ++i) {
-      if (data[i].valid) {
-        test.doesNotThrow(function() {
-          client.subscribe('/foo', data[i].share);
-          client.unsubscribe('/foo', data[i].share);
-        });
-      } else {
-        test.throws(function() {
-          client.unsubscribe('/foo', data[i].share);
-        }, mqlight.InvalidArgumentError, i);
-      }
+
+  var runTests = function(i) {
+    if (i === data.length) {
+      client.stop(function() {
+        test.done();
+      });
+      return;
     }
-    client.stop(function() {
-      test.done();
-    });
+
+    if (data[i].valid) {
+      test.doesNotThrow(function() {
+        client.subscribe('/foo', data[i].share, function() {
+          client.unsubscribe('/foo', data[i].share, function() {
+            runTests(i + 1);
+          });
+        });
+      });
+    } else {
+      test.throws(function() {
+        client.unsubscribe('/foo', data[i].share);
+      }, mqlight.InvalidArgumentError, i);
+      runTests(i + 1);
+    }
+  };
+
+  client.on('started', function() {
+    runTests(0);
   });
 };
 
@@ -388,30 +429,41 @@ module.exports.test_unsubscribe_options = function(test) {
 
   var client = mqlight.createClient({id: 'test_unsubscribe_options', service:
         'amqp://host'});
-  client.on('started', function() {
-    for (var i = 0; i < data.length; ++i) {
-      if (data[i].valid) {
-        test.doesNotThrow(
-            function() {
-              client.subscribe('testpattern', 'share');
-              client.unsubscribe('testpattern', 'share', data[i].options,
-                  function() {});
-            }
-        );
-      } else {
-        test.throws(
-            function() {
-              client.unsubscribe('testpattern', 'share', data[i].options,
-                  function() {});
-            },
-            TypeError,
-            'options should have been rejected: ' + data[i].options
-        );
-      }
+
+  var runTests = function(i) {
+    if (i === data.length) {
+      client.stop(function() {
+        test.done();
+      });
+      return;
     }
-    client.stop(function() {
-      test.done();
-    });
+
+    if (data[i].valid) {
+      test.doesNotThrow(
+          function() {
+            client.subscribe('testpattern', 'share', function() {
+              client.unsubscribe('testpattern', 'share', data[i].options,
+                  function() {
+                    runTests(i + 1);
+                  });
+            });
+          }
+      );
+    } else {
+      test.throws(
+          function() {
+            client.unsubscribe('testpattern', 'share', data[i].options,
+                function() {});
+          },
+          TypeError,
+          'options should have been rejected: ' + data[i].options
+      );
+      runTests(i + 1);
+    }
+  };
+
+  client.on('started', function() {
+    runTests(0);
   });
 };
 
@@ -441,22 +493,33 @@ module.exports.test_unsubscribe_ttl_validity = function(test) {
 
   var client = mqlight.createClient({id: 'test_unsubscribe_ttl_validity',
     service: 'amqp://host'});
-  client.on('started', function() {
-    for (var i = 0; i < data.length; ++i) {
-      var opts = { ttl: data[i].ttl };
-      if (data[i].valid) {
-        test.doesNotThrow(function() {
-          client.subscribe('testpattern');
-          client.unsubscribe('testpattern', opts);
-        });
-      } else {
-        test.throws(function() {
-          client.unsubscribe('testpattern', opts);
-        }, RangeError, 'ttl should have been rejected: ' + data[i].ttl);
-      }
+
+  var runTests = function(i) {
+    if (i === data.length) {
+      client.stop(function() {
+        test.done();
+      });
+      return;
     }
-    client.stop(function() {
-      test.done();
-    });
+
+    var opts = { ttl: data[i].ttl };
+    if (data[i].valid) {
+      test.doesNotThrow(function() {
+        client.subscribe('testpattern', function() {
+          client.unsubscribe('testpattern', opts, function() {
+            runTests(i + 1);
+          });
+        });
+      });
+    } else {
+      test.throws(function() {
+        client.unsubscribe('testpattern', opts);
+      }, RangeError, 'ttl should have been rejected: ' + data[i].ttl);
+      runTests(i + 1);
+    }
+  };
+
+  client.on('started', function() {
+    runTests(0);
   });
 };

@@ -106,6 +106,21 @@ module.exports.createProtonStub = function() {
       settle: function() {
         if (DEBUG) console.log('stub settle function called');
       },
+      settledCount: 0,
+      settled: function() {
+        if (DEBUG) console.log('stub settled function called');
+        if (connectStatus !== 0) {
+          var err = new Error('error on settle: ' + connectStatus);
+          err.name = 'NetworkError';
+          throw err;
+        } else {
+          if (++this.settledCount >= 2) {
+            return true;
+          } else {
+            return false;
+          }
+        }
+      },
       connect: function(service, sslTrustCertificate, sslVerifyName) {
         if (DEBUG) console.log('stub connect function called for service: ' +
                                service, sslTrustCertificate, sslVerifyName);
@@ -162,8 +177,42 @@ module.exports.createProtonStub = function() {
       subscribe: function() {
         if (DEBUG) console.log('stub subscribe function called');
       },
+      subscribedCount: 0,
+      subscribed: function(address) {
+        if (DEBUG) console.log('stub subscribed function called with address ' +
+                               address);
+        if (connectStatus !== 0) {
+          var err = new Error('error on subscribe: ' + connectStatus);
+          err.name = 'NetworkError';
+          throw err;
+        } else {
+          if (++this.subscribedCount >= 2) {
+            this.subscribedCount = 0;
+            return true;
+          } else {
+            return false;
+          }
+        }
+      },
       unsubscribe: function() {
         if (DEBUG) console.log('stub unsubscribe function called');
+      },
+      unsubscribedCount: 0,
+      unsubscribed: function() {
+        if (DEBUG) console.log('stub unsubscribed function called with ' +
+                               'address ' + address);
+        if (connectStatus !== 0) {
+          var err = new Error('error on unsubscribe: ' + connectStatus);
+          err.name = 'NetworkError';
+          throw err;
+        } else {
+          if (++this.unsubscribedCount >= 2) {
+            this.unsubscribedCount = 0;
+            return true;
+          } else {
+            return false;
+          }
+        }
       },
       getRemoteIdleTimeout: function(address) {
         if (DEBUG) console.log('stub getRemoteIdleTimeout function called, ' +

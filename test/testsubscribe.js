@@ -192,7 +192,7 @@ module.exports.test_subscribe_ok_callback = function(test) {
   client.on('started', function() {
     client.subscribe('/foo', function() {
       test.equals(arguments.length, 3);
-      test.deepEqual(arguments[0], undefined);  // error argument
+      test.deepEqual(arguments[0], null);  // error argument
       test.deepEqual(arguments[1], '/foo');     // topic pattern
       test.equals(arguments[2], undefined);  // share name
       test.ok(this === client);
@@ -615,33 +615,48 @@ module.exports.test_subscribe_credit_values = function(test) {
     {credit: false, expected: 0}
   ];
 
-  var savedSubscribe = mqlight.proton.messenger.subscribe;
-  var subscribedCredit = -1;
-  mqlight.proton.messenger.subscribe = function(address, qos, ttl, credit) {
+  var savedFlow = mqlight.proton.messenger.flow;
+  var subscribedCredit;
+  mqlight.proton.messenger.flow = function(address, credit) {
     subscribedCredit = credit;
   };
   var client = mqlight.createClient({id: 'test_subscribe_credit_values',
     service: 'amqp://host'});
-  client.on('started', function() {
-    for (var i = 0; i < data.length; ++i) {
-      if (data[i].expected !== undefined) {
-        test.doesNotThrow(function() {
-          client.subscribe('testpattern' + i,
-                           data[i].credit !== undefined ? data[i] : {});
-        }, undefined, 'test data index: ' + i);
-        test.deepEqual(subscribedCredit, data[i].expected,
-            'wrong value passed to proton messenger - test data index: ' + i +
-            ' expected: ' + data[i].expected + ' actual : ' + subscribedCredit);
-      } else {
-        test.throws(function() {
-          client.subscribe('testpattern', data[i]);
-        }, RangeError, 'test data index: ' + i);
-      }
+
+  var runTests = function(i) {
+    if (i === data.length) {
+      mqlight.proton.messenger.flow = savedFlow;
+      client.stop(function() {
+        test.done();
+      });
+      return;
     }
-    mqlight.proton.messenger.subscribe = savedSubscribe;
-    client.stop(function() {
-      test.done();
-    });
+
+    subscribedCredit = 0;
+    if (data[i].expected !== undefined) {
+      test.doesNotThrow(function() {
+        client.subscribe('testpattern' + i,
+            data[i].credit !== undefined ? data[i] : {},
+            function() {
+              test.deepEqual(subscribedCredit, data[i].expected,
+                             'wrong value passed to proton messenger - test ' +
+                             'data index: ' + i + ' expected: ' +
+                             data[i].expected + ' actual : ' +
+                             subscribedCredit);
+              runTests(i + 1);
+            }
+        );
+      }, undefined, 'test data index: ' + i);
+    } else {
+      test.throws(function() {
+        client.subscribe('testpattern', data[i]);
+      }, RangeError, 'test data index: ' + i);
+      runTests(i + 1);
+    }
+  };
+
+  client.on('started', function() {
+    runTests(0);
   });
 };
 
@@ -702,6 +717,7 @@ module.exports.test_subscribe_client_twice = function(test) {
       test.throws(function () {
         client.subscribe('topic');
       }, mqlight.SubscribedError);
+      client.stop();
       test.done();
     });
   });

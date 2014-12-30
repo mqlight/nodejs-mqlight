@@ -58,6 +58,10 @@ var testMessage = function(sentTopic, subscribedPattern) {
 module.exports.test_receive_message = function(test) {
   var originalReceiveMethod = mqlight.proton.messenger.receive;
   mqlight.proton.messenger.receive = function() {};
+  var subscriptions = 0;
+  var cb = function() {
+    subscriptions++;
+  };
 
   var client = mqlight.createClient({
     service: 'amqp://host',
@@ -73,13 +77,14 @@ module.exports.test_receive_message = function(test) {
         first = false;
       } else {
         test.deepEqual(delivery.destination.topicPattern, '/kittens/+/boots');
-        test.done();
-        client.stop();
         mqlight.proton.messenger.receive = originalReceiveMethod;
+        client.stop(function() {
+          test.done();
+        });
       }
     });
-    client.subscribe('/kittens/#');
-    client.subscribe('/kittens/+/boots');
+    client.subscribe('/kittens/#', cb);
+    client.subscribe('/kittens/+/boots', cb);
   });
 
   client.on('malformed', function() {
@@ -94,9 +99,13 @@ module.exports.test_receive_message = function(test) {
   var messages = [testMessage('/kittens/wearing/boots', '/kittens/#'),
                   testMessage('/kittens/wearing/boots', '/kittens/+/boots')];
   mqlight.proton.messenger.receive = function() {
-    var result = messages;
-    messages = [];
-    return result;
+    if (subscriptions == 2) {
+      var result = messages;
+      messages = [];
+      return result;
+    } else {
+      return [];
+    }
   };
 };
 
@@ -140,9 +149,10 @@ module.exports.test_receive_topic_pattern = function(test) {
     test.ok(delivery.message.confirmDelivery == undefined,
             'confirmDelivery() method should not be present');
 
-    test.done();
-    client.stop();
     mqlight.proton.messenger.receive = originalReceiveMethod;
+    client.stop(function() {
+      test.done();
+    });
   });
 
   client.on('malformed', function() {
@@ -195,9 +205,10 @@ module.exports.test_bad_listener = function(test) {
         throw new Error();
       }
       process.removeListener('uncaughtException', handler);
-      test.done();
-      client.stop();
       mqlight.proton.messenger.receive = originalReceiveMethod;
+      client.stop(function() {
+        test.done();
+      });
     });
     client.subscribe('/public');
   });
@@ -269,9 +280,10 @@ module.exports.test_malformed_message = function(test) {
             "malformed object should have 'MQMD' property");
     test.deepEqual(delivery.malformed.MQMD.CodedCharSetId, 1234);
     test.deepEqual(delivery.malformed.MQMD.Format, 'MQAMQP');
-    test.done();
-    client.stop();
     mqlight.proton.messenger.receive = originalReceiveMethod;
+    client.stop(function() {
+      test.done();
+    });
   });
 
   client.on('message', function() {
@@ -325,8 +337,9 @@ module.exports.test_receive_ttl = function(test) {
                      messages[count].ttl + ')');
     }
     if (++count === messages.length) {
-      client.stop();
-      test.done();
+      client.stop(function() {
+        test.done();
+      });
     }
   });
 };
@@ -350,20 +363,6 @@ function run_receiver_credit_testcase(test, name, credit, qos, numMessages) {
 
   var maxCredit = credit;
   var currentCredit = maxCredit;
-  mqlight.proton.messenger.receive = function() {
-    test.ok(currentCredit >= 0, 'credit should never be negative');
-    if (currentCredit > 0) {
-      --currentCredit;
-      return [testMessage('/kittens/wearing/boots', '/kittens/#')];
-    } else {
-      return [];
-    }
-  };
-  mqlight.proton.messenger.flow = function(linkAddress, credit) {
-    currentCredit += credit;
-    test.ok(currentCredit <= maxCredit,
-            'maximum credit for link should never be exceeded');
-  };
 
   var client = mqlight.createClient({service: 'amqp://host', id: name});
 
@@ -373,14 +372,32 @@ function run_receiver_credit_testcase(test, name, credit, qos, numMessages) {
 
     client.on('message', function(data, delivery) {
       if (++receiveCount >= numMessages) {
-        client.stop();
         mqlight.proton.messenger.receive = savedReceiveMethod;
         mqlight.proton.messenger.flow = savedFlowMethod;
-        test.done();
+        client.stop(function() {
+          test.done();
+        });
       }
     });
 
-    client.subscribe('/kittens/#', {qos: qos, credit: maxCredit});
+    client.subscribe('/kittens/#', {qos: qos, credit: maxCredit},
+        function (err, topicPattern, share) {
+          mqlight.proton.messenger.receive = function() {
+            test.ok(currentCredit >= 0, 'credit should never be negative');
+            if (currentCredit > 0) {
+              --currentCredit;
+              return [testMessage('/kittens/wearing/boots', '/kittens/#')];
+            } else {
+              return [];
+            }
+          };
+          mqlight.proton.messenger.flow = function(linkAddress, credit) {
+            currentCredit += credit;
+            test.ok(currentCredit <= maxCredit,
+                    'maximum credit for link should never be exceeded');
+          };
+        }
+    );
   });
 
   client.on('malformed', function() {
@@ -478,22 +495,6 @@ module.exports.test_subscribe_credit_confirm = function(test) {
 
   var maxCredit = 10;
   var currentCredit = maxCredit;
-  mqlight.proton.messenger.receive = function() {
-    test.ok(currentCredit >= 0, 'credit should never be negative');
-    if (currentCredit > 0) {
-      --currentCredit;
-      return [testMessage('/kittens/wearing/boots', '/kittens/#')];
-    } else {
-      return [];
-    }
-  };
-  mqlight.proton.messenger.flow = function(linkAddress, credit) {
-    test.ok((currentCredit + credit) <= maxCredit,
-            'maximum credit for link should never be exceeded,'+
-            ' current: ' + currentCredit + ' flowed: ' + credit +
-            ' max: ' + maxCredit);
-    currentCredit += credit;
-  };
 
   var client = mqlight.createClient({
     service: 'amqp://host',
@@ -512,16 +513,35 @@ module.exports.test_subscribe_credit_confirm = function(test) {
       if (++receiveCount >= 50) {
         if (interval) clearInterval(interval);
         test.ok(confirmBatch === 4);
-        client.stop();
         mqlight.proton.messenger.receive = savedReceiveMethod;
         mqlight.proton.messenger.flow = savedFlowMethod;
-        test.done();
+        client.stop(function() {
+          test.done();
+        });
       }
     });
 
     client.subscribe('/kittens/#',
-                     {qos: 1, credit: maxCredit, autoConfirm: false});
-
+        {qos: 1, credit: maxCredit, autoConfirm: false},
+        function (err, topicPattern, share) {
+          mqlight.proton.messenger.receive = function() {
+            test.ok(currentCredit >= 0, 'credit should never be negative');
+            if (currentCredit > 0) {
+              --currentCredit;
+              return [testMessage('/kittens/wearing/boots', '/kittens/#')];
+            } else {
+              return [];
+            }
+          };
+          mqlight.proton.messenger.flow = function(linkAddress, credit) {
+            test.ok((currentCredit + credit) <= maxCredit,
+                    'maximum credit for link should never be exceeded,'+
+                    ' current: ' + currentCredit + ' flowed: ' + credit +
+                    ' max: ' + maxCredit);
+            currentCredit += credit;
+          };
+        }
+    );
 
     interval = setInterval(function() {
       ++confirmBatch;
@@ -571,8 +591,9 @@ module.exports.test_receive_client_replaced = function(test) {
     test.ok(err instanceof mqlight.ReplacedError);
     test.ok(/ReplacedError: /.test(err.toString()));
     mqlight.proton.messenger.receive = savedReceiveMethod;
-    client.stop();
-    test.done();
+    client.stop(function() {
+      test.done();
+    });
   });
 
   client.once('started', function() {
@@ -637,16 +658,18 @@ module.exports.test_presence_of_confirmDelivery_method = function(test) {
       test.ok(delivery.message.confirmDelivery == undefined,
               'confirmDelivery() should not be present - test case #'+testCase);
     }
-    client.unsubscribe('/kittens/#');
-    ++testCase;
-    if (testCase < testData.length) {
-      client.subscribe('/kittens/#', testData[testCase].options);
-      messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
-    } else {
-      test.done();
-      client.stop();
-      mqlight.proton.messenger.receive = originalReceiveMethod;
-    }
+    client.unsubscribe('/kittens/#', function(err, topicPattern, share) {
+      ++testCase;
+      if (testCase < testData.length) {
+        client.subscribe('/kittens/#', testData[testCase].options);
+        messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
+      } else {
+        mqlight.proton.messenger.receive = originalReceiveMethod;
+        client.stop(function() {
+          test.done();
+        });
+      }
+    });
   });
 
   client.on('malformed', function() {
@@ -687,11 +710,12 @@ module.exports.test_work_between_messages = function(test) {
     client.on('message', function(data, delivery) {
       ++messageEvents;
       if (messageEvents === 2) {
-        client.stop();
         mqlight.proton.messenger.receive = originalReceiveMethod;
         mqlight.proton.messenger.work = originalWorkMethod;
         test.ok(workCalls > 0, 'expected work to be invoked!');
-        test.done();
+        client.stop(function() {
+          test.done();
+        });
       }
     });
     client.subscribe('/#');

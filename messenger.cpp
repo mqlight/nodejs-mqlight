@@ -111,11 +111,14 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "stop", Stop);
   NODE_SET_PROTOTYPE_METHOD(constructor, "connect", Connect);
   NODE_SET_PROTOTYPE_METHOD(constructor, "subscribe", Subscribe);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "subscribed", Subscribed);
   NODE_SET_PROTOTYPE_METHOD(constructor, "unsubscribe", Unsubscribe);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "unsubscribed", Unsubscribed);
   NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
   NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
   NODE_SET_PROTOTYPE_METHOD(constructor, "statusError", StatusError);
   NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "settled", Settled);
   NODE_SET_PROTOTYPE_METHOD(
       constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
   NODE_SET_PROTOTYPE_METHOD(constructor, "work", Work);
@@ -586,8 +589,8 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   Proton::Entry("ProtonMessenger::Subscribe", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 4 || args[0].IsEmpty() || args[1].IsEmpty() ||
-      args[2].IsEmpty() || args[3].IsEmpty()) {
+  if (args.Length() < 3 || args[0].IsEmpty() || args[1].IsEmpty() ||
+      args[2].IsEmpty()) {
     THROW_EXCEPTION("Missing required argument",
                     "ProtonMessenger::Subscribe",
                     name);
@@ -597,13 +600,9 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   std::string address = std::string(*param);
   int qos = (int)args[1]->ToInteger()->Value();
   int ttl = (int)args[2]->ToInteger()->Value();
-  long creditLong = (long) args[3]->ToInteger()->Value();
-  if (creditLong > 4294967295) creditLong = 4294967295;
-  unsigned int credit = (unsigned int) creditLong;
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("parms", name, "qos:", qos);
   Proton::Log("parms", name, "ttl:", ttl);
-  Proton::Log("parms", name, "credit:", (int)credit);
 
   // throw Error if not connected
   if (!obj->messenger) {
@@ -645,6 +644,35 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Subscribe", name)
   }
 
+  Proton::Exit("ProtonMessenger::Subscribe", name, true);
+  return scope.Close(Boolean::New(true));
+}
+
+Handle<Value> ProtonMessenger::Subscribed(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::Subscribed", name);
+
+  // throw TypeError if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty()) {
+    THROW_EXCEPTION("Missing required argument",
+                    "ProtonMessenger::Subscribed",
+                    name);
+  }
+
+  String::Utf8Value param(args[0]->ToString());
+  std::string address = std::string(*param);
+  Proton::Log("parms", name, "address:", address.c_str());
+
+  // throw Error if not connected
+  if (!obj->messenger) {
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Subscribed", name);
+  }
+
   pn_link_t* link =
       pn_messenger_get_link(obj->messenger, address.c_str(), false);
 
@@ -652,32 +680,28 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
     // throw Error if unable to find a matching Link
     THROW_EXCEPTION_TYPE(Exception::Error,
                          ("unable to locate link for " + address).c_str(),
-                         "ProtonMessenger::Subscribe",
+                         "ProtonMessenger::Subscribed",
                          name)
   }
 
-  // XXX: this is less than ideal, but as a temporary fix we will block
-  //      until we've received the @attach response back from the server
-  //      and the link is marked as active. Ideally we should be passing
-  //      callbacks around between JS and C++, so will fix better later
-  while (!(pn_link_state(link) & PN_REMOTE_ACTIVE)) {
+  bool subscribed;
+  if (!(pn_link_state(link) & PN_REMOTE_ACTIVE)) {
+    subscribed = false;
     Proton::Entry("pn_messenger_work", name);
     pn_messenger_work(obj->messenger, 50);
-    error = pn_messenger_errno(obj->messenger);
+    int error = pn_messenger_errno(obj->messenger);
     Proton::Exit("pn_messenger_work", name, error);
     if (error) {
       const char* text = pn_error_text(pn_messenger_error(obj->messenger));
       const char* err = GetErrorName(text);
-      THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Subscribe", name)
+      THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Subscribed", name)
     }
+  } else {
+    subscribed = true;
   }
 
-  if (credit > 0) {
-    pn_link_flow(link, credit);
-  }
-
-  Proton::Exit("ProtonMessenger::Subscribe", name, true);
-  return scope.Close(Boolean::New(true));
+  Proton::Exit("ProtonMessenger::Subscribed", name, subscribed);
+  return scope.Close(Boolean::New(subscribed));
 }
 
 Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
@@ -751,7 +775,70 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
     Proton::Entry("pn_link_close", name);
     pn_link_close(link);
     Proton::Exit("pn_link_close", name, 0);
-    while (!(pn_link_state(link) & PN_REMOTE_CLOSED)) {
+  } else {
+    // otherwise, keep calling work until we get the remote ack for detachment
+    Proton::Entry("pn_link_detach", name);
+    pn_link_detach(link);
+    Proton::Exit("pn_link_detach", name, 0);
+  }
+
+  Proton::Exit("ProtonMessenger::Unsubscribe", name, true);
+  return scope.Close(Boolean::New(true));
+}
+
+Handle<Value> ProtonMessenger::Unsubscribed(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::Unsubscribed", name);
+
+  // throw TypeError if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty()) {
+    THROW_EXCEPTION("Missing required argument",
+                    "ProtonMessenger::Unsubscribed",
+                    name);
+  }
+
+  String::Utf8Value param(args[0]->ToString());
+  std::string address = std::string(*param);
+  Proton::Log("parms", name, "address:", address.c_str());
+
+  // throw Error if not connected
+  if (!obj->messenger) {
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Unsubscribed", name);
+  }
+
+  // find link based on address
+  pn_link_t* link =
+      pn_messenger_get_link(obj->messenger, address.c_str(), false);
+
+  if (!link) {
+    // throw Error if unable to find a matching Link
+    THROW_EXCEPTION_TYPE(Exception::Error,
+                         ("unable to locate link for " + address).c_str(),
+                         "ProtonMessenger::Unsubscribed",
+                         name)
+  }
+
+  // check if we are detaching with @closed=true
+  bool closing = true;
+  pn_expiry_policy_t expiry_policy =
+      pn_terminus_get_expiry_policy(pn_link_target(link));
+  pn_seconds_t timeout = pn_terminus_get_timeout(pn_link_target(link));
+  if (expiry_policy == PN_EXPIRE_NEVER || timeout > 0) {
+    closing = false;
+  }
+  Proton::Log("data", name, "closing:", closing);
+
+  // if closing, keep calling work until we have received the close
+  // acknowledgment from the remote end
+  bool unsubscribed;
+  if (closing) {
+    if (!(pn_link_state(link) & PN_REMOTE_CLOSED)) {
+      unsubscribed = false;
       Proton::Entry("pn_messenger_work", name);
       pn_messenger_work(obj->messenger, 0);
       int error = pn_messenger_errno(obj->messenger);
@@ -759,15 +846,15 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
       if (error) {
         const char* text = pn_error_text(pn_messenger_error(obj->messenger));
         const char* err = GetErrorName(text);
-        THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Unsubscribe", name)
+        THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Unsubscribed", name)
       }
+    } else {
+      unsubscribed = true;
     }
   } else {
     // otherwise, keep calling work until we get the remote ack for detachment
-    Proton::Entry("pn_link_detach", name);
-    pn_link_detach(link);
-    Proton::Exit("pn_link_detach", name, 0);
-    while (!pn_link_remote_detached(link)) {
+    if (!pn_link_remote_detached(link)) {
+      unsubscribed = false;
       Proton::Entry("pn_messenger_work", name);
       pn_messenger_work(obj->messenger, 0);
       int error = pn_messenger_errno(obj->messenger);
@@ -777,14 +864,16 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
           pn_error_text(pn_messenger_error(obj->messenger));
         const char* err = GetErrorName(text);
         THROW_NAMED_EXCEPTION(
-            err, text, "ProtonMessenger::Unsubscribe", name)
+            err, text, "ProtonMessenger::Unsubscribed", name)
       }
+    } else {
+      unsubscribed = true;
+      pn_link_free(link);
     }
-    pn_link_free(link);
   }
 
-  Proton::Exit("ProtonMessenger::Unsubscribe", name, true);
-  return scope.Close(Boolean::New(true));
+  Proton::Exit("ProtonMessenger::Unsubscribed", name, unsubscribed);
+  return scope.Close(Boolean::New(unsubscribed));
 }
 
 /* XXX: this may need to be wrapped in a uv_async queued operation? */
@@ -995,11 +1084,40 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
         "NetworkError", "Failed to settle", "ProtonMessenger::Settle", name);
   }
 
+  Proton::Exit("ProtonMessenger::Settle", name, true);
+  return scope.Close(Boolean::New(true));
+}
+
+Handle<Value> ProtonMessenger::Settled(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::Settled", name);
+
+  // throw exception if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
+      args[0]->IsUndefined()) {
+    THROW_EXCEPTION(
+        "Missing required message argument.", "ProtonMessenger::Settled", name);
+  }
+
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+
+  // throw exception if not connected
+  if (!obj->messenger) {
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Settled", name);
+  }
+
+  pn_delivery_t* d = pn_messenger_delivery(obj->messenger, msg->tracker);
+
   // For incoming messages, if we haven't already settled it, block for a while
   // until we *think* the settlement disposition has been communicated over the
   // network. We detect that by querying pn_transport_quiesced which should
   // return true once all pending output has been written to the wire.
-  // (as per other comments, ideally we should wrap this in a callback...)
+  bool settled = true;
   if (d != NULL && pn_link_is_receiver(pn_delivery_link(d))) {
     pn_session_t* session = pn_link_session(pn_delivery_link(d));
     if (session) {
@@ -1007,7 +1125,8 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
       if (connection) {
         pn_transport_t* transport = pn_connection_transport(connection);
         if (transport) {
-          while (!pn_transport_quiesced(transport)) {
+          if (!pn_transport_quiesced(transport)) {
+            settled = false;
             Proton::Entry("pn_messenger_work", name);
             pn_messenger_work(obj->messenger, 0);
             int error = pn_messenger_errno(obj->messenger);
@@ -1016,7 +1135,7 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
               const char* text =
                   pn_error_text(pn_messenger_error(obj->messenger));
               const char* err = GetErrorName(text);
-              THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Settle", name)
+              THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Settled", name)
             }
           }
         }
@@ -1024,8 +1143,8 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
     }
   }
 
-  Proton::Exit("ProtonMessenger::Settle", name, true);
-  return scope.Close(Boolean::New(true));
+  Proton::Exit("ProtonMessenger::Settled", name, settled);
+  return scope.Close(Boolean::New(settled));
 }
 
 Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args)
