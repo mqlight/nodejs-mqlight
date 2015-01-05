@@ -56,7 +56,9 @@ var styles = {
  * heading.
  */
 var write = function(lvl, prefix, args) {
-  npmlog.heading = moment().format('HH:mm:ss.SSS') + ' [' + process.pid + ']';
+  if (npmlog.levels[npmlog.level] <= npmlog.levels[lvl]) {
+    npmlog.heading = moment().format('HH:mm:ss.SSS') + ' [' + process.pid + ']';
+  }
   npmlog.log.apply(this, arguments);
 };
 
