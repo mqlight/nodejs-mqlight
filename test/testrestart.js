@@ -144,7 +144,7 @@ module.exports.test_multi_restart_call = function(test) {
 * @param {object} test the unittest interface
 */
 module.exports.test_resubscribe_on_restart = function(test) {
-  test.expect(13);
+  test.expect(7);
   var client = mqlight.createClient({id: 'test_resubscribe_on_restart',
     service: 'amqp://host'});
 
@@ -169,28 +169,11 @@ module.exports.test_resubscribe_on_restart = function(test) {
   var origSubsList = [];
   client.once('started', function(err) {
     client.subscribe('/topic', 'myshare', function(err) {
-      test.ok(!err);
       if (connectErrors > 0) return;
       client.subscribe('/another/topic', function(err) {
-        test.ok(!err);
         if (connectErrors > 0) return;
         client.subscribe('/final/topic/', 'diffshare', function(err) {
-          test.ok(!err);
-          if (connectErrors > 0) {
-            if (err) return;
-            test.equal(client._subscriptions.length, origSubsList.length,
-                'after reconnect subs lists does not match original');
-            while (client._subscriptions.length > 0) {
-              var expected = origSubsList.pop();
-              expected.callback = undefined;
-              var actual = client._subscriptions.pop();
-              actual.callback = undefined;
-              test.deepEqual(actual, expected, 'sub list objects do not match');
-            }
-            client.stop();
-            test.done();
-            clearTimeout(timeout);
-          }
+          if (connectErrors > 0) return;
           if (connectErrors === 0) {
             setImmediate(function() {
               origSubsList = origSubsList.concat(client._subscriptions);
@@ -207,6 +190,18 @@ module.exports.test_resubscribe_on_restart = function(test) {
     // this allows the restarted callback to get in and re-subscribe
     setImmediate(function() {
       test.equal(3, origSubsList.length, 'origSubsList length is wrong');
+      test.equal(client._subscriptions.length, origSubsList.length,
+          'after reconect subs lists does not match original');
+      while (client._subscriptions.length > 0) {
+        var expected = origSubsList.pop();
+        expected.callback = undefined;
+        var actual = client._subscriptions.pop();
+        actual.callback = undefined;
+        test.deepEqual(actual, expected, 'sub list objects do not match');
+      }
+      client.stop();
+      test.done();
+      clearTimeout(timeout);
     });
   });
 };
@@ -375,6 +370,11 @@ module.exports.test_queued_subs_retrying = function(test) {
   var client = mqlight.createClient({id: 'test_queued_subs_retrying', service:
         'amqp://host'});
 
+  var savedSubFunction = mqlight.proton.messenger.subscribe;
+  mqlight.proton.messenger.subscribe = function() {
+    throw new Error('error on subscribe');
+  };
+
   var subscribeErrors = 0;
   client.on('error', function(err) {
     if (/error on subscribe/.test(err.message)) {
@@ -386,6 +386,7 @@ module.exports.test_queued_subs_retrying = function(test) {
       test.strictEqual(client._queuedSubscriptions.length, 4,
                        'expected to see 4 queued subscriptions, but saw ' +
           client._queuedSubscriptions.length);
+      mqlight.proton.messenger.subscribe = savedSubFunction;
       stubproton.setConnectStatus(0);
       setTimeout(function(){client.stop();},500);
     }
@@ -462,9 +463,9 @@ module.exports.test_queued_unsubscribe_via_error = function(test) {
     service: 'amqp://host'
   });
 
-  var savedSubscribedFn = mqlight.proton.messenger.subscribed;
-  mqlight.proton.messenger.subscribed = function() {
-    return true;
+  var savedUnsubscribeFn = mqlight.proton.messenger.unsubscribe;
+  mqlight.proton.messenger.unsubscribe = function() {
+    throw new Error('error on unsubscribe');
   };
 
   var unsubscribeErrors = 0;
@@ -478,9 +479,9 @@ module.exports.test_queued_unsubscribe_via_error = function(test) {
       test.strictEqual(client._queuedUnsubscribes.length, 4,
                        'expected to see 4 queued unsubscriptions, but saw ' +
           client._queuedUnsubscribes.length);
-      mqlight.proton.messenger.subscribed = savedSubscribedFn;
+      mqlight.proton.messenger.unsubscribe = savedUnsubscribeFn;
       stubproton.setConnectStatus(0);
-      setTimeout(function() {client.stop();},1000);
+      setTimeout(function() {client.stop();},500);
     }
   });
 
@@ -489,13 +490,9 @@ module.exports.test_queued_unsubscribe_via_error = function(test) {
     stubproton.setConnectStatus(1);
     // queue up 4 unsubscribes
     for (var i = 1; i < 5; i++) {
-      client.subscribe('queue' + i, function(err, topicPattern, share) {
-        if (unsubscribeErrors >= 4) return;
-        client.unsubscribe(topicPattern, function(err) {
-          if (!err) {
-            successCallbacks++;
-          }
-        });
+      client.subscribe('queue' + i);
+      client.unsubscribe('queue' + i, function() {
+        successCallbacks++;
       });
     }
   });
@@ -645,10 +642,8 @@ module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
     }
     // queue up 2 unsubscribes to queue{2,4}
     for (var j = 2; j < 5; j += 2) {
-      client.unsubscribe('queue' + j, function(err) {
-        if (!err) {
-          successCallbacks++;
-        }
+      client.unsubscribe('queue' + j, function() {
+        successCallbacks++;
       });
     }
   });

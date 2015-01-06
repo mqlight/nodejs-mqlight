@@ -874,7 +874,7 @@ module.exports.test_start_file_bad_json = function(test) {
 
 /**
  * Tests that after successfully connecting to the server, a heartheat is
- * setup to call pn_messeger_work at the rate required by
+ * setup to call pn_messenger_work at the rate required by
  * the server.
  *
  * @param {object} test the unittest interface
