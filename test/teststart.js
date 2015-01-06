@@ -176,6 +176,26 @@ module.exports.test_start_all_callbacks_called = function(test) {
 
 
 /**
+ * Tests that when calling start, the callback gets invoked even
+ * if nested inside another callback.
+ * @param {object} test the unittest interface
+ */
+module.exports.test_start_nested_callback = function(test) {
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_start_nested_callback'
+  }, function(err) {
+    test.ok(!err);
+    client.start(function(err) {
+      test.ok(!err);
+      client.stop();
+      test.done();
+    });
+  });
+};
+
+
+/**
  * Test that if too many arguments are supplied to start - then they are
  * ignored.
  * @param {object} test the unittest interface
@@ -854,7 +874,7 @@ module.exports.test_start_file_bad_json = function(test) {
 
 /**
  * Tests that after successfully connecting to the server, a heartheat is
- * setup to call pn_messenger_work at the rate required by
+ * setup to call pn_messeger_work at the rate required by
  * the server.
  *
  * @param {object} test the unittest interface

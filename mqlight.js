@@ -1091,6 +1091,13 @@ var Client = function(service, id, securityOptions) {
           logger.exit('Client._performConnect', _id, null);
           return;
         } else {
+          if (currentState === STATE_STARTED) {
+            // if the client is already started, then drive any callbacks
+            // waiting to be notified
+            process.nextTick(function() {
+              client._invokeStartedCallbacks.call(client, null);
+            });
+          }
           logger.exit('Client._performConnect', _id, client);
           return client;
         }
@@ -1847,116 +1854,58 @@ var processQueuedActions = function(err) {
   logger.log('data', client.id, 'client.state:', client.state);
 
   if (!err) {
-    var performSend = function() {
-      logger.entry('performSend', client.id);
-      logger.log('data', client.id, 'client._queuedSends',
-                 client._queuedSends);
-      while (client._queuedSends.length > 0 &&
-              client.state === STATE_STARTED) {
-        var remaining = client._queuedSends.length;
-        var msg = client._queuedSends.shift();
-        client.send(msg.topic, msg.data, msg.options, msg.callback);
-        if (client._queuedSends.length >= remaining) {
-          // Calling client.send can cause messages to be added back into
-          // _queuedSends, if the network connection is broken.  Check that the
-          // size of the array is decreasing to avoid looping forever...
-          break;
-        }
-      }
-
-      logger.exit('performSend', client.id, null);
-    };
-
-    var performUnsub = function() {
-      logger.entry('performUnsub', client.id);
-
-      if (client._queuedUnsubscribes.length > 0 &&
-          client.state === STATE_STARTED) {
-        var rm = client._queuedUnsubscribes.shift();
-        logger.log('data', client.id, 'rm:', rm);
-        if (rm.noop) {
-          // no-op, so just trigger the callback without actually unsubscribing
-          if (rm.callback) {
-            logger.entry('performUnsub.callback', client.id);
-            rm.callback.apply(client, [null, rm.topicPattern, rm.share]);
-            logger.exit('performUnsub.callback', client.id, null);
-          }
-          setImmediate(function() {
-            performUnsub.apply(client);
+    logger.log('data', client.id, 'client._queuedSubscriptions',
+               client._queuedSubscriptions);
+    while (client._queuedSubscriptions.length > 0 &&
+            client.state === STATE_STARTED) {
+      var sub = client._queuedSubscriptions.shift();
+      if (sub.noop) {
+        // no-op, so just trigger the callback without actually subscribing
+        if (sub.callback) {
+          process.nextTick(function() {
+            logger.entry('processQueuedActions.callback', client.id);
+            logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+                       sub.topicPattern, ', originalShareValue:', sub.share);
+            sub.callback.apply(client,
+                [err, sub.topicPattern, sub.originalShareValue]);
+            logger.exit('processQueuedActions.callback', client.id, null);
           });
-        } else {
-          client.unsubscribe(rm.topicPattern, rm.share, rm.options,
-              function(err, topicPattern, share) {
-                if (rm.callback) {
-                  logger.entry('performUnsub.callback', client.id);
-                  rm.callback.apply(client, [err, rm.topicPattern, rm.share]);
-                  logger.exit('performUnsub.callback', client.id, null);
-                }
-                setImmediate(function() {
-                  performUnsub.apply(client);
-                });
-              }
-          );
         }
       } else {
-        performSend.apply(client);
+        client.subscribe(sub.topicPattern, sub.share, sub.options,
+                         sub.callback);
       }
-
-      logger.exit('performUnsub', client.id, null);
-    };
-
-    var performSub = function() {
-      logger.entry('performSub', client.id);
-
-      if (client._queuedSubscriptions.length > 0 &&
-          client.state === STATE_STARTED) {
-        var sub = client._queuedSubscriptions.shift();
-        logger.log('data', client.id, 'sub:', sub);
-        if (sub.noop) {
-          // no-op, so just trigger the callback without actually subscribing
-          if (sub.callback) {
-            process.nextTick(function() {
-              logger.entry('performSub.callback', client.id);
-              logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-                         sub.topicPattern, ', originalShareValue:', sub.share);
-              sub.callback.apply(client,
-                  [err, sub.topicPattern, sub.originalShareValue]);
-              logger.exit('performSub.callback', client.id, null);
-            });
-          }
-          setImmediate(function() {
-            performSub.apply(client);
-          });
-        } else {
-          client.subscribe(sub.topicPattern, sub.share, sub.options,
-              function(err, topicPattern, share) {
-                if (sub.callback) {
-                  process.nextTick(function() {
-                    logger.entry('performSub.callback',
-                                 client.id);
-                    logger.log('parms', client.id, 'err:', err,
-                               ', topicPattern:', sub.topicPattern,
-                               ', originalShareValue:', sub.share);
-                    sub.callback.apply(client,
-                        [err, sub.topicPattern, sub.originalShareValue]);
-                    logger.exit('performSub.callback',
-                                client.id, null);
-                  });
-                }
-                setImmediate(function() {
-                  performSub.apply(client);
-                });
-              }
-          );
+    }
+    logger.log('data', client.id, 'client._queuedUnsubscribes',
+               client._queuedUnsubscribes);
+    while (client._queuedUnsubscribes.length > 0 &&
+            client.state === STATE_STARTED) {
+      var rm = client._queuedUnsubscribes.shift();
+      if (rm.noop) {
+        // no-op, so just trigger the callback without actually unsubscribing
+        if (rm.callback) {
+          logger.entry('processQueuedActions.callback', client.id);
+          rm.callback.apply(client, [null, rm.topicPattern, rm.share]);
+          logger.exit('processQueuedActions.callback', client.id, null);
         }
       } else {
-        performUnsub.apply(client);
+        client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
       }
-
-      logger.exit('performSub', client.id, null);
-    };
-
-    performSub();
+    }
+    logger.log('data', client.id, 'client._queuedSends',
+               client._queuedSends);
+    while (client._queuedSends.length > 0 &&
+            client.state === STATE_STARTED) {
+      var remaining = client._queuedSends.length;
+      var msg = client._queuedSends.shift();
+      client.send(msg.topic, msg.data, msg.options, msg.callback);
+      if (client._queuedSends.length >= remaining) {
+        // Calling client.send can cause messages to be added back into
+        // _queuedSends, if the network connection is broken.  Check that the
+        // size of the array is decreasing to avoid looping forever...
+        break;
+      }
+    }
   }
   logger.exit('processQueuedActions', client.id, null);
 };
@@ -2542,42 +2491,6 @@ var processMessage = function(client, protonMsg) {
     }
   };
 
-
-  var stillSettling = function(subscription, protonMsg) {
-    var client = this;
-    logger.entryLevel('entry_often', 'processMessage.stillSettling', client.id);
-
-    var settled = messenger.settled(protonMsg);
-    if (settled) {
-      --subscription.unconfirmed;
-      ++subscription.confirmed;
-      logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
-          '[' + subscription.credit + ',' +
-          subscription.unconfirmed + ',' +
-          subscription.confirmed + ']');
-      // Ask to flow more messages if >= 80% of available credit
-      // (e.g. not including unconfirmed messages) has been used.
-      // Or if we have just confirmed everything.
-      var available = subscription.credit - subscription.unconfirmed;
-      if ((available / subscription.confirmed) <= 1.25 ||
-          (subscription.unconfirmed === 0 &&
-          subscription.confirmed > 0)) {
-        messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
-                             subscription.confirmed);
-        subscription.confirmed = 0;
-      }
-      protonMsg.destroy();
-      protonMsg = null;
-    } else {
-      setImmediate(function() {
-        stillSettling.call(client, subscription, protonMsg);
-      });
-    }
-
-    logger.exitLevel('exit_often', 'processMessage.stillSettling',
-                     client.id, !settled);
-  };
-
   if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
     delivery.message.confirmDelivery = function() {
       logger.entry('message.confirmDelivery', client.id);
@@ -2598,7 +2511,25 @@ var processMessage = function(client, protonMsg) {
           throw err;
         }
         messenger.settle(protonMsg);
-        stillSettling.call(client, subscription, protonMsg);
+        --subscription.unconfirmed;
+        ++subscription.confirmed;
+        logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
+            '[' + subscription.credit + ',' +
+            subscription.unconfirmed + ',' +
+            subscription.confirmed + ']');
+        // Ask to flow more messages if >= 80% of available credit
+        // (e.g. not including unconfirmed messages) has been used.
+        // Or we have just confirmed everything.
+        var available = subscription.credit - subscription.unconfirmed;
+        if ((available / subscription.confirmed) <= 1.25 ||
+            (subscription.unconfirmed === 0 &&
+            subscription.confirmed > 0)) {
+          messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
+                               subscription.confirmed);
+          subscription.confirmed = 0;
+        }
+        protonMsg.destroy();
+        protonMsg = null;
       }
       logger.exit('message.confirmDelivery', client.id, null);
     };
@@ -2679,7 +2610,24 @@ var processMessage = function(client, protonMsg) {
     }
     if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
       messenger.settle(protonMsg);
-      stillSettling.call(client, subscription, protonMsg);
+      --subscription.unconfirmed;
+      ++subscription.confirmed;
+      logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
+          '[' + subscription.credit + ',' +
+          subscription.unconfirmed + ',' +
+          subscription.confirmed + ']');
+      // Ask to flow more messages if >= 80% of available credit
+      // (e.g. not including unconfirmed messages) has been used.
+      // Or we have just confirmed everything.
+      var available = subscription.credit - subscription.unconfirmed;
+      if ((available / subscription.confirmed <= 1.25) ||
+          (subscription.unconfirmed === 0 &&
+          subscription.confirmed > 0)) {
+        messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
+                             subscription.confirmed);
+        subscription.confirmed = 0;
+      }
+      protonMsg.destroy();
     }
   }
   logger.exitLevel('exit_often', 'processMessage', client.id, null);
@@ -2907,113 +2855,73 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
   }
 
-  var finishedSubscribing = function(err, callback) {
-    logger.entry('Client.subscribe.finishedSubscribing', client.id);
-    logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-               topicPattern);
-
-    if (callback) {
-      process.nextTick(function() {
-        logger.entry('Client.subscribe.finishedSubscribing.callback',
-                     client.id);
-        logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-                   topicPattern, ', originalShareValue:', originalShareValue);
-        callback.apply(client, [err, topicPattern, originalShareValue]);
-        logger.exit('Client.subscribe.finishedSubscribing.callback',
-                    client.id, null);
-      });
+  if (!err) {
+    try {
+      messenger.subscribe(address, qos, ttl, credit);
+    } catch (e) {
+      logger.caught('Client.subscribe', client.id, e);
+      err = getNamedError(e);
     }
+  }
 
-    if (err) {
-      setImmediate(function() {
-        logger.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      });
-      if (shouldReconnect(err)) {
-        logger.log('data', client.id, 'queued subscription and calling ' +
-                   'reconnect');
-        // error during subscribe so add to list of queued to resub
-        client._queuedSubscriptions.push({
-          address: subscriptionAddress,
-          qos: qos,
-          autoConfirm: autoConfirm,
-          topicPattern: topicPattern,
-          share: originalShareValue,
-          options: options,
-          callback: callback
-        });
-        // schedule a reconnect
-        setImmediate(function() {
-          reconnect(client);
-        });
-      }
-    } else {
-      // if no errors, add this to the stored list of subscriptions
-      var isFirstSub = (client._subscriptions.length === 0);
-      logger.log('data', client.id, 'isFirstSub:', isFirstSub);
+  if (callback) {
+    process.nextTick(function() {
+      logger.entry('Client.subscribe.callback', client.id);
+      logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+                 topicPattern, ', originalShareValue:', originalShareValue);
+      callback.apply(client, [err, topicPattern, originalShareValue]);
+      logger.exit('Client.subscribe.callback', client.id, null);
+    });
+  }
 
-      client._subscriptions.push({
+  if (err) {
+    setImmediate(function() {
+      logger.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+    });
+    if (shouldReconnect(err)) {
+      logger.log('data', client.id, 'queued subscription and calling ' +
+                 'reconnect');
+      // error during subscribe so add to list of queued to resub
+      client._queuedSubscriptions.push({
         address: subscriptionAddress,
         qos: qos,
         autoConfirm: autoConfirm,
         topicPattern: topicPattern,
         share: originalShareValue,
         options: options,
-        callback: callback,
-        credit: credit,
-        unconfirmed: 0,
-        confirmed: 0
+        callback: callback
       });
-
-      // If this is the first subscription to be added, schedule a request to
-      // start the polling loop to check for messages arriving
-      if (isFirstSub) {
-        setImmediate(function() {
-          client.checkForMessages.apply(client);
-        });
-      }
-    }
-
-    logger.exit('Client.subscribe.finishedSubscribing', client.id, null);
-  };
-
-  if (!err) {
-    try {
-      messenger.subscribe(address, qos, ttl);
-
-      var stillSubscribing = function(client, callback) {
-        logger.entry('Client.subscribe.stillSubscribing', client.id);
-
-        try {
-          if (!messenger.subscribed(address)) {
-            setImmediate(function() {
-              stillSubscribing(client, callback);
-            });
-          } else {
-            if (credit > 0) {
-              messenger.flow(address, credit);
-            }
-            finishedSubscribing(null, callback);
-          }
-        } catch (e) {
-          logger.caught('Client.subscribe.stillSubscribing', client.id, e);
-          err = getNamedError(e);
-          finishedSubscribing(err, callback);
-        }
-
-        logger.exit('Client.subscribe.stillSubscribing', client.id, null);
-      };
-
+      // schedule a reconnect
       setImmediate(function() {
-        stillSubscribing(client, callback);
+        reconnect(client);
       });
-    } catch (e) {
-      logger.caught('Client.subscribe', client.id, e);
-      err = getNamedError(e);
-      finishedSubscribing(err, callback);
     }
   } else {
-    finishedSubscribing(err, callback);
+    // if no errors, add this to the stored list of subscriptions
+    var isFirstSub = (client._subscriptions.length === 0);
+    logger.log('data', client.id, 'isFirstSub:', isFirstSub);
+
+    client._subscriptions.push({
+      address: subscriptionAddress,
+      qos: qos,
+      autoConfirm: autoConfirm,
+      topicPattern: topicPattern,
+      share: originalShareValue,
+      options: options,
+      callback: callback,
+      credit: credit,
+      unconfirmed: 0,
+      confirmed: 0
+    });
+
+    // If this is the first subscription to be added, schedule a request to
+    // start the polling loop to check for messages arriving
+    if (isFirstSub) {
+      setImmediate(function() {
+        client.checkForMessages.apply(client);
+      });
+    }
   }
 
   logger.exit('Client.subscribe', client.id, client);
@@ -3221,82 +3129,41 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     throw err;
   }
 
-  var finishedUnsubscribing = function(err, callback) {
-    logger.entry('Client.unsubscribe.finishedUnsubscribing', client.id);
-    logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-               topicPattern);
-
-    if (callback) {
-      setTimeout(function() {
-        logger.entry('Client.unsubscribe.finishedUnsubscribing.callback',
-                     client.id);
-        logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-                   topicPattern, ', originalShareValue:', originalShareValue);
-        callback.apply(client, [err, topicPattern, originalShareValue]);
-        logger.exit('Client.unsubscribe.finishedUnsubscribing.callback',
-                    client.id, null);
-      }, 100);
-    }
-
-    if (err) {
-      setImmediate(function() {
-        logger.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      });
-      if (shouldReconnect(err)) {
-        logger.log('data', client.id, 'client error "' + err + '" during ' +
-                   'messenger.unsubscribe call so queueing the unsubscribe ' +
-                   'request');
-        queueUnsubscribe();
-        setImmediate(function() {
-          reconnect(client);
-        });
-      }
-    } else {
-      // if no errors, remove this from the stored list of subscriptions
-      for (i = 0; i < client._subscriptions.length; i++) {
-        if (client._subscriptions[i].address === subscriptionAddress &&
-            client._subscriptions[i].share === originalShareValue) {
-          client._subscriptions.splice(i, 1);
-          break;
-        }
-      }
-    }
-
-    logger.exit('Client.unsubscribe.finishedUnsubscribing', client.id, null);
-  };
-
   // unsubscribe using the specified topic pattern and share options
   try {
     messenger.unsubscribe(address, ttl);
 
-    var stillUnsubscribing = function(client, callback) {
-      logger.entry('Client.unsubscribe.stillUnsubscribing', client.id);
-
-      try {
-        if (!messenger.unsubscribed(address)) {
-          setImmediate(function() {
-            stillUnsubscribing(client, callback);
-          });
-        } else {
-          finishedUnsubscribing(null, callback);
-        }
-      } catch (e) {
-        logger.caught('Client.unsubscribe.stillUnsubscribing', client.id, e);
-        err = getNamedError(e);
-        finishedUnsubscribing(err, callback);
+    if (callback) {
+      setTimeout(function() {
+        logger.entry('Client.unsubscribe.callback', client.id);
+        callback.apply(client, [null, topicPattern, originalShareValue]);
+        logger.exit('Client.unsubscribe.callback', client.id, null);
+      }, 100);
+    }
+    // if no errors, remove this from the stored list of subscriptions
+    for (i = 0; i < client._subscriptions.length; i++) {
+      if (client._subscriptions[i].address === subscriptionAddress &&
+          client._subscriptions[i].share === originalShareValue) {
+        client._subscriptions.splice(i, 1);
+        break;
       }
-
-      logger.exit('Client.unsubscribe.stillUnsubscribing', client.id, null);
-    };
-
-    setImmediate(function() {
-      stillUnsubscribing(client, callback);
-    });
+    }
   } catch (e) {
-    logger.caught('Client.unsubscribe', client.id, e);
     err = getNamedError(e);
-    finishedUnsubscribing(err, callback);
+    logger.caught('Client.unsubscribe', client.id, err);
+    setImmediate(function() {
+      logger.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+    });
+    if (shouldReconnect(err)) {
+      logger.log('data', client.id, 'client error "' + err + '" during ' +
+                 'messenger.unsubscribe call so queueing the unsubscribe ' +
+                 'request');
+      queueUnsubscribe();
+      setImmediate(function() {
+        reconnect(client);
+      });
+    }
   }
 
   logger.exit('Client.unsubscribe', client.id, client);
