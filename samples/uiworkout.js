@@ -217,7 +217,7 @@ function startClient(topic, share) {
       var sendTopic = allTopics[Math.floor(Math.random() * allTopics.length)];
       var sendCallback = function(err, msg) {
         if (err) {
-          console.err('Problem with send request: ' + err.message);
+          console.error('Problem with send request: ' + err.message);
           process.exit(0);
         } else {
           if (messageCount === 0) {
