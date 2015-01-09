@@ -1371,9 +1371,9 @@ Handle<Value> ProtonMessenger::Closed(const Arguments& args)
   Proton::Entry("ProtonMessenger::Closed", name);
 
   if (obj->messenger && obj->connection) {
-    Proton::Entry("pn_connection_closed", name);
-    pn_connection_closed(obj->messenger, obj->connection);
-    Proton::Exit("pn_connection_closed", name, 0);
+    Proton::Entry("pn_connection_was_closed", name);
+    pn_connection_was_closed(obj->messenger, obj->connection);
+    Proton::Exit("pn_connection_was_closed", name, 0);
 
     int error = pn_messenger_errno(obj->messenger);
     if (error) {

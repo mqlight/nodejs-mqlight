@@ -1158,7 +1158,7 @@ var Client = function(service, id, securityOptions) {
   };
 
   /**
-  * Function to listen for socket errors.
+  * Function to log socket errors.
   *
   * @this should be set to the client object.
   * @param {Error} err The error that occurred on the socket.
