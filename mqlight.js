@@ -3,13 +3,13 @@
  * <copyright
  * notice="lm-source-program"
  * pids="5725-P60"
- * years="2013,2014"
+ * years="2013,2015"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
  * 5725-P60
  *
- * (C) Copyright IBM Corp. 2013, 2014
+ * (C) Copyright IBM Corp. 2013, 2015
  *
  * US Government Users Restricted Rights - Use, duplication or
  * disclosure restricted by GSA ADP Schedule Contract with
@@ -68,6 +68,8 @@ var url = require('url');
 var fs = require('fs');
 var http = require('http');
 var https = require('https');
+var net = require('net');
+var tls = require('tls');
 
 var invalidClientIdRegex = /[^A-Za-z0-9%\/\._]+/;
 
@@ -463,7 +465,7 @@ exports.createClient = function(options, callback) {
 
     if (client && client.state === STATE_STARTED) {
       try {
-        client._messenger.send();
+        client._messenger.send(client._stream);
         client.stop();
       } catch (err) {
         logger.caught('createClient.on.exit', client.id, err);
@@ -1156,6 +1158,18 @@ var Client = function(service, id, securityOptions) {
   };
 
   /**
+  * Function to listen for socket errors.
+  *
+  * @this should be set to the client object.
+  * @param {Error} err The error that occurred on the socket.
+  */
+  this._socketError = function(err) {
+    logger.entry('Client._socketError', _id);
+    logger.log('error', _id, 'err:', err);
+    logger.exit('Client._socketError', _id, null);
+  };
+
+  /**
   * Function to connect to a service. Callback happens once a successful
   * connect/reconnect occurs.
   *
@@ -1192,10 +1206,10 @@ var Client = function(service, id, securityOptions) {
           auth = null;
         }
         var logUrl;
+        var serviceUrl = url.parse(service);
         // reparse the service url to prepend authentication information
         // back on as required
         if (auth) {
-          var serviceUrl = url.parse(service);
           service = serviceUrl.protocol + '//' + auth + serviceUrl.host;
           logUrl = serviceUrl.protocol + '//' +
                    auth.replace(/:[^\/:]+@/g, ':********@') + serviceUrl.host;
@@ -1266,32 +1280,166 @@ var Client = function(service, id, securityOptions) {
           logger.log('data', _id, 'failed to connect to: ' + logUrl +
                      ' due to error: ' + err);
 
+          // Deregister the connection error handler since we've failed to
+          // connect.
+          client._stream.removeListener('error', connError);
+          client._stream.on('error', client._socketError);
+
+          if (/ECONNREFUSED/.test(err)) {
+            // Convert ECONNREFUSED into a clearer error message.
+            err = new NetworkError('CONNECTION ERROR (' + serviceUrl.host +
+                '): Connect failure: The remote computer refused the network ' +
+                'connection.');
+          } else if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(err)) {
+            // Convert DEPTH_ZERO_SELF_SIGNED_CERT into a clearer error message.
+            err = new SecurityError('SSL Failure: certificate verify failed');
+          } else if (/CERT_HAS_EXPIRED/.test(err)) {
+            // Convert CERT_HAS_EXPIRED into a clearer error message.
+            err = new SecurityError('SSL Failure: certificate verify failed ' +
+                                    '- certificate has expired');
+          }
+
+          // Close our end of the socket, if we have one.
+          if (client._stream) {
+            client._stream.end();
+            client._stream = null;
+          }
+
           // This service failed to connect. Try the next one.
           tryNextService(err);
 
           logger.exit('Client._tryService.connError', _id, null);
         };
 
-        // Define a callback function that will be called once the stream has
-        // actually been connected.
-        var connected = function() {
-          logger.entry('Client._tryService.connected', _id);
+        // Define an on stream readable handler. Tell proton that the stream has
+        // data to be pushed in.
+        var dataAvailable = function(chunk) {
+          logger.entry('Client.dataAvailable', _id);
+
+          // Keep pushing data into proton until the whole chunk is pushed.
+          var pushed = 0;
+          while (chunk.length > 0) {
+            if (chunk instanceof String) {
+              // The chunk could be a string or a buffer. If it's a string
+              // convert it into a buffer that we can pass into proton.
+              var buffer = new Buffer(chunk);
+              logger.log('data', _id, 'string chunk length:', chunk.length);
+              chunk = buffer;
+            }
+
+            // Attempt to push the whole chunk into proton.
+            logger.log('data', _id, 'chunk length:', chunk.length);
+            var n = client._messenger.push(chunk.length, chunk);
+
+            // Update the total number of bytes we've pushed.
+            pushed += n;
+
+            if (n < chunk.length) {
+              if (client._stream) {
+                // A push into proton may mean data also needs to be written.
+                client._messenger.pop(client._stream, false);
+              }
+
+              if (n == 0) {
+                // If we failed to push anything in, then quit pushing now and
+                // schedule work to happen again shortly.
+                logger.log('debug', _id, 'retrying ' + chunk.length +
+                           ' bytes');
+                setImmediate(dataAvailable, chunk, 10);
+                break;
+              }
+
+              // Remove the pushed part of the chunk.
+              chunk = chunk.slice(n);
+            } else {
+              // Check if there is any more data to be read before we continue.
+              logger.log('debug', _id, 'checking for more data on stream');
+              if (client._stream) {
+                chunk = client._stream.read();
+
+                if (!chunk) {
+                  // Write any pending data.
+                  client._messenger.pop(client._stream, false);
+
+                  // Schedule this function to be called again once more data is
+                  // available.
+                  client._stream.once('data', dataAvailable);
+                  break;
+                }
+              } else {
+                break;
+              }
+            }
+          }
+
+          // If data has been read, messages may have arrived, so perform
+          // a check.
+          if (client._subscriptions.length > 0) {
+            setImmediate(function() {
+              if (client.state === STATE_STARTED) {
+                client.checkForMessages.apply(client);
+              }
+            });
+          }
+
+          logger.exit('Client.dataAvailable', _id, pushed);
+        };
+
+        // Define an on stream drain handler. Check if proton has further data
+        // to be written to the stream.
+        var dataDrained = function() {
+          logger.entry('Client.dataDrained', _id);
+          var drained = client._messenger.pop(client._stream, false);
+          logger.exit('Client.dataDrained', _id, drained);
+        };
+
+        // Define an on stream close handler. Notify proton of the close.
+        var streamClosed = function(had_error) {
+          logger.entry('Client.streamClosed', _id);
 
           try {
-            client._messenger.connect(connectUrl,
-                                      securityOptions.sslTrustCertificate,
-                                      securityOptions.sslVerifyName,
-                                      null);
+            client._messenger.closed();
           } catch (err) {
             error = getNamedError(err);
-            logger.caught('Client._tryService.connected', _id, error);
+            logger.caught('Client.streamClosed', _id, error);
+            process.nextTick(function() {
+              logger.log('emit', _id, 'error', error);
+              client.emit('error', error);
+              if (shouldReconnect(error)) {
+                reconnect(client);
+              }
+            });
+          }
+
+          // Force any final data from the messenger, which may give it the
+          // chance to close any connections.
+          client._messenger.pop(client._stream, true);
+
+          logger.exit('Client.streamClosed', _id, had_error);
+        };
+
+        // Define a function that we can keep calling until the messenger has
+        // actually started.
+        var waitForStart = function() {
+          logger.entry('Client._tryService.waitForStart', _id);
+
+          try {
+            if (!client._messenger.started) {
+              setImmediate(function() {
+                waitForStart.call(client);
+              });
+              logger.exit('Client._tryService.waitForStart', _id, false);
+              return false;
+            }
+          } catch (err) {
+            error = getNamedError(err);
+            logger.caught('Client._tryService.waitForStart', _id, error);
             connError(error);
-            logger.exit('Client._tryService.connected', _id, null);
+            logger.exit('Client._tryService.waitForStart', _id, false);
             return;
           }
 
-          logger.log('data', _id, 'successfully connected to: ' +
-              logUrl);
+          logger.log('data', _id, 'successfully started:', logUrl);
           _service = serviceList[0];
 
           // Indicate that we're started
@@ -1328,14 +1476,14 @@ var Client = function(service, id, securityOptions) {
                      heartbeatInterval);
           if (heartbeatInterval > 0) {
             var performHeartbeat = function(client, heartbeatInterval) {
-              logger.entry('Client._tryService.connected.performHeartbeat',
+              logger.entry('Client._tryService.waitForStart.performHeartbeat',
                            _id);
               if (client._messenger) {
-                client._messenger.work(0);
+                client._messenger.pop(client._stream, true);
                 client.heartbeatTimeout = setTimeout(performHeartbeat,
                     heartbeatInterval, client, heartbeatInterval);
               }
-              logger.exit('Client._tryService.connected.performHeartbeat',
+              logger.exit('Client._tryService.waitForStart.performHeartbeat',
                           _id, null);
             };
             client.heartbeatTimeout = setTimeout(performHeartbeat,
@@ -1343,12 +1491,99 @@ var Client = function(service, id, securityOptions) {
                                                  client, heartbeatInterval);
           }
 
+          logger.exit('Client._tryService.waitForStart', _id, true);
+        };
+
+        // Define a callback function that will be called once the stream has
+        // actually been connected.
+        var connected = function() {
+          logger.entry('Client._tryService.connected', _id);
+
+          if (connectUrl.protocol === 'amqps:') {
+            // For secure connections, check that an authorization error didn't
+            // occur.
+            if (!client._stream.authorized) {
+              var authError =
+                  new SecurityError(client._stream.authorizationError);
+              logger.log('data', _id, 'authorization error occurred:',
+                         authError);
+
+              // Self-signed certificates will produce an authorization failure.
+              // We allow them if a trust certificate was not provided.
+              if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(authError)) {
+                if (typeof securityOptions.sslTrustCertificate !==
+                    'undefined') {
+                  connError(authError);
+                  logger.exit('Client._tryService.connected', _id, null);
+                  return;
+                }
+                logger.log('data', _id, 'permitting self-signed certificate');
+              }
+              // We allow hostname mismatches whereas node won't.
+              else if (authError.message ===
+                  'Hostname/IP doesn\'t match certificate\'s altnames') {
+                logger.log('data', _id,
+                           'permitting certificate with hostname mismatch');
+              } else {
+                connError(authError);
+                logger.exit('Client._tryService.connected', _id, null);
+                return;
+              }
+            }
+          }
+
+          // Deregister the connection error handler since we're connected.
+          client._stream.removeListener('error', connError);
+          client._stream.on('error', client._socketError);
+
+          try {
+            client._messenger.connect(connectUrl);
+          } catch (err) {
+            error = getNamedError(err);
+            logger.caught('Client._tryService.connected', _id, error);
+            connError(error);
+            logger.exit('Client._tryService.connected', _id, null);
+            return;
+          }
+
+          logger.log('data', _id, 'successfully connected to:', logUrl);
+
+          // Pass any data to proton.
+          client._messenger.pop(client._stream, false);
+
+          // Wait for the messenger to have started.
+          waitForStart.call(client);
+
           logger.exit('Client._tryService.connected', _id, null);
         };
 
-        process.nextTick(function() {
-          connected.call(client);
-        });
+        if (process.env.NODE_ENV === 'unittest') {
+          // If the unit tests are being run, then don't really connect.
+          logger.log('debug', _id, 'connecting via stub');
+          client._stream = proton.connect({}, connected);
+        } else if (serviceUrl.protocol === 'amqps:') {
+          // If the amqps protocol is being used, then do a tls connect.
+          logger.log('debug', _id, 'connecting via tls');
+          client._stream = tls.connect({
+            host: serviceUrl.hostname,
+            port: serviceUrl.port,
+            rejectUnauthorized: false,
+            ca: (typeof securityOptions.sslTrustCertificate !== 'undefined') ?
+                [fs.readFileSync(securityOptions.sslTrustCertificate)] :
+                undefined}, connected);
+        } else {
+          // Otherwise do a standard net connect.
+          // In all cases we register a connected callback, and an error
+          // handler.
+          logger.log('debug', _id, 'connecting via net');
+          client._stream = net.connect({
+            host: serviceUrl.hostname,
+            port: serviceUrl.port}, connected);
+        }
+        client._stream.on('error', connError);
+        client._stream.on('drain', dataDrained);
+        client._stream.on('close', streamClosed);
+        client._stream.once('data', dataAvailable);
       } catch (err) {
         // should never get here, as it means that messenger.connect has been
         // called in an invalid way, so FFDC
@@ -1460,7 +1695,9 @@ var Client = function(service, id, securityOptions) {
   // Set the initial state to starting
   _state = STATE_STARTING;
   _service = null;
-  // the first start, set to false after start and back to true on stop
+  // The stream associated with the client
+  this._stream = null;
+  // The first start, set to false after start and back to true on stop
   this._firstStart = true;
   // List of callbacks to notify when a start operation completes
   this._queuedStartCallbacks = [];
@@ -1601,7 +1838,7 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
   // If messenger available then request it to stop
   // (otherwise it must have already been stopped)
   if (client._messenger) {
-    stopped = client._messenger.stop();
+    stopped = client._messenger.stop(client._stream);
   }
 
   // If stopped then perform the required stop processing
@@ -1701,6 +1938,11 @@ Client.prototype.stop = function(callback) {
                    client._subscriptions);
         while (client._subscriptions.length > 0) {
           client._subscriptions.shift();
+        }
+        // Close our end of the socket
+        if (client._stream) {
+          client._stream.end();
+          client._stream = null;
         }
         // Indicate that we've disconnected
         client._setState(STATE_STOPPED);
@@ -1817,6 +2059,11 @@ var reconnect = function(client) {
       callback: processQueuedActions,
       create: false
     });
+    // Close our end of the socket
+    if (client._stream) {
+      client._stream.end();
+      client._stream = null;
+    }
     client._performConnect.apply(client, [false]);
 
     logger.exit('Client.reconnect.stopProcessing', client.id, null);
@@ -1854,58 +2101,116 @@ var processQueuedActions = function(err) {
   logger.log('data', client.id, 'client.state:', client.state);
 
   if (!err) {
-    logger.log('data', client.id, 'client._queuedSubscriptions',
-               client._queuedSubscriptions);
-    while (client._queuedSubscriptions.length > 0 &&
-            client.state === STATE_STARTED) {
-      var sub = client._queuedSubscriptions.shift();
-      if (sub.noop) {
-        // no-op, so just trigger the callback without actually subscribing
-        if (sub.callback) {
-          process.nextTick(function() {
-            logger.entry('processQueuedActions.callback', client.id);
-            logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-                       sub.topicPattern, ', originalShareValue:', sub.share);
-            sub.callback.apply(client,
-                [err, sub.topicPattern, sub.originalShareValue]);
-            logger.exit('processQueuedActions.callback', client.id, null);
+    var performSend = function() {
+      logger.entry('performSend', client.id);
+      logger.log('data', client.id, 'client._queuedSends',
+                 client._queuedSends);
+      while (client._queuedSends.length > 0 &&
+              client.state === STATE_STARTED) {
+        var remaining = client._queuedSends.length;
+        var msg = client._queuedSends.shift();
+        client.send(msg.topic, msg.data, msg.options, msg.callback);
+        if (client._queuedSends.length >= remaining) {
+          // Calling client.send can cause messages to be added back into
+          // _queuedSends, if the network connection is broken.  Check that the
+          // size of the array is decreasing to avoid looping forever...
+          break;
+        }
+      }
+
+      logger.exit('performSend', client.id, null);
+    };
+
+    var performUnsub = function() {
+      logger.entry('performUnsub', client.id);
+
+      if (client._queuedUnsubscribes.length > 0 &&
+          client.state === STATE_STARTED) {
+        var rm = client._queuedUnsubscribes.shift();
+        logger.log('data', client.id, 'rm:', rm);
+        if (rm.noop) {
+          // no-op, so just trigger the callback without actually unsubscribing
+          if (rm.callback) {
+            logger.entry('performUnsub.callback', client.id);
+            rm.callback.apply(client, [null, rm.topicPattern, rm.share]);
+            logger.exit('performUnsub.callback', client.id, null);
+          }
+          setImmediate(function() {
+            performUnsub.apply(client);
           });
+        } else {
+          client.unsubscribe(rm.topicPattern, rm.share, rm.options,
+              function(err, topicPattern, share) {
+                if (rm.callback) {
+                  logger.entry('performUnsub.callback', client.id);
+                  rm.callback.apply(client, [err, rm.topicPattern, rm.share]);
+                  logger.exit('performUnsub.callback', client.id, null);
+                }
+                setImmediate(function() {
+                  performUnsub.apply(client);
+                });
+              }
+          );
         }
       } else {
-        client.subscribe(sub.topicPattern, sub.share, sub.options,
-                         sub.callback);
+        performSend.apply(client);
       }
-    }
-    logger.log('data', client.id, 'client._queuedUnsubscribes',
-               client._queuedUnsubscribes);
-    while (client._queuedUnsubscribes.length > 0 &&
-            client.state === STATE_STARTED) {
-      var rm = client._queuedUnsubscribes.shift();
-      if (rm.noop) {
-        // no-op, so just trigger the callback without actually unsubscribing
-        if (rm.callback) {
-          logger.entry('processQueuedActions.callback', client.id);
-          rm.callback.apply(client, [null, rm.topicPattern, rm.share]);
-          logger.exit('processQueuedActions.callback', client.id, null);
+
+      logger.exit('performUnsub', client.id, null);
+    };
+
+    var performSub = function() {
+      logger.entry('performSub', client.id);
+
+      if (client._queuedSubscriptions.length > 0 &&
+          client.state === STATE_STARTED) {
+        var sub = client._queuedSubscriptions.shift();
+        logger.log('data', client.id, 'sub:', sub);
+        if (sub.noop) {
+          // no-op, so just trigger the callback without actually subscribing
+          if (sub.callback) {
+            process.nextTick(function() {
+              logger.entry('performSub.callback', client.id);
+              logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+                         sub.topicPattern, ', originalShareValue:', sub.share);
+              sub.callback.apply(client,
+                  [err, sub.topicPattern, sub.originalShareValue]);
+              logger.exit('performSub.callback', client.id, null);
+            });
+          }
+          setImmediate(function() {
+            performSub.apply(client);
+          });
+        } else {
+          client.subscribe(sub.topicPattern, sub.share, sub.options,
+              function(err, topicPattern, share) {
+                if (sub.callback) {
+                  process.nextTick(function() {
+                    logger.entry('performSub.callback',
+                                 client.id);
+                    logger.log('parms', client.id, 'err:', err,
+                               ', topicPattern:', sub.topicPattern,
+                               ', originalShareValue:', sub.share);
+                    sub.callback.apply(client,
+                        [err, sub.topicPattern, sub.originalShareValue]);
+                    logger.exit('performSub.callback',
+                                client.id, null);
+                  });
+                }
+                setImmediate(function() {
+                  performSub.apply(client);
+                });
+              }
+          );
         }
       } else {
-        client.unsubscribe(rm.topicPattern, rm.share, rm.options, rm.callback);
+        performUnsub.apply(client);
       }
-    }
-    logger.log('data', client.id, 'client._queuedSends',
-               client._queuedSends);
-    while (client._queuedSends.length > 0 &&
-            client.state === STATE_STARTED) {
-      var remaining = client._queuedSends.length;
-      var msg = client._queuedSends.shift();
-      client.send(msg.topic, msg.data, msg.options, msg.callback);
-      if (client._queuedSends.length >= remaining) {
-        // Calling client.send can cause messages to be added back into
-        // _queuedSends, if the network connection is broken.  Check that the
-        // size of the array is decreasing to avoid looping forever...
-        break;
-      }
-    }
+
+      logger.exit('performSub', client.id, null);
+    };
+
+    performSub();
   }
   logger.exit('processQueuedActions', client.id, null);
 };
@@ -2105,7 +2410,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     inOutstandingSends = true;
 
     messenger.put(protonMsg, qos);
-    messenger.send();
+    messenger.send(client._stream);
 
     if (client._outstandingSends.length === 1) {
       var sendOutboundMessages = function() {
@@ -2116,12 +2421,8 @@ Client.prototype.send = function(topic, data, options, callback) {
           var inFlight;
           if (!messenger.stopped) {
             // Write any data buffered within messenger
-            var tries = 50;
-            while (tries-- > 0 &&
-                   messenger.pendingOutbound(client._getService())) {
-              messenger.send();
-            }
-            if (tries === 0) {
+            messenger.pop(client._stream, false);
+            if (messenger.pendingOutbound(client._getService())) {
               logger.log('debug', client.id, 'output still pending!');
             }
 
@@ -2137,7 +2438,7 @@ Client.prototype.send = function(topic, data, options, callback) {
                 switch (status) {
                   case PN_STATUS_ACCEPTED:
                   case PN_STATUS_SETTLED:
-                    messenger.settle(inFlight.msg);
+                    messenger.settle(inFlight.msg, client._stream);
                     complete = true;
                     break;
                   case PN_STATUS_REJECTED:
@@ -2161,7 +2462,7 @@ Client.prototype.send = function(topic, data, options, callback) {
                     err = new Error('send failed - message was aborted');
                     break;
                   case PN_STATUS_PENDING:
-                    messenger.send();
+                    messenger.send(client._stream);
                     break;
                 }
               }
@@ -2380,7 +2681,7 @@ Client.prototype.checkForMessages = function() {
   var err;
 
   try {
-    var messages = messenger.receive(50);
+    var messages = messenger.receive(client._stream);
     if (messages.length > 0) {
       logger.log('debug', client.id, 'received %d messages', messages.length);
 
@@ -2389,10 +2690,10 @@ Client.prototype.checkForMessages = function() {
         var protonMsg = messages[msg];
         processMessage(client, protonMsg);
         if (msg < (tot - 1)) {
-          // Unless this is the last pass around the loop, call work() so that
+          // Unless this is the last pass around the loop, call pop() so that
           // Messenger has a chance to respond to any heartbeat requests
           // that may have arrived from the server.
-          client._messenger.work(0);
+          client._messenger.pop(client._stream, true);
         }
       }
     }
@@ -2409,12 +2710,6 @@ Client.prototype.checkForMessages = function() {
   }
 
   logger.exitLevel('exit_often', 'checkForMessages', client.id, null);
-
-  setImmediate(function() {
-    if (client.state === STATE_STARTED) {
-      client.checkForMessages.apply(client);
-    }
-  });
 };
 
 var processMessage = function(client, protonMsg) {
@@ -2491,16 +2786,54 @@ var processMessage = function(client, protonMsg) {
     }
   };
 
+
+  var stillSettling = function(subscription, protonMsg) {
+    var client = this;
+    logger.entryLevel('entry_often', 'processMessage.stillSettling', client.id);
+
+    var settled = messenger.settled(protonMsg);
+    if (settled) {
+      --subscription.unconfirmed;
+      ++subscription.confirmed;
+      logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
+          '[' + subscription.credit + ',' +
+          subscription.unconfirmed + ',' +
+          subscription.confirmed + ']');
+      // Ask to flow more messages if >= 80% of available credit
+      // (e.g. not including unconfirmed messages) has been used.
+      // Or if we have just confirmed everything.
+      var available = subscription.credit - subscription.unconfirmed;
+      if ((available / subscription.confirmed) <= 1.25 ||
+          (subscription.unconfirmed === 0 &&
+          subscription.confirmed > 0)) {
+        messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
+                             subscription.confirmed, client._stream);
+        subscription.confirmed = 0;
+      }
+      protonMsg.destroy();
+      protonMsg = null;
+    } else {
+      setImmediate(function() {
+        stillSettling.call(client, subscription, protonMsg);
+      });
+    }
+
+    logger.exitLevel('exit_often', 'processMessage.stillSettling',
+                     client.id, !settled);
+  };
+
   if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
+    var deliveryConfirmed = false;
     delivery.message.confirmDelivery = function() {
       logger.entry('message.confirmDelivery', client.id);
       logger.log('data', client.id, 'delivery:', delivery);
+      logger.log('data', client.id, 'deliveryConfirmed:', deliveryConfirmed);
       if (client.isStopped()) {
         err = new NetworkError('not started');
         logger.throw('message.confirmDelivery', client.id, err);
         throw err;
       }
-      if (protonMsg) {
+      if (!deliveryConfirmed && protonMsg) {
         // also throw NetworkError if the client has
         // disconnected at some point since this particular message was
         // received
@@ -2510,26 +2843,9 @@ var processMessage = function(client, protonMsg) {
           logger.throw('message.confirmDelivery', client.id, err);
           throw err;
         }
-        messenger.settle(protonMsg);
-        --subscription.unconfirmed;
-        ++subscription.confirmed;
-        logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
-            '[' + subscription.credit + ',' +
-            subscription.unconfirmed + ',' +
-            subscription.confirmed + ']');
-        // Ask to flow more messages if >= 80% of available credit
-        // (e.g. not including unconfirmed messages) has been used.
-        // Or we have just confirmed everything.
-        var available = subscription.credit - subscription.unconfirmed;
-        if ((available / subscription.confirmed) <= 1.25 ||
-            (subscription.unconfirmed === 0 &&
-            subscription.confirmed > 0)) {
-          messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
-                               subscription.confirmed);
-          subscription.confirmed = 0;
-        }
-        protonMsg.destroy();
-        protonMsg = null;
+        deliveryConfirmed = true;
+        messenger.settle(protonMsg, client._stream);
+        stillSettling.call(client, subscription, protonMsg);
       }
       logger.exit('message.confirmDelivery', client.id, null);
     };
@@ -2609,25 +2925,8 @@ var processMessage = function(client, protonMsg) {
       messenger.accept(protonMsg);
     }
     if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
-      messenger.settle(protonMsg);
-      --subscription.unconfirmed;
-      ++subscription.confirmed;
-      logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
-          '[' + subscription.credit + ',' +
-          subscription.unconfirmed + ',' +
-          subscription.confirmed + ']');
-      // Ask to flow more messages if >= 80% of available credit
-      // (e.g. not including unconfirmed messages) has been used.
-      // Or we have just confirmed everything.
-      var available = subscription.credit - subscription.unconfirmed;
-      if ((available / subscription.confirmed <= 1.25) ||
-          (subscription.unconfirmed === 0 &&
-          subscription.confirmed > 0)) {
-        messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
-                             subscription.confirmed);
-        subscription.confirmed = 0;
-      }
-      protonMsg.destroy();
+      messenger.settle(protonMsg, client._stream);
+      stillSettling.call(client, subscription, protonMsg);
     }
   }
   logger.exitLevel('exit_often', 'processMessage', client.id, null);
@@ -2855,73 +3154,102 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
   }
 
-  if (!err) {
-    try {
-      messenger.subscribe(address, qos, ttl, credit);
-    } catch (e) {
-      logger.caught('Client.subscribe', client.id, e);
-      err = getNamedError(e);
+  var finishedSubscribing = function(err, callback) {
+    logger.entry('Client.subscribe.finishedSubscribing', client.id);
+    logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+               topicPattern);
+
+    if (callback) {
+      process.nextTick(function() {
+        logger.entry('Client.subscribe.finishedSubscribing.callback',
+                     client.id);
+        logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+                   topicPattern, ', originalShareValue:', originalShareValue);
+        callback.apply(client, [err, topicPattern, originalShareValue]);
+        logger.exit('Client.subscribe.finishedSubscribing.callback',
+                    client.id, null);
+      });
     }
-  }
 
-  if (callback) {
-    process.nextTick(function() {
-      logger.entry('Client.subscribe.callback', client.id);
-      logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-                 topicPattern, ', originalShareValue:', originalShareValue);
-      callback.apply(client, [err, topicPattern, originalShareValue]);
-      logger.exit('Client.subscribe.callback', client.id, null);
-    });
-  }
-
-  if (err) {
-    setImmediate(function() {
-      logger.log('emit', client.id, 'error', err);
-      client.emit('error', err);
-    });
-    if (shouldReconnect(err)) {
-      logger.log('data', client.id, 'queued subscription and calling ' +
-                 'reconnect');
-      // error during subscribe so add to list of queued to resub
-      client._queuedSubscriptions.push({
+    if (err) {
+      setImmediate(function() {
+        logger.log('emit', client.id, 'error', err);
+        client.emit('error', err);
+      });
+      if (shouldReconnect(err)) {
+        logger.log('data', client.id, 'queued subscription and calling ' +
+                   'reconnect');
+        // error during subscribe so add to list of queued to resub
+        client._queuedSubscriptions.push({
+          address: subscriptionAddress,
+          qos: qos,
+          autoConfirm: autoConfirm,
+          topicPattern: topicPattern,
+          share: originalShareValue,
+          options: options,
+          callback: callback
+        });
+        // schedule a reconnect
+        setImmediate(function() {
+          reconnect(client);
+        });
+      }
+    } else {
+      // if no errors, add this to the stored list of subscriptions
+      client._subscriptions.push({
         address: subscriptionAddress,
         qos: qos,
         autoConfirm: autoConfirm,
         topicPattern: topicPattern,
         share: originalShareValue,
         options: options,
-        callback: callback
+        callback: callback,
+        credit: credit,
+        unconfirmed: 0,
+        confirmed: 0
       });
-      // schedule a reconnect
+    }
+
+    logger.exit('Client.subscribe.finishedSubscribing', client.id, null);
+  };
+
+  if (!err) {
+    try {
+      messenger.subscribe(address, qos, ttl, client._stream);
+
+      var stillSubscribing = function(client, callback) {
+        logger.entry('Client.subscribe.stillSubscribing', client.id);
+
+        try {
+          if (!messenger.subscribed(address)) {
+            setImmediate(function() {
+              stillSubscribing(client, callback);
+            });
+          } else {
+            if (credit > 0) {
+              messenger.flow(address, credit, client._stream);
+            }
+            finishedSubscribing(null, callback);
+          }
+        } catch (e) {
+          logger.caught('Client.subscribe.stillSubscribing', client.id, e);
+          err = getNamedError(e);
+          finishedSubscribing(err, callback);
+        }
+
+        logger.exit('Client.subscribe.stillSubscribing', client.id, null);
+      };
+
       setImmediate(function() {
-        reconnect(client);
+        stillSubscribing(client, callback);
       });
+    } catch (e) {
+      logger.caught('Client.subscribe', client.id, e);
+      err = getNamedError(e);
+      finishedSubscribing(err, callback);
     }
   } else {
-    // if no errors, add this to the stored list of subscriptions
-    var isFirstSub = (client._subscriptions.length === 0);
-    logger.log('data', client.id, 'isFirstSub:', isFirstSub);
-
-    client._subscriptions.push({
-      address: subscriptionAddress,
-      qos: qos,
-      autoConfirm: autoConfirm,
-      topicPattern: topicPattern,
-      share: originalShareValue,
-      options: options,
-      callback: callback,
-      credit: credit,
-      unconfirmed: 0,
-      confirmed: 0
-    });
-
-    // If this is the first subscription to be added, schedule a request to
-    // start the polling loop to check for messages arriving
-    if (isFirstSub) {
-      setImmediate(function() {
-        client.checkForMessages.apply(client);
-      });
-    }
+    finishedSubscribing(err, callback);
   }
 
   logger.exit('Client.subscribe', client.id, client);
@@ -3129,41 +3457,82 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     throw err;
   }
 
-  // unsubscribe using the specified topic pattern and share options
-  try {
-    messenger.unsubscribe(address, ttl);
+  var finishedUnsubscribing = function(err, callback) {
+    logger.entry('Client.unsubscribe.finishedUnsubscribing', client.id);
+    logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+               topicPattern);
 
     if (callback) {
       setTimeout(function() {
-        logger.entry('Client.unsubscribe.callback', client.id);
-        callback.apply(client, [null, topicPattern, originalShareValue]);
-        logger.exit('Client.unsubscribe.callback', client.id, null);
+        logger.entry('Client.unsubscribe.finishedUnsubscribing.callback',
+                     client.id);
+        logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+                   topicPattern, ', originalShareValue:', originalShareValue);
+        callback.apply(client, [err, topicPattern, originalShareValue]);
+        logger.exit('Client.unsubscribe.finishedUnsubscribing.callback',
+                    client.id, null);
       }, 100);
     }
-    // if no errors, remove this from the stored list of subscriptions
-    for (i = 0; i < client._subscriptions.length; i++) {
-      if (client._subscriptions[i].address === subscriptionAddress &&
-          client._subscriptions[i].share === originalShareValue) {
-        client._subscriptions.splice(i, 1);
-        break;
+
+    if (err) {
+      setImmediate(function() {
+        logger.log('emit', client.id, 'error', err);
+        client.emit('error', err);
+      });
+      if (shouldReconnect(err)) {
+        logger.log('data', client.id, 'client error "' + err + '" during ' +
+                   'messenger.unsubscribe call so queueing the unsubscribe ' +
+                   'request');
+        queueUnsubscribe();
+        setImmediate(function() {
+          reconnect(client);
+        });
+      }
+    } else {
+      // if no errors, remove this from the stored list of subscriptions
+      for (i = 0; i < client._subscriptions.length; i++) {
+        if (client._subscriptions[i].address === subscriptionAddress &&
+            client._subscriptions[i].share === originalShareValue) {
+          client._subscriptions.splice(i, 1);
+          break;
+        }
       }
     }
-  } catch (e) {
-    err = getNamedError(e);
-    logger.caught('Client.unsubscribe', client.id, err);
+
+    logger.exit('Client.unsubscribe.finishedUnsubscribing', client.id, null);
+  };
+
+  // unsubscribe using the specified topic pattern and share options
+  try {
+    messenger.unsubscribe(address, ttl, client._stream);
+
+    var stillUnsubscribing = function(client, callback) {
+      logger.entry('Client.unsubscribe.stillUnsubscribing', client.id);
+
+      try {
+        if (!messenger.unsubscribed(address)) {
+          setImmediate(function() {
+            stillUnsubscribing(client, callback);
+          });
+        } else {
+          finishedUnsubscribing(null, callback);
+        }
+      } catch (e) {
+        logger.caught('Client.unsubscribe.stillUnsubscribing', client.id, e);
+        err = getNamedError(e);
+        finishedUnsubscribing(err, callback);
+      }
+
+      logger.exit('Client.unsubscribe.stillUnsubscribing', client.id, null);
+    };
+
     setImmediate(function() {
-      logger.log('emit', client.id, 'error', err);
-      client.emit('error', err);
+      stillUnsubscribing(client, callback);
     });
-    if (shouldReconnect(err)) {
-      logger.log('data', client.id, 'client error "' + err + '" during ' +
-                 'messenger.unsubscribe call so queueing the unsubscribe ' +
-                 'request');
-      queueUnsubscribe();
-      setImmediate(function() {
-        reconnect(client);
-      });
-    }
+  } catch (e) {
+    logger.caught('Client.unsubscribe', client.id, e);
+    err = getNamedError(e);
+    finishedUnsubscribing(err, callback);
   }
 
   logger.exit('Client.unsubscribe', client.id, client);

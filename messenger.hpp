@@ -74,10 +74,16 @@ class ProtonMessenger : public node::ObjectWrap
   static v8::Handle<v8::Value> Settle(const v8::Arguments& args);
   static v8::Handle<v8::Value> Settled(const v8::Arguments& args);
   static v8::Handle<v8::Value> GetRemoteIdleTimeout(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Work(const v8::Arguments& args);
   static v8::Handle<v8::Value> Flow(const v8::Arguments& args);
   static v8::Handle<v8::Value> PendingOutbound(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Push(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Pop(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Started(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Closed(const v8::Arguments& args);
+
   static void Tracer(pn_transport_t* transport, const char* message);
+  static v8::Handle<v8::Value> Write(ProtonMessenger* obj,
+                                     v8::Local<v8::Value> value, bool force);
 
   /**
    * Name for the messenger. Initially this will be set to the value passed to
@@ -103,6 +109,12 @@ class ProtonMessenger : public node::ObjectWrap
    * called and unset when stop is called.
    */
   pn_messenger_t* messenger;
+
+  /**
+   * Points to the underlying proton connection. This will be set
+   * when Connect is called and unset when Stop is called.
+   */
+  pn_connection_t* connection;
 };
 
 #endif /* MESSENGER_HPP */
