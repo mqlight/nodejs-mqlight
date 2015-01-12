@@ -127,6 +127,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "pop", Pop);
   NODE_SET_PROTOTYPE_METHOD(constructor, "started", Started);
   NODE_SET_PROTOTYPE_METHOD(constructor, "closed", Closed);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "heartbeat", Heartbeat);
 
   tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
 
@@ -1384,5 +1385,24 @@ Handle<Value> ProtonMessenger::Closed(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Closed", name, 0);
+  return scope.Close(Undefined());
+}
+
+Handle<Value> ProtonMessenger::Heartbeat(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+  Proton::Entry("ProtonMessenger::Heartbeat", name);
+
+  // throw TypeError if not enough args
+  if (args.Length() < 2 || args[0].IsEmpty()) {
+    THROW_EXCEPTION("Missing stream argument.",
+                    "ProtonMessenger::Heartbeat", name);
+  }
+
+  ProtonMessenger::Write(obj, args[0], true);
+
+  Proton::Exit("ProtonMessenger::Heartbeat", name, 0);
   return scope.Close(Undefined());
 }

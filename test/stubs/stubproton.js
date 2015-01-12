@@ -232,21 +232,29 @@ module.exports.createProtonStub = function() {
                        address);
         return false;
       },
+      pushCount: 0,
       push: function(length, chunk) {
-        var result = Math.floor(Math.random() * (length+1));
+        var result = length;
+        if (++this.pushCount === 5) {
+          result--;
+        } else if (this.pushCount === 6) {
+          this.pushCount = 0;
+          result = 0;
+        }
         if (DEBUG) log('stub push function called, returning:', result);
         return result;
       },
       pop: function(stream, force) {
-        if (DEBUG) log('stub pop function called');
-        if (force) {
-          if (workCallback) workCallback.apply();
-        }
+        if (DEBUG) log('stub pop function called with force: ' + force);
         return 0;
       },
       closed: function() {
         if (DEBUG) log('stub closed function called');
         return 0;
+      },
+      heartbeat: function() {
+        if (DEBUG) log('stub heartbeat function called');
+        if (workCallback) workCallback.apply();
       }
     },
 
