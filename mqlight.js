@@ -1169,6 +1169,81 @@ var Client = function(service, id, securityOptions) {
     logger.exit('Client._socketError', _id, null);
   };
 
+  // Push the queue of chunks into proton.
+  this._pushChunks = function() {
+    var client = this;
+    var pushed = 0;
+    logger.entry('Client._pushChunks', _id);
+
+    // Allow further calls to be scheduled.
+    if (client.pushTimeout) {
+      // If we previously set a timeout to process the chunks, clear it.
+      clearTimeout(client.pushTimeout);
+    }
+    client.pushTimeout = null;
+
+    // Build up a merged buffer of all the chunks
+    logger.log('data', _id, '_queuedChunks.length:',
+               client._queuedChunks.length, '_queuedChunksSize:',
+               client._queuedChunksSize);
+    if (client._queuedChunks.length > 0) {
+      var chunk = Buffer.concat(client._queuedChunks,
+                                client._queuedChunksSize);
+      client._queuedChunks = [];
+      client._queuedChunksSize = 0;
+
+      // Keep pushing data into proton until the whole chunk is pushed.
+      while (chunk.length > 0) {
+        // Attempt to push the whole chunk into proton.
+        logger.log('data', _id, 'chunk length:', chunk.length);
+        var n = client._messenger.push(chunk.length, chunk);
+
+        if (n < chunk.length) {
+          if (n <= 0) {
+            // If we failed to push anything in, then quit pushing now and
+            // schedule work to happen again shortly.
+            logger.log('debug', _id, 'retrying later');
+            client._queuedChunks.push(chunk);
+            client._queuedChunksSize = chunk.length;
+            client._messenger.pop(client._stream, true);
+            setImmediate(function() {
+              client._pushChunks.call(client);
+            });
+            logger.exit('Client._pushChunks', _id, pushed);
+            return;
+          } else {
+            // A push into proton may mean data also needs to be written.
+            pushed += n;
+            client._messenger.pop(client._stream, false);
+          }
+
+          // Remove the pushed part of the chunk.
+          chunk = chunk.slice(n);
+        } else {
+          // This chunk has been fully dealt with.
+          pushed += n;
+          break;
+        }
+      }
+
+      // A push into proton may mean data also needs to be written. Force
+      // a messenger tick.
+      client._messenger.pop(client._stream, true);
+    }
+
+    // If data has been read, messages may have arrived, so perform
+    // a check.
+    if (client._subscriptions.length > 0) {
+      setImmediate(function() {
+        if (client.state === STATE_STARTED) {
+          client.checkForMessages.apply(client);
+        }
+      });
+    }
+
+    logger.exit('Client._pushChunks', _id, pushed);
+  };
+
   /**
   * Function to connect to a service. Callback happens once a successful
   * connect/reconnect occurs.
@@ -1333,87 +1408,17 @@ var Client = function(service, id, securityOptions) {
           // so push them immediately, whereas larger chunks may simply be part
           // of a larger message.
           if ((chunk.length < 1024)) {
-            if (client.pushTimeout) {
-              // If we previously set a timeout to process the chunks, clear it.
-              clearTimeout(client.pushTimeout);
-            }
-            pushChunks();
+            client._pushChunks.call(client);
           } else {
             // Allow more time for chunks to arrive before we process them.
             if (!client.pushTimeout) {
-              client.pushTimeout = setTimeout(pushChunks, 50);
+              client.pushTimeout = setTimeout(function() {
+                client._pushChunks.call(client);
+              }, 50);
             }
           }
 
           logger.exitLevel('exit_often', 'Client.dataAvailable', _id, null);
-        };
-
-        // Push the queue of chunks into proton.
-        var pushChunks = function() {
-          var pushed = 0;
-          logger.entry('Client.pushChunks', _id);
-
-          // Allow further calls to be scheduled.
-          client.pushTimeout = null;
-
-          // Build up a merged buffer of all the chunks
-          logger.log('data', _id, '_queuedChunks.length:',
-                     client._queuedChunks.length, '_queuedChunksSize:',
-                     client._queuedChunksSize);
-          if (client._queuedChunks.length > 0) {
-            var chunk = Buffer.concat(client._queuedChunks,
-                                      client._queuedChunksSize);
-            client._queuedChunks = [];
-            client._queuedChunksSize = 0;
-
-            // Keep pushing data into proton until the whole chunk is pushed.
-            while (chunk.length > 0) {
-              // Attempt to push the whole chunk into proton.
-              logger.log('data', _id, 'chunk length:', chunk.length);
-              var n = client._messenger.push(chunk.length, chunk);
-
-              if (n < chunk.length) {
-                if (n <= 0) {
-                  // If we failed to push anything in, then quit pushing now and
-                  // schedule work to happen again shortly.
-                  logger.log('debug', _id, 'retrying later');
-                  client._queuedChunks.push(chunk);
-                  client._queuedChunksSize = chunk.length;
-                  client._messenger.pop(client._stream, true);
-                  setImmediate(pushChunks);
-                  logger.exit('Client.pushChunks', _id, pushed);
-                  return;
-                } else {
-                  // A push into proton may mean data also needs to be written.
-                  pushed += n;
-                  client._messenger.pop(client._stream, false);
-                }
-
-                // Remove the pushed part of the chunk.
-                chunk = chunk.slice(n);
-              } else {
-                // This chunk has been fully dealt with.
-                pushed += n;
-                break;
-              }
-            }
-
-            // A push into proton may mean data also needs to be written. Force
-            // a messenger tick.
-            client._messenger.pop(client._stream, true);
-          }
-
-          // If data has been read, messages may have arrived, so perform
-          // a check.
-          if (client._subscriptions.length > 0) {
-            setImmediate(function() {
-              if (client.state === STATE_STARTED) {
-                client.checkForMessages.apply(client);
-              }
-            });
-          }
-
-          logger.exit('Client.pushChunks', _id, pushed);
         };
 
         // Define an on stream drain handler. Check if proton has further data
@@ -1428,11 +1433,7 @@ var Client = function(service, id, securityOptions) {
         var streamClosed = function(had_error) {
           logger.entry('Client.streamClosed', _id);
 
-          if (client.pushTimeout) {
-            // If we previously set a timeout to process data chunks, clear it.
-            clearTimeout(client.pushTimeout);
-          }
-          pushChunks();
+          client._pushChunks.call(client);
 
           try {
             client._messenger.closed();
@@ -1877,6 +1878,10 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
   logger.entry('stopMessenger', client.id);
 
   var stopped = true;
+
+  // Ensure any received data has been pushed into messenger
+  // before we request it to stop
+  client._pushChunks.call(client);
 
   // If messenger available then request it to stop
   // (otherwise it must have already been stopped)
