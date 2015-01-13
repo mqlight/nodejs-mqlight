@@ -509,6 +509,7 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args)
   Proton::Exit("pn_messenger_stopped", name, stopped);
 
   if (stopped) {
+    obj->connection = NULL;
     Proton::Entry("pn_messenger_free", name);
     pn_messenger_free(obj->messenger);
     Proton::Exit("pn_messenger_free", name, 0);
@@ -1234,7 +1235,7 @@ Handle<Value> ProtonMessenger::Push(const Arguments& args)
   HandleScope scope;
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
-  int n = 0;
+  int n;
   Proton::Entry("ProtonMessenger::Push", name);
 
   // throw TypeError if not enough args
@@ -1244,13 +1245,19 @@ Handle<Value> ProtonMessenger::Push(const Arguments& args)
   }
 
   // Pushing data requires a messenger connection
+  ssize_t length = (ssize_t)args[0]->ToInteger()->Value();
   if (obj->messenger && obj->connection) {
-    ssize_t length = (ssize_t)args[0]->ToInteger()->Value();
     Local<Object> buffer = args[1]->ToObject();
 
     Proton::Entry("pn_connection_push", name);
     n = pn_connection_push(obj->connection, node::Buffer::Data(buffer), length);
     Proton::Exit("pn_connection_push", name, n);
+  } else {
+    // This connection has already been closed, so this data can never be
+    // pushed in, so just return saying it has so the data will be
+    // discarded.
+    Proton::Log("data", name, "connection already closed:", "discarding data");
+    n = length;
   }
 
   Proton::Exit("ProtonMessenger::Push", name, n);
@@ -1283,11 +1290,15 @@ Handle<Value> ProtonMessenger::Write(ProtonMessenger* obj,
       if (force) {
         Proton::Log("data_often", name, "forcing messenger tick", "");
         Proton::Entry("pn_connection_pop", name);
-        pn_connection_pop(obj->connection, 0);
+        bool closed = pn_connection_pop(obj->connection, 0);
         Proton::Exit("pn_connection_pop", name, 0);
+        if (closed) {
+          Proton::Log("data_often", name, "connection is closed", "");
+          obj->connection = NULL;
+        }
       }
 
-      if (n > 0) {
+      if (obj->connection && (n > 0)) {
         // write n bytes to stream
         Local<Object> global = Context::GetCurrent()->Global();
         Local<Function> constructor =
@@ -1297,11 +1308,17 @@ Handle<Value> ProtonMessenger::Write(ProtonMessenger* obj,
         memcpy(node::Buffer::Data(buffer),
                pn_transport_head(transport), n);
         Local<Value> writeArgs[1] = {buffer};
-        streamWrite->Call(stream, 1, writeArgs);
+        Local<Value> drained = streamWrite->Call(stream, 1, writeArgs);
+        Proton::Log("data_often", name, "stream drained:",
+                    drained->ToBoolean()->Value());
 
         Proton::Entry("pn_connection_pop", name);
-        pn_connection_pop(obj->connection, n);
+        bool closed = pn_connection_pop(obj->connection, n);
         Proton::Exit("pn_connection_pop", name, n);
+        if (closed) {
+          Proton::Log("data_often", name, "connection is closed", "");
+          obj->connection = NULL;
+        }
       } else {
         n = 0;
       }
@@ -1396,7 +1413,7 @@ Handle<Value> ProtonMessenger::Heartbeat(const Arguments& args)
   Proton::Entry("ProtonMessenger::Heartbeat", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 2 || args[0].IsEmpty()) {
+  if (args.Length() < 1 || args[0].IsEmpty()) {
     THROW_EXCEPTION("Missing stream argument.",
                     "ProtonMessenger::Heartbeat", name);
   }

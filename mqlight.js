@@ -1280,10 +1280,16 @@ var Client = function(service, id, securityOptions) {
           logger.log('data', _id, 'failed to connect to: ' + logUrl +
                      ' due to error: ' + err);
 
-          // Deregister the connection error handler since we've failed to
-          // connect.
-          client._stream.removeListener('error', connError);
-          client._stream.on('error', client._socketError);
+          if (client._stream) {
+            // Deregister the connection error handler since we've failed to
+            // connect.
+            client._stream.removeListener('error', connError);
+            client._stream.on('error', client._socketError);
+
+            // Close our end of the socket.
+            client._stream.end();
+            client._stream = null;
+          }
 
           if (/ECONNREFUSED/.test(err)) {
             // Convert ECONNREFUSED into a clearer error message.
@@ -1297,12 +1303,6 @@ var Client = function(service, id, securityOptions) {
             // Convert CERT_HAS_EXPIRED into a clearer error message.
             err = new SecurityError('SSL Failure: certificate verify failed ' +
                                     '- certificate has expired');
-          }
-
-          // Close our end of the socket, if we have one.
-          if (client._stream) {
-            client._stream.end();
-            client._stream = null;
           }
 
           // This service failed to connect. Try the next one.
@@ -1337,7 +1337,7 @@ var Client = function(service, id, securityOptions) {
               // If we previously set a timeout to process the chunks, clear it.
               clearTimeout(client.pushTimeout);
             }
-            pushChunks(chunk);
+            pushChunks();
           } else {
             // Allow more time for chunks to arrive before we process them.
             if (!client.pushTimeout) {
@@ -1378,6 +1378,7 @@ var Client = function(service, id, securityOptions) {
                   // schedule work to happen again shortly.
                   logger.log('debug', _id, 'retrying later');
                   client._queuedChunks.push(chunk);
+                  client._queuedChunksSize = chunk.length;
                   client._messenger.pop(client._stream, true);
                   setImmediate(pushChunks);
                   logger.exit('Client.pushChunks', _id, pushed);
@@ -1427,6 +1428,12 @@ var Client = function(service, id, securityOptions) {
         var streamClosed = function(had_error) {
           logger.entry('Client.streamClosed', _id);
 
+          if (client.pushTimeout) {
+            // If we previously set a timeout to process data chunks, clear it.
+            clearTimeout(client.pushTimeout);
+          }
+          pushChunks();
+
           try {
             client._messenger.closed();
           } catch (err) {
@@ -1454,7 +1461,7 @@ var Client = function(service, id, securityOptions) {
           logger.entry('Client._tryService.waitForStart', _id);
 
           try {
-            if (!client._messenger.started) {
+            if (!client._messenger.started()) {
               setImmediate(function() {
                 waitForStart.call(client);
               });
@@ -1612,7 +1619,9 @@ var Client = function(service, id, securityOptions) {
         }
         client._stream.on('error', connError);
         client._stream.on('drain', dataDrained);
-        client._stream.on('close', streamClosed);
+        client._stream.on('close', function(had_error) {
+          process.nextTick(streamClosed, had_error);
+        });
         client._stream.on('data', dataAvailable);
       } catch (err) {
         // should never get here, as it means that messenger.connect has been
@@ -1978,6 +1987,9 @@ Client.prototype.stop = function(callback) {
           client._stream.end();
           client._stream = null;
         }
+        client._queuedChunks = [];
+        client._queuedChunksSize = 0;
+
         // Indicate that we've disconnected
         client._setState(STATE_STOPPED);
         // Remove ourself from the active client list
@@ -2098,6 +2110,8 @@ var reconnect = function(client) {
       client._stream.end();
       client._stream = null;
     }
+    client._queuedChunks = [];
+    client._queuedChunksSize = 0;
     client._performConnect.apply(client, [false]);
 
     logger.exit('Client.reconnect.stopProcessing', client.id, null);
