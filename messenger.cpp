@@ -802,6 +802,7 @@ Handle<Value> ProtonMessenger::Unsubscribed(const Arguments& args)
       unsubscribed = false;
     } else {
       unsubscribed = true;
+      pn_messenger_reclaim_link(obj->messenger, link);
       pn_link_free(link);
     }
   }
