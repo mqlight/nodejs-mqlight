@@ -176,7 +176,9 @@ module.exports.createProtonStub = function() {
         if (DEBUG) log('stub hasSent function called');
         return true;
       },
-      started: true,
+      started: function() {
+        return true;
+      },
       stopped: true,
       subscribe: function() {
         if (DEBUG) log('stub subscribe function called');
