@@ -767,9 +767,9 @@ Handle<Value> ProtonMessenger::Unsubscribed(const Arguments& args)
         "NetworkError", "Not connected", "ProtonMessenger::Unsubscribed", name);
   }
 
-  // find link based on address
+  // find link based on address, in any state.
   pn_link_t* link =
-      pn_messenger_get_link(obj->messenger, address.c_str(), false);
+      pn_messenger_get_stated_link(obj->messenger, address.c_str(), false, 0);
 
   if (!link) {
     // throw Error if unable to find a matching Link
