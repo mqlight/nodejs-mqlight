@@ -281,7 +281,7 @@ module.exports.test_start_variable_endpoints = function(test) {
     id: 'test_start_variable_endpoints'
   });
   client.on('error', function(err) {
-    test.ok(err.message.indexOf('amqp://bad') != -1);
+    test.ok(err.message.indexOf('bad') != -1);
   });
   client.start(function() {
     test.equals(client.service, 'amqp://host:1234');
@@ -391,8 +391,8 @@ module.exports.test_start_http_changing_endpoint = function(test) {
     id: 'test_start_http_changing_endpoint'
   });
   client.on('error', function(err) {
-    test.ok(err.message.indexOf('amqp://bad1') != -1 ||
-            err.message.indexOf('amqp://bad2') != -1);
+    test.ok(err.message.indexOf('bad1') != -1 ||
+            err.message.indexOf('bad2') != -1);
   });
   client.start(function(err) {
     test.ifError(err);
@@ -446,7 +446,7 @@ module.exports.test_start_http_multiple_endpoints = function(test) {
   });
   // error will be emitted for the last service in the returned endpoint list
   client.on('error', function(err) {
-    test.ok(err.message.indexOf('amqp://bad4') != -1);
+    test.ok(err.message.indexOf('bad4') != -1);
   });
   client.start(function(err) {
     test.ifError(err);
@@ -709,8 +709,8 @@ module.exports.test_start_file_changing_endpoint = function(test) {
     id: 'test_start_file_changing_endpoint'
   });
   client.on('error', function(err) {
-    test.ok(err.message.indexOf('amqp://bad1') != -1 ||
-            err.message.indexOf('amqp://bad2') != -1);
+    test.ok(err.message.indexOf('bad1') != -1 ||
+            err.message.indexOf('bad2') != -1);
   });
   client.start(function(err) {
     test.ifError(err);
@@ -757,7 +757,7 @@ module.exports.test_start_file_multiple_endpoints = function(test) {
   });
   // error will be emitted for the last service in the returned endpoint list
   client.on('error', function(err) {
-    test.ok(err.message.indexOf('amqp://bad4') != -1);
+    test.ok(err.message.indexOf('bad4') != -1);
   });
   client.start(function(err) {
     test.ifError(err);
@@ -1119,8 +1119,7 @@ module.exports.test_start_user_password_options = function(test) {
 
   var originalConnect = mqlight.proton.messenger.connect;
   var lastUsr, lastPw;
-  mqlight.proton.messenger.connect = function(service, sslTrustCertificate,
-                                              sslVerifyName) {
+  mqlight.proton.messenger.connect = function(service) {
     var auth;
     try {
       auth = url.parse(service).auth;
@@ -1136,8 +1135,7 @@ module.exports.test_start_user_password_options = function(test) {
     }
 
     var messenger = stubproton.createProtonStub().createMessenger();
-    var result = messenger.connect.apply(messenger, [service,
-                                         sslTrustCertificate, sslVerifyName]);
+    var result = messenger.connect.apply(messenger, [service]);
     return result;
   };
 

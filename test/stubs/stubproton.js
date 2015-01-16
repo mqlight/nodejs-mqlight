@@ -124,20 +124,13 @@ module.exports.createProtonStub = function() {
           }
         }
       },
-      connect: function(service, sslTrustCertificate, sslVerifyName) {
-        if (DEBUG) log('stub connect function called for service: ' +
-                       service, sslTrustCertificate, sslVerifyName);
+      connect: function(service) {
+        if (DEBUG) log('stub connect function called for service: ' + service);
         if (!this.stopped) throw new Error('already connected');
         var href = service.href;
         var err = null;
         if (href.indexOf('bad') != -1) {
           err = new TypeError('bad service ' + href);
-        } else if (sslTrustCertificate === 'BadCertificate') {
-          err = new Error('Bad Certificate');
-          err.name = 'SecurityError';
-        } else if (sslTrustCertificate === 'BadVerify' && sslVerifyName) {
-          err = new Error('Bad verify name');
-          err.name = 'SecurityError';
         } else {
           if (connectStatus !== 0) {
             err = new Error('connect error: ' + connectStatus);
@@ -277,11 +270,9 @@ module.exports.createProtonStub = function() {
     },
 
     connect: function(options, callback) {
-      if (DEBUG) log('stub proton connect function called');
-      process.nextTick(function() {
-        callback.apply(this, []);
-      });
-      return new StubStream();
+      if (DEBUG) log('stub proton connect function called with options ' +
+                     options);
+      return new StubStream(options, callback);
     }
   };
 };
@@ -292,33 +283,65 @@ module.exports.createProtonStub = function() {
  *
  * @constructor
  * @param {object} options stream options.
+ * @param {Function} callback connect callback.
  * @return {object} a stub connection.
  */
 
-var StubStream = function(options) {
+var StubStream = function(options, callback) {
   if (DEBUG) log('StubStream constructor called');
 
-  if (!(this instanceof StubStream))
+  var stream = this;
+
+  if (!(stream instanceof StubStream))
     return new StubStream(options);
 
-  Duplex.call(this, options);
+  Duplex.call(stream, options);
 
-  this.ended = false;
-  this.authorized = true;
+  stream.ended = false;
+  stream.connError = false;
+  stream.authorized = true;
+  stream.authorizationError = null;
 
-  this._read = function(size) {
+  var err = null;
+  if (options.host.indexOf('bad') != -1) {
+    err = new TypeError('ECONNREFUSED bad service ' + options.host);
+  } else if (options.sslTrustCertificate === 'BadCertificate') {
+    stream.authorized = false,
+    stream.authorizationError = new Error('Bad Certificate');
+  } else if (options.sslTrustCertificate === 'BadVerify' &&
+             options.sslVerifyName) {
+    stream.authorized = false,
+    stream.authorizationError = new Error('Bad verify name');
+  } else if (connectStatus !== 0) {
+    err = new Error('connect error: ' + connectStatus);
+    err.name = 'NetworkError';
+  }
+  if (err) {
+    stream.connError = true;
+    if (DEBUG) log('emitting error event');
+    process.nextTick(function() {
+      stream.emit('error', err);
+    });
+  } else {
+    if (DEBUG) log('connection made');
+    process.nextTick(function() {
+      callback.apply(stream, []);
+    });
+  }
+
+  stream._read = function(size) {
     if (DEBUG) log('stream _read function called for size:', size);
   };
 
-  this._write = function(chunk, encoding, callback) {
+  stream._write = function(chunk, encoding, callback) {
     if (DEBUG) log('stream _write function called for chunk size:',
                    chunk.length);
   };
 
-  this.end = function() {
+  stream.end = function() {
     if (DEBUG) log('stream end function called');
-    this.ended = true;
-    this.push(null);
+    stream.ended = true;
+    stream.push(null);
   };
 
   var pushData = function(stream) {
@@ -332,6 +355,6 @@ var StubStream = function(options) {
 
   setImmediate(function(stream) {
     pushData(stream)
-  }, this);
+  }, stream);
 };
 util.inherits(StubStream, Duplex);

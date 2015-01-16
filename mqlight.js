@@ -1602,28 +1602,32 @@ var Client = function(service, id, securityOptions) {
           logger.exit('Client._tryService.connected', _id, null);
         };
 
+        // Set up the connect options.
+        var connOpts = {
+          host: serviceUrl.hostname,
+          port: serviceUrl.port,
+          rejectUnauthorized: false,
+          ca: (typeof securityOptions.sslTrustCertificate !== 'undefined') ?
+              [fs.readFileSync(securityOptions.sslTrustCertificate)] :
+              undefined,
+          sslTrustCertificate: securityOptions.sslTrustCertificate,
+          sslVerifyName: securityOptions.sslVerifyName,
+        };
+
         if (process.env.NODE_ENV === 'unittest') {
           // If the unit tests are being run, then don't really connect.
           logger.log('debug', _id, 'connecting via stub');
-          client._stream = proton.connect({}, connected);
+          client._stream = proton.connect(connOpts, connected);
         } else if (serviceUrl.protocol === 'amqps:') {
           // If the amqps protocol is being used, then do a tls connect.
           logger.log('debug', _id, 'connecting via tls');
-          client._stream = tls.connect({
-            host: serviceUrl.hostname,
-            port: serviceUrl.port,
-            rejectUnauthorized: false,
-            ca: (typeof securityOptions.sslTrustCertificate !== 'undefined') ?
-                [fs.readFileSync(securityOptions.sslTrustCertificate)] :
-                undefined}, connected);
+          client._stream = tls.connect(connOpts, connected);
         } else {
           // Otherwise do a standard net connect.
           // In all cases we register a connected callback, and an error
           // handler.
           logger.log('debug', _id, 'connecting via net');
-          client._stream = net.connect({
-            host: serviceUrl.hostname,
-            port: serviceUrl.port}, connected);
+          client._stream = net.connect(connOpts, connected);
         }
         client._stream.on('error', connError);
         client._stream.on('drain', dataDrained);
