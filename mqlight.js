@@ -1557,11 +1557,18 @@ var Client = function(service, id, securityOptions) {
                 }
                 logger.log('data', _id, 'permitting self-signed certificate');
               }
-              // We allow hostname mismatches whereas node won't.
+              // Hostname mismatches will produce an authorization failure. We
+              // allow them if sslVerifyName is false.
               else if (authError.message ===
                   'Hostname/IP doesn\'t match certificate\'s altnames') {
-                logger.log('data', _id,
-                           'permitting certificate with hostname mismatch');
+                if (securityOptions.sslVerifyName) {
+                  connError(authError);
+                  logger.exit('Client._tryService.connected', _id, null);
+                  return;
+                } else {
+                  logger.log('data', _id,
+                             'permitting certificate with hostname mismatch');
+                }
               } else {
                 connError(authError);
                 logger.exit('Client._tryService.connected', _id, null);

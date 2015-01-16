@@ -36,8 +36,7 @@ Creates an IBM MQ Light client instance in `starting` state.
      service specifies the amqps scheme.
   *  **sslVerifyName**, (Boolean, default: true) (optional) whether or not to
      additionally check the MQ Light server's common name in the certificate
-     matches the actual server's DNS name. Only used when the
-     sslTrustCertificate option is specified.
+     matches the actual server's DNS name.
 * `callback` - (Function) (optional) callback that is invoked (indicating
   success) if the client attains `started` state, or invoked (indicating
   failure) if the client enters `stopped` state before attaining `started`
