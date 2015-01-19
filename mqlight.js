@@ -1611,7 +1611,7 @@ var Client = function(service, id, securityOptions) {
               [fs.readFileSync(securityOptions.sslTrustCertificate)] :
               undefined,
           sslTrustCertificate: securityOptions.sslTrustCertificate,
-          sslVerifyName: securityOptions.sslVerifyName,
+          sslVerifyName: securityOptions.sslVerifyName
         };
 
         if (process.env.NODE_ENV === 'unittest') {
