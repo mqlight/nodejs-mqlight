@@ -1461,13 +1461,21 @@ var Client = function(service, id, securityOptions) {
         var waitForStart = function() {
           logger.entry('Client._tryService.waitForStart', _id);
 
+          if (client.state !== STATE_RETRYING &&
+              client.state !== STATE_STARTING) {
+            // Don't keep waiting if we're no longer in a starting state
+            logger.log('debug', _id, 'client no longer starting');
+            logger.exit('Client._tryService.waitForStart', _id, false);
+            return;
+          }
+
           try {
             if (!client._messenger.started()) {
               setImmediate(function() {
                 waitForStart.call(client);
               });
               logger.exit('Client._tryService.waitForStart', _id, false);
-              return false;
+              return;
             }
           } catch (err) {
             error = getNamedError(err);
