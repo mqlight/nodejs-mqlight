@@ -16,6 +16,7 @@ that goes to stderr when you run your application.
 ### 9.9.9999999999
 
 * Minor fix to mqlight-log.js
+* Dependency on OpenSSL libraries removed.
 * ...
 
 ### 1.0.2014091000
