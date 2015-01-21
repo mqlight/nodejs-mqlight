@@ -637,10 +637,11 @@ Handle<Value> ProtonMessenger::Subscribed(const Arguments& args)
         "NetworkError", "Not connected", "ProtonMessenger::Subscribed", name);
   }
 
+  Proton::Entry("pn_messenger_get_link", name);
   pn_link_t* link =
       pn_messenger_get_link(obj->messenger, address.c_str(), false);
   int error = pn_messenger_errno(obj->messenger);
-  Proton::Exit("pn_messenger_recv", name, error);
+  Proton::Exit("pn_messenger_get_link", name, error);
   if (error) {
     const char* text = pn_error_text(pn_messenger_error(obj->messenger));
     const char* err = GetErrorName(text);
