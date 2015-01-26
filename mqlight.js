@@ -1360,10 +1360,6 @@ var Client = function(service, id, securityOptions) {
             // connect.
             client._stream.removeListener('error', connError);
             client._stream.on('error', client._socketError);
-
-            // Close our end of the socket.
-            client._stream.end();
-            client._stream = null;
           }
 
           if (/ECONNREFUSED/.test(err)) {
@@ -1380,8 +1376,23 @@ var Client = function(service, id, securityOptions) {
                                     '- certificate has expired');
           }
 
-          // This service failed to connect. Try the next one.
-          tryNextService(err);
+          // Don't leave an invalid messenger object lying around.
+          stopMessenger(client, function(client) {
+            logger.entry('Client._tryService.connError.stopProcessing',
+                         client.id);
+
+            if (client._stream) {
+              // Close our end of the socket.
+              client._stream.end();
+              client._stream = null;
+            }
+
+            // This service failed to connect. Try the next one.
+            tryNextService(err);
+
+            logger.exit('Client._tryService.connError.stopProcessing',
+                        client.id, null);
+          });
 
           logger.exit('Client._tryService.connError', _id, null);
         };

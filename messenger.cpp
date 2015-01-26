@@ -1284,54 +1284,57 @@ Handle<Value> ProtonMessenger::Write(ProtonMessenger* obj,
   int n;
   if (obj->messenger && obj->connection) {
     // value is expected to contain a Writable Stream object
-    if (!value->IsObject()) {
-      THROW_EXCEPTION_LEVEL("Invalid stream object.",
-                            "exit_often", "ProtonMessenger::Write", name);
-    }
-    Local<Object> stream = value->ToObject();
-    Local<Function> streamWrite = Local<Function>::Cast(
-      stream->Get(String::New("write")));
+    if (value->IsObject()) {
+      Local<Object> stream = value->ToObject();
+      Local<Function> streamWrite = Local<Function>::Cast(
+        stream->Get(String::New("write")));
 
-    pn_transport_t *transport = pn_connection_transport(obj->connection);
-    if (transport) {
-      n = (int)pn_transport_pending(transport);
-      // Force a pop, causing a heartbeat to be generated, if necessary
-      if (force) {
-        Proton::Log("data_often", name, "forcing messenger tick", "");
-        Proton::Entry("pn_connection_pop", name);
-        bool closed = pn_connection_pop(obj->connection, 0);
-        Proton::Exit("pn_connection_pop", name, 0);
-        if (closed) {
-          Proton::Log("data_often", name, "connection is closed", "");
-          obj->connection = NULL;
+      pn_transport_t *transport = pn_connection_transport(obj->connection);
+      if (transport) {
+        n = (int)pn_transport_pending(transport);
+        // Force a pop, causing a heartbeat to be generated, if necessary
+        if (force) {
+          Proton::Log("data_often", name, "forcing messenger tick", "");
+          Proton::Entry("pn_connection_pop", name);
+          bool closed = pn_connection_pop(obj->connection, 0);
+          Proton::Exit("pn_connection_pop", name, 0);
+          if (closed) {
+            Proton::Log("data_often", name, "connection is closed", "");
+            obj->connection = NULL;
+          }
         }
-      }
 
-      if (obj->connection && (n > 0)) {
-        // write n bytes to stream
-        Local<Object> global = Context::GetCurrent()->Global();
-        Local<Function> constructor =
-            Local<Function>::Cast(global->Get(String::New("Buffer")));
-        Local<Value> args[1] = {v8::Integer::New(n)};
-        Local<Value> buffer = constructor->NewInstance(1, args);
-        memcpy(node::Buffer::Data(buffer),
-               pn_transport_head(transport), n);
-        Local<Value> writeArgs[1] = {buffer};
-        Local<Value> drained = streamWrite->Call(stream, 1, writeArgs);
-        Proton::Log("data_often", name, "stream drained:",
-                    drained->ToBoolean()->Value());
+        if (obj->connection && (n > 0)) {
+          // write n bytes to stream
+          Local<Object> global = Context::GetCurrent()->Global();
+          Local<Function> constructor =
+              Local<Function>::Cast(global->Get(String::New("Buffer")));
+          Local<Value> args[1] = {v8::Integer::New(n)};
+          Local<Value> buffer = constructor->NewInstance(1, args);
+          memcpy(node::Buffer::Data(buffer),
+                 pn_transport_head(transport), n);
+          Local<Value> writeArgs[1] = {buffer};
+          Local<Value> drained = streamWrite->Call(stream, 1, writeArgs);
+          Proton::Log("data_often", name, "stream drained:",
+                      drained->ToBoolean()->Value());
 
-        Proton::Entry("pn_connection_pop", name);
-        bool closed = pn_connection_pop(obj->connection, n);
-        Proton::Exit("pn_connection_pop", name, n);
-        if (closed) {
-          Proton::Log("data_often", name, "connection is closed", "");
-          obj->connection = NULL;
+          Proton::Entry("pn_connection_pop", name);
+          bool closed = pn_connection_pop(obj->connection, n);
+          Proton::Exit("pn_connection_pop", name, n);
+          if (closed) {
+            Proton::Log("data_often", name, "connection is closed", "");
+            obj->connection = NULL;
+          }
+        } else {
+          n = 0;
         }
       } else {
-        n = 0;
+        n = -1;
       }
     } else {
+      String::Utf8Value param(value->ToDetailString());
+      std::string detail = std::string(*param);
+      Proton::Log("data_often", name, "Invalid stream object:", detail.c_str());
       n = -1;
     }
   } else {
