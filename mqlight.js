@@ -1565,16 +1565,10 @@ var Client = function(service, id, securityOptions) {
               logger.log('data', _id, 'authorization error occurred:',
                          authError);
 
-              // Self-signed certificates will produce an authorization failure.
-              // We allow them if a trust certificate was not provided.
               if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(authError)) {
-                if (typeof securityOptions.sslTrustCertificate !==
-                    'undefined') {
-                  connError(authError);
-                  logger.exit('Client._tryService.connected', _id, null);
-                  return;
-                }
-                logger.log('data', _id, 'permitting self-signed certificate');
+                connError(authError);
+                logger.exit('Client._tryService.connected', _id, null);
+                return;
               }
               // Hostname mismatches will produce an authorization failure. We
               // allow them if sslVerifyName is false.
