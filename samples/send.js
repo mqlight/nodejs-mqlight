@@ -164,13 +164,8 @@ client.on('started', function() {
   var i = 0;
   var sequenceNum = 0;
   var sendMessage = function() {
+    var buffered = null;
     var msgNum = i++;
-
-    // check if the messages should be repeated again
-    if (messages.length == i) {
-      if (repeat != 1) i = 0;
-      if (repeat > 1) --repeat;
-    }
 
     // keep going until all messages have been sent
     if (messages.length > msgNum) {
@@ -193,17 +188,28 @@ client.on('started', function() {
         body = (++sequenceNum) + ': ' + body;
       }
 
-      if (client.send(topic, body, options, callback)) {
-        // Send the next message now
-        sendNextMessage();
-      } else {
-        // There's a backlog of messages to send, so wait until the backlog is
+      buffered = !client.send(topic, body, options, callback);
+    }
+
+    // check if the messages should be repeated again
+    if (messages.length == i) {
+      if (repeat != 1) i = 0;
+      if (repeat > 1) --repeat;
+    }
+
+    // check if all our messages have been sent
+    if (messages.length == i) {
+      // no more messages to send, so disconnect
+      client.stop();
+    } else {
+      if (buffered) {
+        // there's a backlog of messages to send, so wait until the backlog is
         // cleared before sending any more
         client.once('drain', sendNextMessage);
+      } else {
+        // send the next message now
+        sendNextMessage();
       }
-    } else {
-      // No more messages to send, so disconnect
-      client.stop();
     }
   };
 
