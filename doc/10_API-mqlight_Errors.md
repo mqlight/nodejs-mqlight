@@ -18,6 +18,13 @@ an operational error. `NetworkError` is passed to an application if the
 client cannot establish a network connection to the MQ Light server, or if an
 established connection is broken.
 
+### Error: NotPermittedError
+
+This is a subtype of `Error` defined by the IBM MQ Light client. It is considered
+an operational error. `NotPermittedError` is thrown to indicate that a
+requested operation has been rejected because the remote end does not permit
+it.
+
 ### Error: RangeError
 
 This is a built-in subtype of `Error`. It is considered a programming error.

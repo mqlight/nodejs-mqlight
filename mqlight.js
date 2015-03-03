@@ -241,6 +241,7 @@ function shouldReconnect(err) {
   // exclude all programming errors
   return (!(err instanceof TypeError) &&
           !(err instanceof InvalidArgumentError) &&
+          !(err instanceof NotPermittedError) &&
           !(err instanceof ReplacedError) &&
           !(err instanceof StoppedError) &&
           !(err instanceof SubscribedError) &&
@@ -286,6 +287,26 @@ exports.NetworkError = function(message) {
 };
 var NetworkError = exports.NetworkError;
 util.inherits(NetworkError, Error);
+
+
+
+/**
+ * This is a subtype of Error defined by the MQ Light client. It is considered
+ * an operational error. NotPermittedError is thrown to indicate that a
+ * requested operation has been rejected because the remote end does not
+ * permit it.
+ *
+ * @param {String}
+ *          message - Human-readable description of the error
+ *
+ * @constructor
+ */
+exports.NotPermittedError = function(message) {
+  Error.captureStackTrace(this, this.constructor);
+  setupError(this, 'NotPermittedError', message);
+};
+var NotPermittedError = exports.NotPermittedError;
+util.inherits(NotPermittedError, Error);
 
 
 

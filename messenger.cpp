@@ -86,11 +86,22 @@ using namespace v8;
   THROW_EXCEPTION_LEVEL_TYPE(Exception::TypeError, msg, lvl, fnc, id)
 
 /* parse an error message from messenger and map it to an error type */
+/* FIXME: replace this string matching with a proper scheme (Story 85536) */
 const char* GetErrorName(const char* text)
 {
-  return (strstr(text, "sasl ") || strstr(text, "SSL "))
-             ? "SecurityError"
-             : (strstr(text, "_Takeover")) ? "ReplacedError" : "NetworkError";
+  if (strstr(text, "sasl ") || strstr(text, "SSL ")) {
+    return "SecurityError";
+  }
+
+  if (strstr(text, "_Takeover")) {
+    return "ReplacedError";
+  }
+
+  if (strstr(text, "_InvalidSourceTimeout")) {
+    return "NotPermittedError";
+  }
+
+  return "NetworkError";
 }
 
 Persistent<FunctionTemplate> ProtonMessenger::constructor;
