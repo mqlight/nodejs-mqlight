@@ -72,6 +72,8 @@ var net = require('net');
 var tls = require('tls');
 
 var invalidClientIdRegex = /[^A-Za-z0-9%\/\._]+/;
+var pemCertRegex = new RegExp('-----BEGIN CERTIFICATE-----(.|[\r\n])*?' +
+                              '-----END CERTIFICATE-----', 'gm');
 
 var HashMap = require('hashmap').HashMap;
 
@@ -1641,12 +1643,15 @@ var Client = function(service, id, securityOptions) {
           host: serviceUrl.hostname,
           port: serviceUrl.port,
           rejectUnauthorized: false,
-          ca: (typeof securityOptions.sslTrustCertificate !== 'undefined') ?
-              [fs.readFileSync(securityOptions.sslTrustCertificate)] :
-              undefined,
           sslTrustCertificate: securityOptions.sslTrustCertificate,
           sslVerifyName: securityOptions.sslVerifyName
         };
+
+        // Read the pem file and load multiple certs up into a separate entry
+        if (typeof securityOptions.sslTrustCertificate !== 'undefined') {
+          connOpts.ca = fs.readFileSync(securityOptions.sslTrustCertificate,
+                                        'utf-8').match(pemCertRegex);
+        }
 
         if (process.env.NODE_ENV === 'unittest') {
           // If the unit tests are being run, then don't really connect.
