@@ -8,14 +8,15 @@
         "mqlight-debug": "./bin/mqlight-debug.js"
     },
     "dependencies": {
-        "node-uuid": "~1.4.0",
+        "node-uuid": "~1.4.3",
         "nopt": "~3.0.1",
-        "npmlog": "0.1.1",
-        "moment": "2.8.3",
-        "hashmap": "1.1.0"
+        "npmlog": "~1.2.0",
+        "moment": "~2.9.0",
+        "hashmap": "~2.0.1"
     },
     "devDependencies": {
-        "nodeunit": "~0.9.0"
+        "istanbul": "latest",
+        "nodeunit": "~0.9.1"
     },
     "engines": {
         "node": "~0.10.x"
@@ -25,6 +26,6 @@
         "url": "http://www14.software.ibm.com/cgi-bin/weblap/lap.pl?popup=Y&li_formnum=L-ACRR-9MKEUW"
     }],
     "scripts": {
-        "test": "./node_modules/.bin/nodeunit --config test/nodeunit.json test"
+        "test": "./node_modules/.bin/istanbul cover ./node_modules/.bin/nodeunit --config test/nodeunit.json test"
     }
 }
