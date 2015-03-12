@@ -1270,7 +1270,7 @@ Handle<Value> ProtonMessenger::Push(const Arguments& args)
     Local<Object> buffer = args[1]->ToObject();
 
     Proton::Entry("pn_connection_push", name);
-    n = pn_connection_push(obj->connection, node::Buffer::Data(buffer), length);
+    n = pn_connection_push(obj->connection, (char *)node::Buffer::Data(buffer), length);
     Proton::Exit("pn_connection_push", name, n);
   } else {
     // This connection has already been closed, so this data can never be
