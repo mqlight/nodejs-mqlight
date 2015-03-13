@@ -422,7 +422,7 @@ module.exports.test_bad_ssl_options = function(test) {
 module.exports.test_valid_ssl_options = function(test) {
   var testData = [{
     sslTrustCertificate: 'ValidCertificate',
-    sslVerifyName: true
+    sslVerifyName: false
   },
   {
     sslTrustCertificate: 'ValidCertificate',
