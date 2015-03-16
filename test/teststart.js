@@ -246,7 +246,7 @@ module.exports.test_start_retry = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_start_multiple_endpoints = function(test) {
-  var services = ['amqp://bad1', 'amqp://bad2', 'amqp://host', 'amqp://bad3'];
+  var services = ['amqp://bad1', 'amqp://fail', 'amqp://host', 'amqp://bad2'];
   var client = mqlight.createClient({
     service: services,
     id: 'test_start_multiple_endpoints'
@@ -267,9 +267,9 @@ module.exports.test_start_multiple_endpoints = function(test) {
  */
 module.exports.test_start_variable_endpoints = function(test) {
   var services = ['amqp://bad1',
-    'amqp://bad2',
+    'amqp://fail',
     'amqp://host:1234',
-    'amqp://bad3'];
+    'amqp://bad2'];
   var index = 0;
   var serviceFunction = function(callback) {
     test.ok(index < services.length);
@@ -360,9 +360,9 @@ module.exports.test_start_stop_timing = function(test) {
 module.exports.test_start_http_changing_endpoint = function(test) {
   var amqpServices = [
     'amqp://bad1',
-    'amqp://bad2',
+    'amqp://fail',
     'amqp://host:1234',
-    'amqp://bad3'
+    'amqp://bad2'
   ];
   var originalHttpRequestMethod = http.request;
   var index = 0;
@@ -392,7 +392,7 @@ module.exports.test_start_http_changing_endpoint = function(test) {
   });
   client.on('error', function(err) {
     test.ok(err.message.indexOf('bad1') != -1 ||
-            err.message.indexOf('bad2') != -1);
+            err.message.indexOf('fail') != -1);
   });
   client.start(function(err) {
     test.ifError(err);
@@ -415,7 +415,7 @@ module.exports.test_start_http_changing_endpoint = function(test) {
 module.exports.test_start_http_multiple_endpoints = function(test) {
   var amqpServices = [
     ['amqp://bad1', 'amqp://bad2', 'amqp://bad3', 'amqp://bad4'],
-    ['amqp://bad5', 'amqp://bad6', 'amqp://host:1234', 'amqp://bad7']
+    ['amqp://fail', 'amqp://bad5', 'amqp://host:1234', 'amqp://bad6']
   ];
   var originalHttpRequestMethod = http.request;
   var index = 0;
@@ -686,9 +686,9 @@ module.exports.test_start_http_bad_status = function(test) {
 module.exports.test_start_file_changing_endpoint = function(test) {
   var amqpServices = [
     'amqp://bad1',
-    'amqp://bad2',
+    'amqp://fail',
     'amqp://host:1234',
-    'amqp://bad3'
+    'amqp://bad2'
   ];
   var originalReadFileMethod = fs.readFile;
   var index = 0;
@@ -710,7 +710,7 @@ module.exports.test_start_file_changing_endpoint = function(test) {
   });
   client.on('error', function(err) {
     test.ok(err.message.indexOf('bad1') != -1 ||
-            err.message.indexOf('bad2') != -1);
+            err.message.indexOf('fail') != -1);
   });
   client.start(function(err) {
     test.ifError(err);
@@ -734,7 +734,7 @@ module.exports.test_start_file_changing_endpoint = function(test) {
 module.exports.test_start_file_multiple_endpoints = function(test) {
   var amqpServices = [
     ['amqp://bad1', 'amqp://bad2', 'amqp://bad3', 'amqp://bad4'],
-    ['amqp://bad5', 'amqp://bad6', 'amqp://host:1234', 'amqp://bad7']
+    ['amqp://fail', 'amqp://bad5', 'amqp://host:1234', 'amqp://bad6']
   ];
   var originalReadFileMethod = fs.readFile;
   var index = 0;

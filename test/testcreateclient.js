@@ -397,7 +397,7 @@ module.exports.test_bad_ssl_options = function(test) {
   for (var i = 0; i < testData.length; i++) {
     test.throws(function() {
       var opts = {
-        service: 'amqp://host',
+        service: 'amqps://host',
         sslTrustCertificate: testData[i].sslTrustCertificate,
         sslVerifyName: testData[i].sslVerifyName,
         id: 'test_bad_ssl_options_' + i
@@ -437,7 +437,7 @@ module.exports.test_valid_ssl_options = function(test) {
   var count = 0;
   var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
     var opts = {
-      service: 'amqp://host',
+      service: 'amqps://host',
       sslTrustCertificate: testData[count].sslTrustCertificate,
       sslVerifyName: testData[count].sslVerifyName,
       id: 'test_valid_ssl_options'+count
@@ -475,16 +475,43 @@ module.exports.test_valid_ssl_options = function(test) {
  * @param {object} test - test case.
  */
 module.exports.test_invalid_ssl_options = function(test) {
-  var testData = [{sslTrustCertificate: 'BadCertificate', sslVerifyName: true},
-                  {sslTrustCertificate: 'BadCertificate', sslVerifyName: false},
-                  {sslTrustCertificate: 'BadVerify', sslVerifyName: true}];
+  var testData = [{
+    sslTrustCertificate: 'BadCertificate',
+    sslVerifyName: true
+  },
+  {
+    sslTrustCertificate: 'BadCertificate',
+    sslVerifyName: false
+  },
+  {
+    sslTrustCertificate: 'BadVerify',
+    sslVerifyName: true
+  },
+  {
+    sslTrustCertificate: 'SelfSignedCertificate',
+    sslVerifyName: true
+  },
+  {
+    sslTrustCertificate: 'SelfSignedCertificate',
+    sslVerifyName: false
+  },
+  {
+    sslTrustCertificate: 'ExpiredCertificate',
+    sslVerifyName: true
+  },
+  {
+    sslTrustCertificate: 'ExpiredCertificate',
+    sslVerifyName: false
+  }];
   var badCertificateFd = fs.openSync('BadCertificate', 'w');
   var badVerifyFd = fs.openSync('BadVerify', 'w');
+  var selfSignedFd = fs.openSync('SelfSignedCertificate', 'w');
+  var expiredFd = fs.openSync('ExpiredCertificate', 'w');
   var count = 0;
   var invalidSSLTest = function(sslTrustCertificate, sslVerifyName) {
     var firstError = true;
     var opts = {
-      service: 'amqp://host',
+      service: 'amqps://host',
       sslTrustCertificate: testData[count].sslTrustCertificate,
       sslVerifyName: testData[count].sslVerifyName,
       id: 'test_invalid_ssl_options'+count
@@ -501,6 +528,8 @@ module.exports.test_invalid_ssl_options = function(test) {
             test.done();
             fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
             fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
+            fs.close(selfSignedFd); fs.unlinkSync('SelfSignedCertificate');
+            fs.close(expiredFd); fs.unlinkSync('ExpiredCertificate');
           } else {
             invalidSSLTest(testData[count].sslTrustCertificate,
                 testData[count].sslVerifyName);
@@ -514,6 +543,8 @@ module.exports.test_invalid_ssl_options = function(test) {
       test.done();
       fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
       fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
+      fs.close(selfSignedFd); fs.unlinkSync('SelfSignedCertificate');
+      fs.close(expiredFd); fs.unlinkSync('ExpiredCertificate');
     });
     client.start();
   };

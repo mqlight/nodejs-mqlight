@@ -35,7 +35,7 @@ var connectStatus = 0;
  * @param {string} status Specifies the status to override with.
  */
 exports.setConnectStatus = function(status) {
-  if (DEBUG) log('setting connect status to: ' + status);
+  if (DEBUG) log('setting connect status to:', status);
   connectStatus = status;
 };
 
@@ -73,7 +73,7 @@ var workCallback;
  * @param {function} callback
  */
 exports.setRemoteIdleTimeout = function(interval, callback) {
-  if (DEBUG) log('setRemoteIdleTimeout to ' + interval);
+  if (DEBUG) log('setRemoteIdleTimeout to', interval);
   remoteIdleTimeout = interval;
   workCallback = callback;
 };
@@ -96,7 +96,7 @@ module.exports.createProtonStub = function() {
         if (result === 7 && msg.unitTestQos === 0) {
           result = 0;
         }
-        if (DEBUG) log('stub status function called, returning: ', result);
+        if (DEBUG) log('stub status function called, returning:', result);
         return result;
       },
       statusError: function() {
@@ -125,11 +125,11 @@ module.exports.createProtonStub = function() {
         }
       },
       connect: function(service) {
-        if (DEBUG) log('stub connect function called for service: ' + service);
+        if (DEBUG) log('stub connect function called for service:', service);
         if (!this.stopped) throw new Error('already connected');
         var href = service.href;
         var err = null;
-        if (href.indexOf('bad') != -1) {
+        if (href.indexOf('fail') != -1) {
           err = new TypeError('bad service ' + href);
         } else {
           if (connectStatus !== 0) {
@@ -158,7 +158,7 @@ module.exports.createProtonStub = function() {
             this.stopCount = 2;
           }
         }
-        if (DEBUG) log('stub stop function returning: '+this.stopped);
+        if (DEBUG) log('stub stop function returning:', this.stopped);
         return this.stopped;
       },
       put: function(msg, qos) {
@@ -178,8 +178,7 @@ module.exports.createProtonStub = function() {
       },
       subscribedCount: 0,
       subscribed: function(address) {
-        if (DEBUG) log('stub subscribed function called with address ' +
-                       address);
+        if (DEBUG) log('stub subscribed function called with address', address);
         if (connectStatus !== 0) {
           var err = new Error('error on subscribe: ' + connectStatus);
           err.name = 'NetworkError';
@@ -199,7 +198,7 @@ module.exports.createProtonStub = function() {
       unsubscribedCount: 0,
       unsubscribed: function(address) {
         if (DEBUG) log('stub unsubscribed function called with ' +
-                       'address ' + address);
+                       'address', address);
         if (connectStatus !== 0) {
           var err = new Error('error on unsubscribe: ' + connectStatus);
           err.name = 'NetworkError';
@@ -215,16 +214,15 @@ module.exports.createProtonStub = function() {
       },
       getRemoteIdleTimeout: function(address) {
         if (DEBUG) log('stub getRemoteIdleTimeout function called, ' +
-                       'returning: ' + remoteIdleTimeout);
+                       'returning:', remoteIdleTimeout);
         return remoteIdleTimeout;
       },
       flow: function(linkAddress, credit) {
-        if (DEBUG) log('stub flow function called with link address: ' +
-                       linkAddress + ' and credit: ' + credit);
+        if (DEBUG) log('stub flow function called with link address:',
+                       linkAddress, ' and credit:', credit);
       },
       pendingOutbound: function(address) {
-        if (DEBUG) log('pendingOutbound function called with address ' +
-                       address);
+        if (DEBUG) log('pendingOutbound function called with address', address);
         return false;
       },
       pushCount: 0,
@@ -239,8 +237,17 @@ module.exports.createProtonStub = function() {
         if (DEBUG) log('stub push function called, returning:', result);
         return result;
       },
+      popCount: 0,
       pop: function(stream, force) {
-        if (DEBUG) log('stub pop function called with force: ' + force);
+        if (DEBUG) log('stub pop function called with force:', force);
+        if (stream) {
+          if (++this.popCount === 20) {
+            this.popCount = 0;
+            process.nextTick(function() {
+              stream.emit('error', new Error('stub fake socket error'));
+            });
+          }
+        }
         return 0;
       },
       closed: function() {
@@ -270,7 +277,7 @@ module.exports.createProtonStub = function() {
     },
 
     connect: function(options, callback) {
-      if (DEBUG) log('stub proton connect function called with options ' +
+      if (DEBUG) log('stub proton connect function called with options',
                      options);
       return new StubStream(options, callback);
     }
@@ -304,15 +311,28 @@ var StubStream = function(options, callback) {
 
   var err = null;
   if (options.host.indexOf('bad') != -1) {
+    if (DEBUG) log('StubStream received bad connection');
     err = new TypeError('ECONNREFUSED bad service ' + options.host);
   } else if (options.sslTrustCertificate === 'BadCertificate') {
-    stream.authorized = false,
-    stream.authorizationError = new Error('Bad Certificate');
-  } else if (options.sslTrustCertificate === 'BadVerify' &&
-             options.sslVerifyName) {
-    stream.authorized = false,
-    stream.authorizationError = new Error('Bad verify name');
+    if (DEBUG) log('StubStream received bad certificate');
+    stream.authorized = false;
+    stream.authorizationError = new Error('Bad Certificate').message;
+  } else if (options.sslTrustCertificate === 'BadVerify') {
+    if (DEBUG) log('StubStream received bad verify');
+    stream.authorized = false;
+    stream.authorizationError =
+        new Error('Hostname/IP doesn\'t match certificate\'s altnames').message;
+  } else if (options.sslTrustCertificate === 'SelfSignedCertificate') {
+    if (DEBUG) log('StubStream received self-signed certificate');
+    stream.authorized = false;
+    stream.authorizationError =
+        new Error('DEPTH_ZERO_SELF_SIGNED_CERT').message;
+  } else if (options.sslTrustCertificate === 'ExpiredCertificate') {
+    if (DEBUG) log('StubStream received expired certificate');
+    stream.authorized = false;
+    stream.authorizationError = new Error('CERT_HAS_EXPIRED').message;
   } else if (connectStatus !== 0) {
+    if (DEBUG) log('StubStream received connect error');
     err = new Error('connect error: ' + connectStatus);
     err.name = 'NetworkError';
   }
@@ -342,12 +362,16 @@ var StubStream = function(options, callback) {
     if (DEBUG) log('stream end function called');
     stream.ended = true;
     stream.push(null);
+    process.nextTick(function() {
+      stream.emit('close', false);
+    });
   };
 
   var pushData = function(stream) {
     if (!stream.ended) {
       stream.push('chunk');
       setImmediate(function() {
+        stream.emit('drain');
         pushData(stream);
       });
     }
