@@ -1390,8 +1390,10 @@ var Client = function(service, id, securityOptions) {
             err = new NetworkError('CONNECTION ERROR (' + serviceUrl.host +
                 '): Connect failure: The remote computer refused the network ' +
                 'connection.');
-          } else if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(err)) {
-            // Convert DEPTH_ZERO_SELF_SIGNED_CERT into a clearer error message.
+          } else if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(err) ||
+                     /SELF_SIGNED_CERT_IN_CHAIN/.test(err)) {
+            // Convert DEPTH_ZERO_SELF_SIGNED_CERT or SELF_SIGNED_CERT_IN_CHAIN
+            // into a clearer error message.
             err = new SecurityError('SSL Failure: certificate verify failed');
           } else if (/CERT_HAS_EXPIRED/.test(err)) {
             // Convert CERT_HAS_EXPIRED into a clearer error message.
@@ -1588,7 +1590,8 @@ var Client = function(service, id, securityOptions) {
               logger.log('data', _id, 'authorization error occurred:',
                          authError);
 
-              if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(authError)) {
+              if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(authError) ||
+                  /SELF_SIGNED_CERT_IN_CHAIN/.test(authError)) {
                 connError(authError);
                 logger.exit('Client._tryService.connected', _id, null);
                 return;
