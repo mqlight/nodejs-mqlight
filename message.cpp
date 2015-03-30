@@ -74,6 +74,8 @@ void ProtonMessage::Init(Handle<Object> target)
                                        GetLinkAddress);
   tpl->InstanceTemplate()->SetAccessor(String::New("deliveryAnnotations"),
                                        GetDeliveryAnnotations);
+  tpl->InstanceTemplate()->SetAccessor(String::New("properties"),
+                                       GetMessageProperties);
   tpl->InstanceTemplate()->SetAccessor(
       String::New("ttl"), GetTimeToLive, SetTimeToLive);
 
@@ -532,6 +534,114 @@ Handle<Value> ProtonMessage::GetDeliveryAnnotations(Local<String> property,
   }
 
   Proton::Exit("ProtonMessage::GetDeliveryAnnotations", name, 1);
+  return scope.Close(result);
+}
+
+Handle<Value> ProtonMessage::GetMessageProperties(Local<String> property,
+                                                  const AccessorInfo& info)
+{
+  HandleScope scope;
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char* name = msg ? msg->name : NULL;
+  Handle<Value> result;
+
+  Proton::Entry("ProtonMessage::GetMessageProperties", name);
+
+  if (!msg || !msg->message) {
+    Proton::Exit("ProtonMessage::GetMessageProperties", name, 0);
+    return scope.Close(Undefined());
+  }
+
+  pn_data_t* data = pn_message_properties(msg->message);
+  pn_data_next(data);
+  size_t size = pn_data_get_map(data);
+  if (size == 0) {
+    Proton::Exit("ProtonMessage::GetMessageProperties", name, 0);
+    return scope.Close(Undefined());
+  }
+
+  pn_data_enter(data);
+  pn_data_next(data);
+
+  Local<Object> obj = Object::New();
+  result = obj;
+  for (size_t i = 0; i < size; i += 2) {
+    if (pn_data_type(data) == PN_STRING) {
+      Handle<String> key = String::NewSymbol(pn_data_get_string(data).start);
+
+      if (pn_data_next(data)) {
+        Handle<Value> value;
+        bool add_entry = true;
+
+        pn_type_t type = pn_data_type(data);
+        switch (type) {
+          case PN_NULL:
+            value = Null();
+            break;
+          case PN_BOOL:
+            value = Boolean::New(pn_data_get_bool(data));
+            break;
+          case PN_SHORT:
+            value = Number::New(pn_data_get_short(data));
+            break;
+          case PN_INT:
+            value = Number::New(pn_data_get_int(data));
+            break;
+          case PN_LONG:
+            value = Number::New(pn_data_get_long(data));
+            break;
+          case PN_FLOAT:
+            value = Number::New(pn_data_get_float(data));
+            break;
+          case PN_DOUBLE:
+            value = Number::New(pn_data_get_double(data));
+            break;
+          case PN_BYTE:
+          case PN_BINARY: {
+            Local<Object> global = Context::GetCurrent()->Global();
+            Local<Function> constructor =
+                Local<Function>::Cast(global->Get(String::New("Buffer")));
+
+            if (type == PN_BINARY) {
+              pn_bytes_t binary = pn_data_get_binary(data);
+              Handle<Value> args[1] = {v8::Integer::New(binary.size)};
+              value = constructor->NewInstance(1, args);
+              memcpy(Buffer::Data(value), binary.start, binary.size);
+            } else {
+              int8_t byte = pn_data_get_byte(data);
+              Handle<Value> args[1] = {v8::Integer::New(1)};
+              value = constructor->NewInstance(1, args);
+              Local<Object> buffer = value->ToObject();
+              Local<Function> bufferWrite =
+                  Local<Function>::Cast(buffer->Get(String::New("writeInt8")));
+              Local<Value> writeArgs[2] = {Number::New(byte), Integer::New(0)};
+              bufferWrite->Call(buffer, 2, writeArgs);
+            }
+          } break;
+          case PN_STRING:
+            value = String::NewSymbol(pn_data_get_string(data).start);
+            break;
+          default:
+            add_entry = false;
+            break;
+        }
+
+        if (add_entry) {
+          obj->Set(key, value);
+        }
+
+        if (!pn_data_next(data)) {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+  }
+  pn_data_exit(data);
+  pn_data_rewind(data);
+
+  Proton::Exit("ProtonMessage::GetMessageProperties", name, 1);
   return scope.Close(result);
 }
 

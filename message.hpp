@@ -78,6 +78,11 @@ class ProtonMessage : public node::ObjectWrap
   static v8::Handle<v8::Value> GetDeliveryAnnotations(
       v8::Local<v8::String> property,
       const v8::AccessorInfo& info);
+
+  static v8::Handle<v8::Value> GetMessageProperties(
+      v8::Local<v8::String> property,
+      const v8::AccessorInfo& info);
+
   static v8::Handle<v8::Value> GetTimeToLive(v8::Local<v8::String> property,
                                              const v8::AccessorInfo& args);
   static void SetTimeToLive(v8::Local<v8::String> property,

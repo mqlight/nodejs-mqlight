@@ -2975,6 +2975,10 @@ var processMessage = function(client, protonMsg) {
     delivery.message.ttl = protonMsg.ttl;
   }
 
+  if (protonMsg.properties) {
+    delivery.message.properties = protonMsg.properties;
+  }
+
   var da = protonMsg.deliveryAnnotations;
   var malformed = {};
   malformed.MQMD = {};
