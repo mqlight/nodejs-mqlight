@@ -253,34 +253,34 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
     // inspect data to see if we have PN_STRING data
     pn_data_next(body);
     pn_type_t type = pn_data_type(body);
-    if (type == PN_STRING) {
-      pn_message_set_format(msg->message, PN_TEXT);
-    }
 
     // XXX: maybe cache this in the C++ object at set time?
     char* buffer = (char*)malloc(512 * sizeof(char));
     size_t buffsize = sizeof(buffer);
 
-    // TODO: patch proton to return the required size in buffsize for realloc
-    int rc = pn_message_save(msg->message, buffer, &buffsize);
-    while (rc == PN_OVERFLOW) {
-      buffsize = 2 * buffsize;
-      buffer = (char*)realloc(buffer, buffsize);
-      rc = pn_message_save(msg->message, buffer, &buffsize);
-    }
-
     // return appropriate JS object based on type
     switch (type) {
       case PN_STRING:
-        result = String::New(buffer, (int)buffsize);
+        {
+          int rc = pn_data_format(body, buffer, &buffsize);
+          while (rc == PN_OVERFLOW) {
+            buffsize = 2 * buffsize;
+            buffer = (char*)realloc(buffer, buffsize);
+            rc = pn_data_format(body, buffer, &buffsize);
+          }
+          result = String::New(buffer, (int)buffsize);
+        }
         break;
       default:
-        Local<Object> global = Context::GetCurrent()->Global();
-        Local<Function> constructor =
+        {
+          pn_bytes_t binary = pn_data_get_binary(body);
+          Local<Object> global = Context::GetCurrent()->Global();
+          Local<Function> constructor =
             Local<Function>::Cast(global->Get(String::New("Buffer")));
-        Handle<Value> args[1] = {v8::Integer::New((int)buffsize)};
-        result = constructor->NewInstance(1, args);
-        memcpy(Buffer::Data(result), buffer, buffsize);
+          Handle<Value> args[1] = {v8::Integer::New(binary.size)};
+          result = constructor->NewInstance(1, args);
+          memcpy(Buffer::Data(result), binary.start, binary.size);
+        }
         break;
     }
 
@@ -310,23 +310,22 @@ void ProtonMessage::PutBody(Local<String> property,
   Proton::Entry("ProtonMessage::PutBody", name);
 
   if (msg && msg->message) {
+    pn_data_t* body = pn_message_body(msg->message);
     if (value->IsString()) {
       String::Utf8Value param(value->ToString());
       std::string msgtext = std::string(*param);
       Proton::Log("data", name, "format:", "PN_TEXT");
       Proton::LogBody(name, msgtext.c_str());
-      pn_message_set_format(msg->message, PN_TEXT);
-      pn_message_load_text(
-          msg->message, msgtext.c_str(), strlen(msgtext.c_str()));
+      pn_data_put_string(body,
+                         pn_bytes(strlen(msgtext.c_str()), msgtext.c_str()));
       V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgtext.c_str()));
     } else if (value->IsObject()) {
       Local<Object> buffer = value->ToObject();
       char* msgdata = Buffer::Data(buffer);
       size_t msglen = Buffer::Length(buffer);
-      Proton::Log("data", name, "format:", "PN_DATA");
+      Proton::Log("data", name, "format:", "PN_BINARY");
       Proton::LogBody(name, buffer);
-      pn_message_set_format(msg->message, PN_DATA);
-      pn_message_load_data(msg->message, msgdata, msglen);
+      pn_data_put_binary(body, pn_bytes(msglen, msgdata));
       V8::AdjustAmountOfExternalAllocatedMemory(sizeof(msgdata));
     }
   }
