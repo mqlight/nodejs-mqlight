@@ -256,21 +256,12 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
     pn_data_next(body);
     pn_type_t type = pn_data_type(body);
 
-    // XXX: maybe cache this in the C++ object at set time?
-    char* buffer = (char*)malloc(512 * sizeof(char));
-    size_t buffsize = sizeof(buffer);
-
     // return appropriate JS object based on type
     switch (type) {
       case PN_STRING:
         {
-          int rc = pn_data_format(body, buffer, &buffsize);
-          while (rc == PN_OVERFLOW) {
-            buffsize = 2 * buffsize;
-            buffer = (char*)realloc(buffer, buffsize);
-            rc = pn_data_format(body, buffer, &buffsize);
-          }
-          result = String::New(buffer, (int)buffsize);
+          pn_bytes_t string = pn_data_get_string(body);
+          result = String::New(string.start, string.size);
         }
         break;
       default:
@@ -291,8 +282,6 @@ Handle<Value> ProtonMessage::GetBody(Local<String> property,
     Proton::Log(
         "debug", name, "subject:", pn_message_get_subject(msg->message));
     Proton::LogBody(name, result);
-
-    free(buffer);
   } else {
     result = Undefined();
   }
