@@ -74,8 +74,8 @@ void ProtonMessage::Init(Handle<Object> target)
                                        GetLinkAddress);
   tpl->InstanceTemplate()->SetAccessor(String::New("deliveryAnnotations"),
                                        GetDeliveryAnnotations);
-  tpl->InstanceTemplate()->SetAccessor(String::New("properties"),
-                                       GetMessageProperties);
+  tpl->InstanceTemplate()->SetAccessor(
+      String::New("properties"), GetMessageProperties, SetMessageProperties);
   tpl->InstanceTemplate()->SetAccessor(
       String::New("ttl"), GetTimeToLive, SetTimeToLive);
 
@@ -643,6 +643,69 @@ Handle<Value> ProtonMessage::GetMessageProperties(Local<String> property,
 
   Proton::Exit("ProtonMessage::GetMessageProperties", name, 1);
   return scope.Close(result);
+}
+
+void ProtonMessage::SetMessageProperties(Local<String> property,
+                                         Local<Value> value,
+                                         const AccessorInfo& info)
+{
+  HandleScope scope;
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.Holder());
+  const char* name = msg ? msg->name : NULL;
+
+  Proton::Entry("ProtonMessage::SetMessageProperties", name);
+
+  if (msg && msg->message) {
+    Local<Object> obj = value->ToObject();
+    Local<Array> props = obj->GetPropertyNames();
+
+    if (props->Length() > 0) {
+      pn_data_t* data = pn_message_properties(msg->message);
+      pn_data_put_map(data);
+      pn_data_enter(data);
+
+      for (uint32_t i = 0; i < props->Length(); i++) {
+        String::Utf8Value keyStr(props->Get(i)->ToString());
+        std::string key = std::string(*keyStr);
+        Local<Value> value = obj->Get(props->Get(i)->ToString());
+
+        if (value->IsUndefined() || value->IsNull()) {
+          pn_data_put_string(data, pn_bytes(strlen(key.c_str()), key.c_str()));
+          pn_data_put_null(data);
+        } else if (value->IsBoolean()) {
+          pn_data_put_string(data, pn_bytes(strlen(key.c_str()), key.c_str()));
+          pn_data_put_bool(data, value->ToBoolean()->Value());
+        } else if (value->IsNumber()) {
+          pn_data_put_string(data, pn_bytes(strlen(key.c_str()), key.c_str()));
+          pn_data_put_double(data, value->NumberValue());
+        } else if (value->IsString()) {
+          String::Utf8Value valStr(value->ToString());
+          std::string val = std::string(*valStr);
+          pn_data_put_string(data, pn_bytes(strlen(key.c_str()), key.c_str()));
+          pn_data_put_string(data,
+                             pn_bytes(strlen(val.c_str()), val.c_str()));
+        } else if (value->IsObject()) {
+          Local<Object> global = Context::GetCurrent()->Global();
+          Local<Value> bufferPrototype =
+              global->Get(String::New("Buffer"))->ToObject()->Get(
+                  String::New("prototype"));
+          if (bufferPrototype->Equals(value->ToObject()->GetPrototype())) {
+            Local<Object> buffer = value->ToObject();
+            char* bufdata = Buffer::Data(buffer);
+            size_t buflen = Buffer::Length(buffer);
+            pn_data_put_string(data,
+                               pn_bytes(strlen(key.c_str()), key.c_str()));
+            pn_data_put_binary(data, pn_bytes(buflen, bufdata));
+          }
+        }
+      }
+      pn_data_exit(data);
+      pn_data_rewind(data);
+    }
+  }
+
+  Proton::Exit("ProtonMessage::SetMessageProperties", name, 0);
+  scope.Close(Undefined());
 }
 
 Handle<Value> ProtonMessage::GetTimeToLive(Local<String> property,

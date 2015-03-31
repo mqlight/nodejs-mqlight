@@ -2494,6 +2494,24 @@ Client.prototype.send = function(topic, data, options, callback) {
     if (ttl) {
       protonMsg.ttl = ttl;
     }
+    if ('properties' in options) {
+      var properties = {};
+      for (var property in options.properties) {
+        var key = String(property);
+        var val = options.properties[property];
+        var type = typeof(val);
+        if (val !== null && type !== 'boolean' && type !== 'number' &&
+            type !== 'string' && !(val instanceof Buffer)) {
+          var msg = "Property key '" + key + "' specifies a value which is " +
+                    'not of a supported type';
+          err = new InvalidArgumentError(msg);
+          logger.throw('Client.send', this.id, err);
+          throw err;
+        }
+        properties[key] = val;
+      }
+      protonMsg.properties = properties;
+    }
     if (typeof data === 'string') {
       protonMsg.body = data;
       protonMsg.contentType = 'text/plain';
