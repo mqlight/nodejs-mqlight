@@ -2494,7 +2494,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     if (ttl) {
       protonMsg.ttl = ttl;
     }
-    if ('properties' in options) {
+    if (options && 'properties' in options) {
       var properties = {};
       for (var property in options.properties) {
         var key = String(property);
