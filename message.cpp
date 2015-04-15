@@ -110,9 +110,11 @@ ProtonMessage::~ProtonMessage()
     linkAddr = NULL;
   }
 
-  handle_->SetInternalField(0, Undefined());
-  handle_.Dispose();
-  handle_.Clear();
+  if (!handle_.IsEmpty()) {
+    handle_->SetInternalField(0, Undefined());
+    handle_.Dispose();
+    handle_.Clear();
+  }
 
   Proton::Exit("ProtonMessage::destructor", name, 0);
 }
@@ -191,7 +193,6 @@ Handle<Value> ProtonMessage::Destroy(const Arguments& args)
   Proton::Entry("ProtonMessage::Destroy", name);
 
   if (msg) {
-    msg->~ProtonMessage();
     delete msg;
   }
 
