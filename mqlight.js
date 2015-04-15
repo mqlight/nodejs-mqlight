@@ -2480,17 +2480,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     logger.entry('proton.createMessage', client.id);
     protonMsg = proton.createMessage();
     logger.exit('proton.createMessage', client.id, protonMsg);
-    protonMsg.address = client._getService();
-    if (topic) {
-      // need to encode the topic component but / has meaning that shouldn't be
-      // encoded
-      var topicLevels = topic.split('/');
-      var encodedTopicLevels = topicLevels.map(function(tLevel) {
-        return encodeURIComponent(tLevel);
-      });
-      var encodedTopic = encodedTopicLevels.join('/');
-      protonMsg.address += '/' + encodedTopic;
-    }
+    protonMsg.address = client._getService() + '/' + topic;
     if (ttl) {
       protonMsg.ttl = ttl;
     }
@@ -2857,8 +2847,11 @@ var processMessage = function(client, protonMsg) {
     data = protonMsg.body;
   }
 
-  var topic =
-      decodeURIComponent(url.parse(protonMsg.address).path.substring(1));
+  var topic = protonMsg.address;
+  if (topic.indexOf('amqp://') === 0) {
+    topic = topic.slice(7);
+    topic = topic.slice(topic.indexOf('/') + 1);
+  }
   var autoConfirm = true;
   var qos = exports.QOS_AT_MOST_ONCE;
   var matchedSubs = client._subscriptions.filter(function(el) {

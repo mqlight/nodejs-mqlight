@@ -896,7 +896,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
                     pn_message_get_address(msg->message));
       } else {
         const char* tmpAddr =
-            pn_terminus_get_address(pn_link_remote_target(link));
+            pn_terminus_get_address(pn_link_remote_source(link));
         msg->linkAddr = (char*)malloc(strlen(tmpAddr) + 1);
         strcpy(msg->linkAddr, tmpAddr);
         vector.push_back(msgObj);
