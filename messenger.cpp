@@ -200,6 +200,7 @@ Handle<Value> ProtonMessenger::NewInstance(const Arguments& args)
     argv[i] = args[i];
   }
   Local<Object> instance = constructor->GetFunction()->NewInstance(argc, argv);
+  delete [] argv;
 
   Proton::Exit("ProtonMessenger::NewInstance", NULL, 0);
   return scope.Close(instance);

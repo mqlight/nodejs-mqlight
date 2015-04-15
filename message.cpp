@@ -192,9 +192,10 @@ Handle<Value> ProtonMessage::Destroy(const Arguments& args)
 
   if (msg) {
     msg->~ProtonMessage();
+    delete msg;
   }
 
-  Proton::Exit("ProtonMessage::Destroy", name, 0);
+  Proton::Exit("ProtonMessage::Destroy", NULL, 0);
   return scope.Close(Undefined());
 }
 
