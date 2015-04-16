@@ -1213,7 +1213,7 @@ Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
   pn_delivery_t *delivery = pn_messenger_delivery(obj->messenger, msg->tracker);
   pn_disposition_t *disposition = NULL;
   pn_condition_t *condition = NULL;
-  const char *description = "";
+  const char *description = NULL;
   if (delivery != NULL) {
     disposition = pn_delivery_remote(delivery);
   }
@@ -1224,8 +1224,11 @@ Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
     description = pn_condition_get_description(condition);
   }
 
-  Proton::Exit("ProtonMessenger::StatusError", name, description);
-  return scope.Close(String::New(description));
+  Handle<Value> result =
+      (description == NULL) ? Undefined() : String::New(description);
+  Proton::Exit("ProtonMessenger::StatusError", name,
+               (description == NULL) ? "" : description);
+  return scope.Close(result);
 }
 
 Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
