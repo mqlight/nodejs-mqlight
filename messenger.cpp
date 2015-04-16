@@ -584,6 +584,17 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
         "NetworkError", "Not connected", "ProtonMessenger::Subscribe", name);
   }
 
+  // find link based on address - there shouldn't be one.
+  pn_link_t* link =
+      pn_messenger_get_link(obj->messenger, address.c_str(), false);
+
+  if (link) {
+    // throw Error if find an active matching Link
+    THROW_NAMED_EXCEPTION(
+        "SubscribedError", "client is already subscribed to this address",
+        "ProtonMessenger::Subscribe", name);
+  }
+
   /* Set the required QoS, by setting the sender settler mode to settled (QoS =
    * AMO) or unsettled (QoS = ALO).
    * Note that our API client implementation will always specify a value of
@@ -717,11 +728,19 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
       pn_messenger_get_link(obj->messenger, address.c_str(), false);
 
   if (!link) {
-    // throw Error if unable to find a matching Link
-    THROW_EXCEPTION_TYPE(Exception::Error,
-                         ("unable to locate link for " + address).c_str(),
-                         "ProtonMessenger::Unsubscribe",
-                         name)
+    // find link based on address, in any state.
+    if(pn_messenger_get_stated_link(obj->messenger, address.c_str(), false, 0)) {
+      // throw UnsubscribedError if able to find an inactive matching Link
+      THROW_NAMED_EXCEPTION(
+          "UnsubscribedError", "client is not subscribed to this address",
+          "ProtonMessenger::Unsubscribe", name);
+    } else {
+      // throw Error if unable to find an active matching Link
+      THROW_EXCEPTION_TYPE(Exception::Error,
+                           ("unable to locate link for " + address).c_str(),
+                           "ProtonMessenger::Unsubscribe",
+                           name)
+    }
   }
 
   if (ttl == 0) {
