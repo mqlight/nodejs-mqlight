@@ -718,7 +718,7 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
   }
 
   // throw Error if not connected
-  if (!obj->messenger) {
+  if (!obj->messenger || !obj->connection) {
     THROW_NAMED_EXCEPTION(
         "NetworkError", "Not connected", "ProtonMessenger::Unsubscribe", name);
   }
@@ -801,7 +801,7 @@ Handle<Value> ProtonMessenger::Unsubscribed(const Arguments& args)
   Proton::Log("parms", name, "address:", address.c_str());
 
   // throw Error if not connected
-  if (!obj->messenger) {
+  if (!obj->messenger || !obj->connection) {
     THROW_NAMED_EXCEPTION(
         "NetworkError", "Not connected", "ProtonMessenger::Unsubscribed", name);
   }
