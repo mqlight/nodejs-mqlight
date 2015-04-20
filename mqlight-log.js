@@ -69,13 +69,15 @@ var header = function(lvl, clientId, options) {
   if (npmlog.levels[npmlog.level] <= npmlog.levels[lvl]) {
     npmlog.log(lvl, clientId, HEADER_BANNER);
     npmlog.log(lvl, clientId, '| IBM MQ Light Node.js Client Module -',
-          options.title);
+               options.title);
     npmlog.log(lvl, clientId, HEADER_BANNER);
     npmlog.log(lvl, clientId, '| Date/Time         :-',
-          moment().format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
+               moment().format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
     npmlog.log(lvl, clientId, '| Host Name         :-', os.hostname());
-    npmlog.log(lvl, clientId, '| Operating System  :-', os.type(), os.release());
-    npmlog.log(lvl, clientId, '| Architecture      :-', os.platform(), os.arch());
+    npmlog.log(lvl, clientId, '| Operating System  :-',
+               os.type(), os.release());
+    npmlog.log(lvl, clientId, '| Architecture      :-',
+               os.platform(), os.arch());
     npmlog.log(lvl, clientId, '| Node Version      :-', process.version);
     npmlog.log(lvl, clientId, '| Node Path         :-', process.execPath);
     npmlog.log(lvl, clientId, '| Node Arguments    :-', process.execArgs);
@@ -97,7 +99,8 @@ var header = function(lvl, clientId, options) {
       npmlog.log(lvl, clientId, '| Probe Id          :-', options.probeId);
     }
     if ('ffdcSequence' in options) {
-      npmlog.log(lvl, clientId, '| FFDCSequenceNumber:-', options.ffdcSequence++);
+      npmlog.log(lvl, clientId, '| FFDCSequenceNumber:-',
+                 options.ffdcSequence++);
     }
     if (potentialUnwinds !== 0) {
       npmlog.log(lvl, clientId, '| potentialUnwinds  :-', potentialUnwinds);
@@ -292,10 +295,10 @@ logger.exitLevel = function(lvl, name, id, rc) {
   // Only log object type returns if object logging is enabled.
   if (npmlog.levels[npmlog.level] <= npmlog.levels.object) {
     npmlog.log(lvl, id, EXIT_IND.substring(0, Math.max(1, stack.length - 1)),
-          name, rc ? rc : '');
+               name, rc ? rc : '');
   } else {
     npmlog.log(lvl, id, EXIT_IND.substring(0, Math.max(1, stack.length - 1)),
-          name, rc ? (typeof rc === 'object' ? '[object]' : rc) : '');
+               name, rc ? (typeof rc === 'object' ? '[object]' : rc) : '');
   }
   var last;
   do {
@@ -367,10 +370,10 @@ logger.body = function(id, data) {
     } else {
       if ((dataSize >= data.length) || (dataSize < 0)) {
         npmlog.log('data', id, '! buffer:',
-              data.toString('hex'));
+                   data.toString('hex'));
       } else {
         npmlog.log('data', id, '! buffer:',
-              data.toString('hex', 0, dataSize), '...');
+                   data.toString('hex', 0, dataSize), '...');
       }
     }
   }
@@ -496,7 +499,7 @@ logger.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
       if ((rec.level !== 'ffdc') &&
           (npmlog.levels[rec.level] >= npmlog.levels[historyLevel])) {
         npmlog.log('ffdc', opts.clientId, '%d %s %s %s',
-              rec.id, npmlog.disp[rec.level], rec.prefix, rec.message);
+                   rec.id, npmlog.disp[rec.level], rec.prefix, rec.message);
       }
     }
     if (opt_client) {
