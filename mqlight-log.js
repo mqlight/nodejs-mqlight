@@ -52,15 +52,13 @@ var styles = {
 };
 
 /*
- * Write the log entry, including a timestamp and process identifier in the
- * heading.
+ * Set the npmlog heading to include a timestamp and process identifier.
  */
-var write = function(lvl, prefix, args) {
-  if (npmlog.levels[npmlog.level] <= npmlog.levels[lvl]) {
-    npmlog.heading = moment().format('HH:mm:ss.SSS') + ' [' + process.pid + ']';
+Object.defineProperty(npmlog, 'heading', {
+  get: function() {
+    return moment().format('HH:mm:ss.SSS') + ' [' + process.pid + ']';
   }
-  npmlog.log.apply(this, arguments);
-};
+});
 
 
 /*
@@ -69,43 +67,43 @@ var write = function(lvl, prefix, args) {
  */
 var header = function(lvl, clientId, options) {
   if (npmlog.levels[npmlog.level] <= npmlog.levels[lvl]) {
-    write(lvl, clientId, HEADER_BANNER);
-    write(lvl, clientId, '| IBM MQ Light Node.js Client Module -',
+    npmlog.log(lvl, clientId, HEADER_BANNER);
+    npmlog.log(lvl, clientId, '| IBM MQ Light Node.js Client Module -',
           options.title);
-    write(lvl, clientId, HEADER_BANNER);
-    write(lvl, clientId, '| Date/Time         :-',
+    npmlog.log(lvl, clientId, HEADER_BANNER);
+    npmlog.log(lvl, clientId, '| Date/Time         :-',
           moment().format('ddd MMMM DD YYYY HH:mm:ss.SSS Z'));
-    write(lvl, clientId, '| Host Name         :-', os.hostname());
-    write(lvl, clientId, '| Operating System  :-', os.type(), os.release());
-    write(lvl, clientId, '| Architecture      :-', os.platform(), os.arch());
-    write(lvl, clientId, '| Node Version      :-', process.version);
-    write(lvl, clientId, '| Node Path         :-', process.execPath);
-    write(lvl, clientId, '| Node Arguments    :-', process.execArgs);
+    npmlog.log(lvl, clientId, '| Host Name         :-', os.hostname());
+    npmlog.log(lvl, clientId, '| Operating System  :-', os.type(), os.release());
+    npmlog.log(lvl, clientId, '| Architecture      :-', os.platform(), os.arch());
+    npmlog.log(lvl, clientId, '| Node Version      :-', process.version);
+    npmlog.log(lvl, clientId, '| Node Path         :-', process.execPath);
+    npmlog.log(lvl, clientId, '| Node Arguments    :-', process.execArgs);
     if (!isWin) {
-      write(lvl, clientId, '| User Id           :-', process.getuid());
-      write(lvl, clientId, '| Group Id          :-', process.getgid());
+      npmlog.log(lvl, clientId, '| User Id           :-', process.getuid());
+      npmlog.log(lvl, clientId, '| Group Id          :-', process.getgid());
     }
-    write(lvl, clientId, '| Name              :-', pkg.name);
-    write(lvl, clientId, '| Version           :-', pkg.version);
-    write(lvl, clientId, '| Description       :-', pkg.description);
-    write(lvl, clientId, '| Installation Path :-', __dirname);
-    write(lvl, clientId, '| Uptime            :-', process.uptime());
-    write(lvl, clientId, '| Log Level         :-', npmlog.level);
-    write(lvl, clientId, '| Data Size         :-', dataSize);
+    npmlog.log(lvl, clientId, '| Name              :-', pkg.name);
+    npmlog.log(lvl, clientId, '| Version           :-', pkg.version);
+    npmlog.log(lvl, clientId, '| Description       :-', pkg.description);
+    npmlog.log(lvl, clientId, '| Installation Path :-', __dirname);
+    npmlog.log(lvl, clientId, '| Uptime            :-', process.uptime());
+    npmlog.log(lvl, clientId, '| Log Level         :-', npmlog.level);
+    npmlog.log(lvl, clientId, '| Data Size         :-', dataSize);
     if ('fnc' in options) {
-      write(lvl, clientId, '| Function          :-', options.fnc);
+      npmlog.log(lvl, clientId, '| Function          :-', options.fnc);
     }
     if ('probeId' in options) {
-      write(lvl, clientId, '| Probe Id          :-', options.probeId);
+      npmlog.log(lvl, clientId, '| Probe Id          :-', options.probeId);
     }
     if ('ffdcSequence' in options) {
-      write(lvl, clientId, '| FFDCSequenceNumber:-', options.ffdcSequence++);
+      npmlog.log(lvl, clientId, '| FFDCSequenceNumber:-', options.ffdcSequence++);
     }
     if (potentialUnwinds !== 0) {
-      write(lvl, clientId, '| potentialUnwinds  :-', potentialUnwinds);
+      npmlog.log(lvl, clientId, '| potentialUnwinds  :-', potentialUnwinds);
     }
-    write(lvl, clientId, HEADER_BANNER);
-    write(lvl, clientId, '');
+    npmlog.log(lvl, clientId, HEADER_BANNER);
+    npmlog.log(lvl, clientId, '');
   }
 };
 
@@ -263,7 +261,7 @@ logger.entryLevel = function(lvl, name, id) {
       stack.pop();
     }
   }
-  write(lvl, id, ENTRY_IND.substring(0, stack.length), name);
+  npmlog.log(lvl, id, ENTRY_IND.substring(0, stack.length), name);
   stack.push(name);
 };
 
@@ -291,8 +289,14 @@ logger.entry = function(name, id) {
  * @param {Object} rc The function return code.
  */
 logger.exitLevel = function(lvl, name, id, rc) {
-  write(lvl, id, EXIT_IND.substring(0, Math.max(1, stack.length - 1)),
-        name, rc ? rc : '');
+  // Only log object type returns if object logging is enabled.
+  if (npmlog.levels[npmlog.level] <= npmlog.levels.object) {
+    npmlog.log(lvl, id, EXIT_IND.substring(0, Math.max(1, stack.length - 1)),
+          name, rc ? rc : '');
+  } else {
+    npmlog.log(lvl, id, EXIT_IND.substring(0, Math.max(1, stack.length - 1)),
+          name, rc ? (typeof rc === 'object' ? '[object]' : rc) : '');
+  }
   var last;
   do {
     // Check if we've unwound to the bottom of the stack.
@@ -337,7 +341,7 @@ logger.exit = function(name, id, rc) {
  */
 logger.log = function(lvl, id, args) {
   if (npmlog.levels[npmlog.level] <= npmlog.levels[lvl]) {
-    write.apply(this, arguments);
+    npmlog.log.apply(this, arguments);
   }
 };
 
@@ -353,19 +357,19 @@ logger.log = function(lvl, id, args) {
                                                                 */
 logger.body = function(id, data) {
   if (npmlog.levels[npmlog.level] <= npmlog.levels.data) {
-    write('data', id, '! length:', data.length);
+    npmlog.log('data', id, '! length:', data.length);
     if (typeof data === 'string') {
       if ((dataSize >= data.length) || (dataSize < 0)) {
-        write('data', id, '! string:', data);
+        npmlog.log('data', id, '! string:', data);
       } else {
-        write('data', id, '! string:', data.substring(0, dataSize), '...');
+        npmlog.log('data', id, '! string:', data.substring(0, dataSize), '...');
       }
     } else {
       if ((dataSize >= data.length) || (dataSize < 0)) {
-        write('data', id, '! buffer:',
+        npmlog.log('data', id, '! buffer:',
               data.toString('hex'));
       } else {
-        write('data', id, '! buffer:',
+        npmlog.log('data', id, '! buffer:',
               data.toString('hex', 0, dataSize), '...');
       }
     }
@@ -481,39 +485,39 @@ logger.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
 
   if (npmlog.levels[npmlog.level] <= npmlog.levels.ffdc) {
     header('ffdc', opts.clientId, opts);
-    write('ffdc', opts.clientId, new Error().stack);
-    write('ffdc', opts.clientId, '');
-    write('ffdc', opts.clientId, 'Function Stack');
-    write('ffdc', opts.clientId, stack.slice(1));
-    write('ffdc', opts.clientId, '');
-    write('ffdc', opts.clientId, 'Function History');
+    npmlog.log('ffdc', opts.clientId, new Error().stack);
+    npmlog.log('ffdc', opts.clientId, '');
+    npmlog.log('ffdc', opts.clientId, 'Function Stack');
+    npmlog.log('ffdc', opts.clientId, stack.slice(1));
+    npmlog.log('ffdc', opts.clientId, '');
+    npmlog.log('ffdc', opts.clientId, 'Function History');
     for (var idx = 0; idx < npmlog.record.length; idx++) {
       var rec = npmlog.record[idx];
       if ((rec.level !== 'ffdc') &&
           (npmlog.levels[rec.level] >= npmlog.levels[historyLevel])) {
-        write('ffdc', opts.clientId, '%d %s %s %s',
+        npmlog.log('ffdc', opts.clientId, '%d %s %s %s',
               rec.id, npmlog.disp[rec.level], rec.prefix, rec.message);
       }
     }
     if (opt_client) {
-      write('ffdc', opts.clientId, '');
-      write('ffdc', opts.clientId, 'Client');
-      write('ffdc', opts.clientId, opt_client);
+      npmlog.log('ffdc', opts.clientId, '');
+      npmlog.log('ffdc', opts.clientId, 'Client');
+      npmlog.log('ffdc', opts.clientId, opt_client);
     }
     if (opt_data) {
-      write('ffdc', opts.clientId, '');
-      write('ffdc', opts.clientId, 'Data');
-      write('ffdc', opts.clientId, opt_data);
+      npmlog.log('ffdc', opts.clientId, '');
+      npmlog.log('ffdc', opts.clientId, 'Data');
+      npmlog.log('ffdc', opts.clientId, opt_data);
     }
-    write('ffdc', opts.clientId, '');
-    write('ffdc', opts.clientId, 'Memory Usage');
-    write('ffdc', opts.clientId, process.memoryUsage());
+    npmlog.log('ffdc', opts.clientId, '');
+    npmlog.log('ffdc', opts.clientId, 'Memory Usage');
+    npmlog.log('ffdc', opts.clientId, process.memoryUsage());
     if ((ffdcSequence === 1) || (opts.probeId === 255)) {
-      write('ffdc', opts.clientId, '');
-      write('ffdc', opts.clientId, 'Environment Variables');
-      write('ffdc', opts.clientId, process.env);
+      npmlog.log('ffdc', opts.clientId, '');
+      npmlog.log('ffdc', opts.clientId, 'Environment Variables');
+      npmlog.log('ffdc', opts.clientId, process.env);
     }
-    write('ffdc', opts.clientId, '');
+    npmlog.log('ffdc', opts.clientId, '');
   }
 
   // In a unit testing environment we expect to get no ffdcs.
@@ -555,6 +559,7 @@ npmlog.addLevel('exit', 1500, styles.yellow, 'exit  ');
 npmlog.addLevel('entry', 1500, styles.yellow, 'entry ');
 npmlog.addLevel('entry_exit', 1500, styles.yellow, 'func  ');
 npmlog.addLevel('error', 1800, styles.red, 'error ');
+npmlog.addLevel('object', 1900, styles.red, 'object');
 npmlog.addLevel('ffdc', 2000, styles.red, 'ffdc  ');
 
 
