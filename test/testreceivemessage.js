@@ -681,3 +681,65 @@ module.exports.test_presence_of_confirmDelivery_method = function(test) {
     test.ok(false);
   });
 };
+
+
+/**
+ * Tests that the confirmDelivery() method accepts a callback parameter which
+ * will be called once the message has successfully been confirmed
+ *
+ * @param {object} test the unittest interface
+ */
+module.exports.test_confirmDelivery_callback = function(test) {
+  var options = { qos: 1, autoConfirm: false };
+
+  var originalReceiveMethod = mqlight.proton.messenger.receive;
+  var messages = [];
+  mqlight.proton.messenger.receive = function() {
+    var result = messages;
+    messages = [];
+    return result;
+  };
+
+  var client = mqlight.createClient({
+    service: 'amqp://host',
+    id: 'test_confirmDelivery_callback'
+  }, function() {
+    client.subscribe('/kittens/#', options);
+    messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
+  });
+
+  var stop = function() {
+    client.stop(function() {
+      test.done();
+    });
+  };
+
+  var timer = setTimeout(function() {
+    test.ok(false, 'test timed out without callback being invoked');
+    stop();
+    test.done();
+  }, 2500);
+
+  var callback = function() {
+    clearTimeout(timer);
+    client.unsubscribe('/kittens/#', function(err, topicPattern, share) {
+      mqlight.proton.messenger.receive = originalReceiveMethod;
+      stop();
+    });
+  };
+
+  client.on('message', function(data, delivery) {
+    test.ok(delivery.message.confirmDelivery !== undefined,
+            'confirmDelivery() should be present');
+    delivery.message.confirmDelivery(callback);
+  });
+
+  client.on('malformed', function() {
+    test.ok(false, 'malformed event should not be emitted');
+  });
+
+  client.on('error', function(err) {
+    test.ok(false, 'error event should not be emitted');
+  });
+
+};

@@ -2904,7 +2904,7 @@ var processMessage = function(client, protonMsg) {
   };
 
 
-  var stillSettling = function(subscription, protonMsg) {
+  var stillSettling = function(subscription, protonMsg, callback) {
     var client = this;
     logger.entryLevel('entry_often', 'processMessage.stillSettling', client.id);
 
@@ -2929,9 +2929,16 @@ var processMessage = function(client, protonMsg) {
       }
       protonMsg.destroy();
       protonMsg = null;
+      if (callback) {
+        process.nextTick(function() {
+          logger.entry('processMessage.stillSettling.callback', client.id);
+          callback.apply(client);
+          logger.exit('processMessage.stillSettling.callback', client.id, null);
+        });
+      }
     } else {
       setImmediate(function() {
-        stillSettling.call(client, subscription, protonMsg);
+        stillSettling.call(client, subscription, protonMsg, callback);
       });
     }
 
@@ -2941,28 +2948,37 @@ var processMessage = function(client, protonMsg) {
 
   if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
     var deliveryConfirmed = false;
-    delivery.message.confirmDelivery = function() {
+    delivery.message.confirmDelivery = function(callback) {
       logger.entry('message.confirmDelivery', client.id);
       logger.log('data', client.id, 'delivery:', delivery);
-      logger.log('data', client.id, 'deliveryConfirmed:', deliveryConfirmed);
+
+      var err;
       if (client.isStopped()) {
         err = new NetworkError('not started');
         logger.throw('message.confirmDelivery', client.id, err);
         throw err;
       }
+
+      if (callback && (typeof callback !== 'function')) {
+        err = new TypeError('Callback must be a function');
+        logger.throw('message.confirmDelivery', client.id, err);
+        throw err;
+      }
+
+      logger.log('data', client.id, 'deliveryConfirmed:', deliveryConfirmed);
+
       if (!deliveryConfirmed && protonMsg) {
-        // also throw NetworkError if the client has
-        // disconnected at some point since this particular message was
-        // received
+        // also throw NetworkError if the client has disconnected at some point
+        // since this particular message was received
         if (protonMsg.connectionId !== client._connectionId) {
           err = new NetworkError('client has reconnected since this ' +
-                                       'message was received');
+                                 'message was received');
           logger.throw('message.confirmDelivery', client.id, err);
           throw err;
         }
         deliveryConfirmed = true;
         messenger.settle(protonMsg, client._stream);
-        stillSettling.call(client, subscription, protonMsg);
+        stillSettling.call(client, subscription, protonMsg, callback);
       }
       logger.exit('message.confirmDelivery', client.id, null);
     };
