@@ -119,6 +119,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(constructor, "accept", Accept);
   NODE_SET_PROTOTYPE_METHOD(constructor, "put", Put);
   NODE_SET_PROTOTYPE_METHOD(constructor, "send", Send);
+  NODE_SET_PROTOTYPE_METHOD(constructor, "sending", Sending);
   NODE_SET_PROTOTYPE_METHOD(constructor, "stop", Stop);
   NODE_SET_PROTOTYPE_METHOD(constructor, "connect", Connect);
   NODE_SET_PROTOTYPE_METHOD(constructor, "subscribe", Subscribe);
@@ -352,6 +353,56 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
 
   Proton::Exit("ProtonMessenger::Send", name, true);
   return scope.Close(Boolean::New(true));
+}
+
+Handle<Value> ProtonMessenger::Sending(const Arguments& args)
+{
+  HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+
+  Proton::Entry("ProtonMessenger::Sending", name);
+
+  // throw TypeError if not enough args
+  if (args.Length() < 1 || args[0].IsEmpty()) {
+    THROW_EXCEPTION("Missing required argument",
+                    "ProtonMessenger::Sending",
+                    name);
+  }
+
+  String::Utf8Value param(args[0]->ToString());
+  std::string address = std::string(*param);
+  Proton::Log("parms", name, "address:", address.c_str());
+
+  // throw Error if not connected
+  if (!obj->messenger) {
+    THROW_NAMED_EXCEPTION(
+        "NetworkError", "Not connected", "ProtonMessenger::Sending", name);
+  }
+
+  Proton::Entry("pn_messenger_get_link", name);
+  pn_link_t* link =
+      pn_messenger_get_link(obj->messenger, address.c_str(), true);
+  int error = pn_messenger_errno(obj->messenger);
+  Proton::Exit("pn_messenger_get_link", name, error);
+  if (error) {
+    const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+    const char* err = GetErrorName(text);
+    THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Sending", name)
+  }
+
+  if (!link) {
+    // throw Error if unable to find a matching Link
+    THROW_EXCEPTION_TYPE(Exception::Error,
+                         ("unable to locate link for " + address).c_str(),
+                         "ProtonMessenger::Sending",
+                         name)
+  }
+
+  bool sending = (pn_link_state(link) & PN_REMOTE_ACTIVE);
+
+  Proton::Exit("ProtonMessenger::Sending", name, sending);
+  return scope.Close(Boolean::New(sending));
 }
 
 Handle<Value> ProtonMessenger::Connect(const Arguments& args)

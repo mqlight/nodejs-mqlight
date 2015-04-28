@@ -2547,7 +2547,9 @@ Client.prototype.send = function(topic, data, options, callback) {
               var complete = false;
               var err = null;
               if (inFlight.qos == exports.QOS_AT_MOST_ONCE) {
-                complete = (status === PN_STATUS_UNKNOWN);
+                if (messenger.sending(inFlight.msg.address)) {
+                  complete = (status === PN_STATUS_UNKNOWN);
+                }
               } else {
                 switch (status) {
                   case PN_STATUS_ACCEPTED:

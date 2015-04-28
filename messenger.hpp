@@ -59,6 +59,7 @@ class ProtonMessenger : public node::ObjectWrap
   static v8::Handle<v8::Value> New(const v8::Arguments& args);
   static v8::Handle<v8::Value> Put(const v8::Arguments& args);
   static v8::Handle<v8::Value> Send(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Sending(const v8::Arguments& args);
   static v8::Handle<v8::Value> Stop(const v8::Arguments& args);
   static v8::Handle<v8::Value> Stopped(v8::Local<v8::String> property,
                                        const v8::AccessorInfo& info);
