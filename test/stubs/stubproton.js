@@ -91,6 +91,10 @@ module.exports.createProtonStub = function() {
       send: function() {
         if (DEBUG) log('stub send function called');
       },
+      sending: function(address) {
+        if (DEBUG) log('stub sending function called with address', address);
+        return true;
+      },
       status: function(msg) {
         var result = sendStatus;
         if (result === 7 && msg.unitTestQos === 0) {
