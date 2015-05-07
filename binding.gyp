@@ -29,17 +29,17 @@
                     'PreprocessorDefinitions': [ '_WIN32_WINNT=0x0600', 'PN_NODEFINE_SSIZE_T' ]
                   }
                 },
-                "include_dirs+": [".", "<!(echo %BROOT%)/ship/mqm/include"],
+                "include_dirs+": [".", "<!(echo %BROOT%)/ship/mqm/include", "<!(node -e \"require('nan')\")"],
                 "libraries": ["<!(echo %QPIDLIB%)"],
             }],
             ["OS=='linux'", {
                 "cflags_cc+": ["-Wall", "-Wno-comment", "-g"],
-                "include_dirs+": [".", "<!(echo $BROOT)/ship/opt/mqm/include"],
+                "include_dirs+": [".", "<!(echo $BROOT)/ship/opt/mqm/include", "<!(node -e \"require('nan')\")"],
                 "libraries": ["-lqpid-proton", "-L<!(echo $BROOT)/ship/opt/mqm/lib64", "-Wl,-rpath=\'$$ORIGIN\'"],
             }],
             ["OS=='mac'", {
                 "cflags_cc+": ["-Wall", "-Wno-comment", "-g"],
-                "include_dirs+": [".", "<!(echo $BROOT)/ship/opt/mqm/include"],
+                "include_dirs+": [".", "<!(echo $BROOT)/ship/opt/mqm/include", "<!(node -e \"require('nan')\")"],
                 "libraries": ["-lqpid-proton", "-L<!(echo $BROOT)/ship/opt/mqm/lib64", "-Wl,-install_name,@rpath/proton.node", "-Wl,-rpath,@loader_path/", "-Wl,-headerpad_max_install_names"],
             }],
         ]

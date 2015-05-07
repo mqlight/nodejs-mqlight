@@ -1460,9 +1460,11 @@ var Client = function(service, id, securityOptions) {
         // Define an on stream drain handler. Check if proton has further data
         // to be written to the stream.
         var dataDrained = function() {
-          logger.entry('Client.dataDrained', _id);
-          var drained = client._messenger.pop(client._stream, false);
-          logger.exit('Client.dataDrained', _id, drained);
+          setImmediate(function() {
+            logger.entry('Client.dataDrained', _id);
+            var drained = client._messenger.pop(client._stream, false);
+            logger.exit('Client.dataDrained', _id, drained);
+          });
         };
 
         // Define an on stream close handler. Notify proton of the close.

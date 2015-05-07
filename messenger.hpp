@@ -4,7 +4,7 @@
 /*   <copyright                                                       */
 /*   notice="oco-source"                                              */
 /*   pids="5725-P60"                                                  */
-/*   years="2013,2014"                                                */
+/*   years="2013,2015"                                                */
 /*   crc="2536674324" >                                               */
 /*   IBM Confidential                                                 */
 /*                                                                    */
@@ -12,7 +12,7 @@
 /*                                                                    */
 /*   5725-P60                                                         */
 /*                                                                    */
-/*   (C) Copyright IBM Corp. 2013, 2014                               */
+/*   (C) Copyright IBM Corp. 2013, 2015                               */
 /*                                                                    */
 /*   The source code for the program is not published                 */
 /*   or otherwise divested of its trade secrets,                      */
@@ -34,6 +34,7 @@
 #include <string>
 
 #include <node.h>
+#include <nan.h>
 
 #include <proton/message.h>
 #include <proton/messenger.h>
@@ -51,48 +52,48 @@ class ProtonMessenger : public node::ObjectWrap
  public:
   static v8::Persistent<v8::FunctionTemplate> constructor;
   static void Init(v8::Handle<v8::Object> target);
-  static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
+  static NAN_METHOD(NewInstance);
   ProtonMessenger(std::string name, std::string username, std::string password);
   ~ProtonMessenger();
 
  protected:
-  static v8::Handle<v8::Value> New(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Put(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Send(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Sending(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Stop(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Stopped(v8::Local<v8::String> property,
-                                       const v8::AccessorInfo& info);
-  static v8::Handle<v8::Value> Connect(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Subscribe(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Subscribed(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Unsubscribe(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Unsubscribed(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Receive(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Status(const v8::Arguments& args);
-  static v8::Handle<v8::Value> StatusError(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Accept(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Settle(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Settled(const v8::Arguments& args);
-  static v8::Handle<v8::Value> GetRemoteIdleTimeout(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Flow(const v8::Arguments& args);
-  static v8::Handle<v8::Value> PendingOutbound(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Push(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Pop(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Started(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Closed(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Heartbeat(const v8::Arguments& args);
+  static NAN_METHOD(New);
+  static NAN_METHOD(Put);
+  static NAN_METHOD(Send);
+  static NAN_METHOD(Sending);
+  static NAN_METHOD(Stop);
+  static NAN_GETTER(Stopped);
+  static NAN_METHOD(Connect);
+  static NAN_METHOD(Subscribe);
+  static NAN_METHOD(Subscribed);
+  static NAN_METHOD(Unsubscribe);
+  static NAN_METHOD(Unsubscribed);
+  static NAN_METHOD(Receive);
+  static NAN_METHOD(Status);
+  static NAN_METHOD(StatusError);
+  static NAN_METHOD(Accept);
+  static NAN_METHOD(Settle);
+  static NAN_METHOD(Settled);
+  static NAN_METHOD(GetRemoteIdleTimeout);
+  static NAN_METHOD(Flow);
+  static NAN_METHOD(PendingOutbound);
+  static NAN_METHOD(Push);
+  static NAN_METHOD(Pop);
+  static NAN_METHOD(Started);
+  static NAN_METHOD(Closed);
+  static NAN_METHOD(Heartbeat);
 
+  static int Write(ProtonMessenger* obj,
+                   v8::Local<v8::Value> value,
+                   bool force);
   static void Tracer(pn_transport_t* transport, const char* message);
-  static v8::Handle<v8::Value> Write(ProtonMessenger* obj,
-                                     v8::Local<v8::Value> value, bool force);
 
   /**
    * Name for the messenger. Initially this will be set to the value passed to
    * the constructor.
    * When the proton messenger is constructed this may be modified to the name
-   * passed back from
-   * the pn_messenger_name function. In general it will not change.
+   * passed back from the pn_messenger_name function. In general it will not
+   * change.
    */
   std::string name;
 

@@ -1,31 +1,34 @@
 {
-    "name": "mqlight",
-    "version": "9.9.9999999999",
-    "description": "IBM MQ Light Client Module",
-    "main": "mqlight.js",
-    "gypfile": true,
-    "bin": {
-        "mqlight-debug": "./bin/mqlight-debug.js"
-    },
-    "dependencies": {
-        "node-uuid": "~1.4.3",
-        "nopt": "~3.0.1",
-        "npmlog": "~1.2.0",
-        "moment": "~2.9.0",
-        "hashmap": "~2.0.1"
-    },
-    "devDependencies": {
-        "istanbul": "latest",
-        "nodeunit": "~0.9.1"
-    },
-    "engines": {
-        "node": "~0.10.x"
-    },
-    "licenses": [{
-        "type": "proprietary",
-        "url": "http://www14.software.ibm.com/cgi-bin/weblap/lap.pl?popup=Y&li_formnum=L-ACRR-9MKEUW"
-    }],
-    "scripts": {
-        "test": "./node_modules/.bin/istanbul cover ./node_modules/nodeunit/bin/nodeunit --config test/nodeunit.json test"
+  "name": "mqlight",
+  "version": "9.9.9999999999",
+  "description": "IBM MQ Light Client Module",
+  "main": "mqlight.js",
+  "gypfile": true,
+  "bin": {
+    "mqlight-debug": "./bin/mqlight-debug.js"
+  },
+  "dependencies": {
+    "hashmap": "~2.0.3",
+    "moment": "~2.10.2",
+    "nan": "^1.8.4",
+    "node-uuid": "~1.4.3",
+    "nopt": "~3.0.1",
+    "npmlog": "~1.2.0"
+  },
+  "devDependencies": {
+    "istanbul": "latest",
+    "nodeunit": "~0.9.1"
+  },
+  "engines": {
+    "node": "~0.10.x"
+  },
+  "licenses": [
+    {
+      "type": "proprietary",
+      "url": "http://www14.software.ibm.com/cgi-bin/weblap/lap.pl?popup=Y&li_formnum=L-ACRR-9MKEUW"
     }
+  ],
+  "scripts": {
+    "test": "./node_modules/.bin/istanbul cover ./node_modules/nodeunit/bin/nodeunit --config test/nodeunit.json test"
+  }
 }

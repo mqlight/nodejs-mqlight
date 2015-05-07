@@ -4,7 +4,7 @@
 /*   <copyright                                                       */
 /*   notice="oco-source"                                              */
 /*   pids="5725-P60"                                                  */
-/*   years="2014"                                                     */
+/*   years="2014,2015"                                                */
 /*   crc="2536674324" >                                               */
 /*   IBM Confidential                                                 */
 /*                                                                    */
@@ -12,7 +12,7 @@
 /*                                                                    */
 /*   5725-P60                                                         */
 /*                                                                    */
-/*   (C) Copyright IBM Corp. 2014                                     */
+/*   (C) Copyright IBM Corp. 2014, 2015                               */
 /*                                                                    */
 /*   The source code for the program is not published                 */
 /*   or otherwise divested of its trade secrets,                      */
@@ -34,16 +34,17 @@
 #include <string>
 
 #include <node.h>
+#include <nan.h>
 
 class Proton
 {
  public:
-  static v8::Persistent<v8::Function> loggerEntry;
-  static v8::Persistent<v8::Function> loggerExit;
-  static v8::Persistent<v8::Function> loggerLog;
-  static v8::Persistent<v8::Function> loggerBody;
-  static v8::Persistent<v8::Function> loggerFFDC;
-  static v8::Persistent<v8::Function> loggerThrow;
+  static NanCallback* loggerEntry;
+  static NanCallback* loggerExit;
+  static NanCallback* loggerLog;
+  static NanCallback* loggerBody;
+  static NanCallback* loggerFFDC;
+  static NanCallback* loggerThrow;
   static void Entry(const char* name, const char* id);
   static void Entry(const char* lvl, const char* name, const char* id);
   static void Exit(const char* name, const char* id, int rc);
@@ -66,15 +67,15 @@ class Proton
                   const char* prefix,
                   int data);
   static void LogBody(const char* id, const char* data);
-  static void LogBody(const char* id, v8::Handle<v8::Value> data);
+  static void LogBody(const char* id, v8::Local<v8::Value> data);
   static void FFDC(const char* fnc, int probeId, const char* data);
   static void Throw(const char* name, const char* id, const char* err);
   static void Throw(const char* lvl,
                     const char* name,
                     const char* id,
                     const char* err);
-  static v8::Handle<v8::Object> NewNamedError(const char* name,
-                                              const char* msg);
+  static v8::Local<v8::Value> NewNamedError(const char* name,
+                                            const char* msg);
 };
 
 #endif /* PROTON_HPP */

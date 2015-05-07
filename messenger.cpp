@@ -3,7 +3,7 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 /*   <copyright                                                       */
 /*   notice="oco-source"                                              */
 /*   pids="5725-P60"                                                  */
-/*   years="2013,2014"                                                */
+/*   years="2013,2015"                                                */
 /*   crc="2536674324" >                                               */
 /*   IBM Confidential                                                 */
 /*                                                                    */
@@ -11,7 +11,7 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 /*                                                                    */
 /*   5725-P60                                                         */
 /*                                                                    */
-/*   (C) Copyright IBM Corp. 2013, 2014                               */
+/*   (C) Copyright IBM Corp. 2013, 2015                               */
 /*                                                                    */
 /*   The source code for the program is not published                 */
 /*   or otherwise divested of its trade secrets,                      */
@@ -54,32 +54,33 @@ typedef unsigned __int32 uint32_t;
 using namespace v8;
 
 /* throw an exception of a particular named type at the default log lvl */
-#define THROW_NAMED_EXCEPTION(name, msg, fnc, id)                             \
-  Proton::Throw((fnc), (id), msg);                                            \
-  ThrowException(Proton::NewNamedError(name, msg));                           \
-  return scope.Close(Undefined());
+#define THROW_NAMED_EXCEPTION(name, msg, fnc, id)  \
+  Proton::Throw((fnc), (id), msg);                 \
+  NanThrowError(Proton::NewNamedError(name, msg)); \
+  NanReturnUndefined();
 
 /* throw an exception of a particular named type at a specific log lvl */
-#define THROW_NAMED_EXCEPTION_LEVEL(name, msg, lvl, fnc, id)                  \
-  Proton::Throw((lvl), (fnc), (id), msg);                                     \
-  ThrowException(Proton::NewNamedError(name, msg));                           \
-  return scope.Close(Undefined());
+#define THROW_NAMED_EXCEPTION_LEVEL(name, msg, lvl, fnc, id) \
+  Proton::Throw((lvl), (fnc), (id), msg);                    \
+  NanThrowError(Proton::NewNamedError(name, msg));           \
+  NanReturnUndefined();
 
 /* throw an exception of a particular type at the default log lvl */
-#define THROW_EXCEPTION_TYPE(type, msg, fnc, id)                              \
-  Proton::Throw((fnc), (id), msg);                                            \
-  ThrowException(type(String::New((msg) == NULL ? "unknown error" : (msg)))); \
-  return scope.Close(Undefined());
+#define THROW_EXCEPTION_TYPE(type, msg, fnc, id)          \
+  Proton::Throw((fnc), (id), msg);                        \
+  NanThrowError((msg) == NULL ? "unknown error" : (msg)); \
+  NanReturnUndefined();
 
 /* throw an exception of the default type (TypeError) at the default log lvl */
 #define THROW_EXCEPTION(msg, fnc, id) \
   THROW_EXCEPTION_TYPE(Exception::TypeError, msg, fnc, id)
 
 /* throw an exception of a particular type at a specific log lvl */
-#define THROW_EXCEPTION_LEVEL_TYPE(type, msg, lvl, fnc, id)                   \
-  Proton::Throw((lvl), (fnc), (id), msg);                                     \
-  ThrowException(type(String::New((msg) == NULL ? "unknown error" : (msg)))); \
-  return scope.Close(Undefined());
+#define THROW_EXCEPTION_LEVEL_TYPE(type, msg, lvl, fnc, id)           \
+  Proton::Throw((lvl), (fnc), (id), msg);                             \
+  NanThrowError(                                                      \
+      type(NanNew<String>((msg) == NULL ? "unknown error" : (msg)))); \
+  NanReturnUndefined();
 
 /* throw an exception of the default type (TypeError) at a specific log lvl */
 #define THROW_EXCEPTION_LEVEL(msg, lvl, fnc, id) \
@@ -108,42 +109,41 @@ Persistent<FunctionTemplate> ProtonMessenger::constructor;
 
 void ProtonMessenger::Init(Handle<Object> target)
 {
-  HandleScope scope;
+  NanScope();
 
-  Local<FunctionTemplate> tpl = FunctionTemplate::New(New);
-  constructor = Persistent<FunctionTemplate>::New(tpl);
-  constructor->InstanceTemplate()->SetInternalFieldCount(1);
-  Local<String> name = String::NewSymbol("ProtonMessenger");
-  constructor->SetClassName(name);
+  Local<FunctionTemplate> tpl = NanNew<FunctionTemplate>(ProtonMessenger::New);
+  NanAssignPersistent(constructor, tpl);
+  tpl->InstanceTemplate()->SetInternalFieldCount(1);
+  tpl->SetClassName(NanNew<String>("ProtonMessenger"));
 
-  NODE_SET_PROTOTYPE_METHOD(constructor, "accept", Accept);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "put", Put);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "send", Send);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "sending", Sending);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "stop", Stop);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "connect", Connect);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "subscribe", Subscribe);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "subscribed", Subscribed);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "unsubscribe", Unsubscribe);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "unsubscribed", Unsubscribed);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "receive", Receive);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "status", Status);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "statusError", StatusError);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "settle", Settle);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "settled", Settled);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "accept", Accept);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "put", Put);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "send", Send);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "sending", Sending);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "stop", Stop);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "connect", Connect);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "subscribe", Subscribe);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "subscribed", Subscribed);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "unsubscribe", Unsubscribe);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "unsubscribed", Unsubscribed);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "receive", Receive);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "status", Status);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "statusError", StatusError);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "settle", Settle);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "settled", Settled);
   NODE_SET_PROTOTYPE_METHOD(
-      constructor, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "flow", Flow);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "pendingOutbound", PendingOutbound);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "push", Push);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "pop", Pop);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "started", Started);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "closed", Closed);
-  NODE_SET_PROTOTYPE_METHOD(constructor, "heartbeat", Heartbeat);
+      tpl, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "flow", Flow);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "pendingOutbound", PendingOutbound);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "push", Push);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "pop", Pop);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "started", Started);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "closed", Closed);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "heartbeat", Heartbeat);
 
-  tpl->InstanceTemplate()->SetAccessor(String::New("stopped"), Stopped);
+  tpl->InstanceTemplate()->SetAccessor(NanNew<String>("stopped"), Stopped);
 
-  target->Set(name, constructor->GetFunction());
+  target->Set(NanNew("ProtonMessenger"), NanNew(constructor)->GetFunction());
 }
 
 void ProtonMessenger::Tracer(pn_transport_t* transport, const char* message)
@@ -189,9 +189,9 @@ ProtonMessenger::~ProtonMessenger()
   Proton::Exit("ProtonMessenger::destructor", NULL, 0);
 }
 
-Handle<Value> ProtonMessenger::NewInstance(const Arguments& args)
+NAN_METHOD(ProtonMessenger::NewInstance)
 {
-  HandleScope scope;
+  NanScope();
 
   Proton::Entry("ProtonMessenger::NewInstance", NULL);
 
@@ -200,16 +200,19 @@ Handle<Value> ProtonMessenger::NewInstance(const Arguments& args)
   for (uint32_t i = 0; i < argc; i++) {
     argv[i] = args[i];
   }
-  Local<Object> instance = constructor->GetFunction()->NewInstance(argc, argv);
+
+  Local<Object> instance =
+      NanNew(constructor)->GetFunction()->NewInstance(argc, argv);
+
   delete [] argv;
 
   Proton::Exit("ProtonMessenger::NewInstance", NULL, 0);
-  return scope.Close(instance);
+  NanReturnValue(instance);
 }
 
-Handle<Value> ProtonMessenger::New(const Arguments& args)
+NAN_METHOD(ProtonMessenger::New)
 {
-  HandleScope scope;
+  NanScope();
 
   Proton::Entry("ProtonMessenger::New", NULL);
 
@@ -252,12 +255,12 @@ Handle<Value> ProtonMessenger::New(const Arguments& args)
   obj->Wrap(args.This());
 
   Proton::Exit("ProtonMessenger::New", NULL, 0);
-  return args.This();
+  NanReturnValue(args.This());
 }
 
-Handle<Value> ProtonMessenger::Put(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Put)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   ProtonMessage* msg;
   const char* name = obj->name.c_str();
@@ -273,7 +276,7 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
 
   msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
   Local<Integer> integer = args[1]->ToInteger();
-  int qos = (int)integer->Value();
+  int qos = static_cast<int>(integer->Value());
   Proton::Log("parms", name, "qos:", qos);
 
   // throw exception if not connected
@@ -316,12 +319,12 @@ Handle<Value> ProtonMessenger::Put(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Put", name, true);
-  return scope.Close(Boolean::New(true));
+  NanReturnValue(NanTrue());
 }
 
-Handle<Value> ProtonMessenger::Send(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Send)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -352,12 +355,12 @@ Handle<Value> ProtonMessenger::Send(const Arguments& args)
   ProtonMessenger::Write(obj, args[0], false);
 
   Proton::Exit("ProtonMessenger::Send", name, true);
-  return scope.Close(Boolean::New(true));
+  NanReturnValue(NanTrue());
 }
 
-Handle<Value> ProtonMessenger::Sending(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Sending)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -402,12 +405,12 @@ Handle<Value> ProtonMessenger::Sending(const Arguments& args)
   bool sending = (pn_link_state(link) & PN_REMOTE_ACTIVE);
 
   Proton::Exit("ProtonMessenger::Sending", name, sending);
-  return scope.Close(Boolean::New(sending));
+  NanReturnValue((sending) ? NanTrue() : NanFalse());
 }
 
-Handle<Value> ProtonMessenger::Connect(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Connect)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Connect", name);
@@ -420,14 +423,14 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
 
   // First argument is expected to contain a url.parse object
   Local<Object> url = args[0]->ToObject();
-  String::Utf8Value urlHref(url->Get(String::NewSymbol("href")));
+  String::Utf8Value urlHref(url->Get(NanNew<String>("href")));
   std::string address = std::string(*urlHref);
-  Local<RegExp> regex = RegExp::New(String::New(":[^\\/:]+@"), RegExp::kNone);
+  Local<RegExp> regex = RegExp::New(NanNew<String>(":[^\\/:]+@"), RegExp::kNone);
   Handle<Function> replace = Handle<Function>::Cast(
-      String::New(address.c_str())->ToObject()->Get(String::New("replace")));
-  Handle<Value> argv[] = {regex, String::New(":********@")};
+      NanNew<String>(address.c_str())->ToObject()->Get(NanNew<String>("replace")));
+  Handle<Value> argv[] = {regex, NanNew<String>(":********@")};
   String::Utf8Value traceUrlHref(
-      replace->Call(String::New(address.c_str())->ToObject(), 2, argv));
+      replace->Call(NanNew<String>(address.c_str())->ToObject(), 2, argv));
   std::string traceAddress = std::string(*traceUrlHref);
   Proton::Log("parms", name, "address:", traceAddress.c_str());
 
@@ -473,9 +476,9 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
    * confirms that it can connect at startup.
    */
   int error;
-  String::Utf8Value urlProtocol(url->Get(String::NewSymbol("protocol")));
+  String::Utf8Value urlProtocol(url->Get(NanNew<String>("protocol")));
   std::string protocol = std::string(*urlProtocol);
-  String::Utf8Value urlHost(url->Get(String::NewSymbol("host")));
+  String::Utf8Value urlHost(url->Get(NanNew<String>("host")));
   std::string hostandport = std::string(*urlHost);
   std::string pattern = protocol + "//" + hostandport + "/*";
   std::string validationAddress  = address + "/$1";
@@ -538,12 +541,12 @@ Handle<Value> ProtonMessenger::Connect(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Connect", name, 0);
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
-Handle<Value> ProtonMessenger::Stop(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Stop)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -558,7 +561,7 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args)
   // If already stopped then simply return true
   if (!obj->messenger) {
     Proton::Exit("ProtonMessenger::Stop", name, true);
-    return scope.Close(Boolean::New(true));
+    NanReturnValue(NanTrue());
   }
 
   Proton::Entry("pn_messenger_stop", name);
@@ -580,14 +583,13 @@ Handle<Value> ProtonMessenger::Stop(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Stop", name, stopped);
-  return scope.Close(Boolean::New(stopped));
+  NanReturnValue((stopped) ? NanTrue() : NanFalse());
 }
 
-Handle<Value> ProtonMessenger::Stopped(Local<String> property,
-                                       const AccessorInfo& info)
+NAN_GETTER(ProtonMessenger::Stopped)
 {
-  HandleScope scope;
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.Holder());
+  NanScope();
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Stopped", name);
@@ -602,12 +604,12 @@ Handle<Value> ProtonMessenger::Stopped(Local<String> property,
   }
 
   Proton::Exit("ProtonMessenger::Stopped", name, stopped);
-  return scope.Close(Boolean::New(stopped));
+  NanReturnValue((stopped) ? NanTrue() : NanFalse());
 }
 
-Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Subscribe)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -623,8 +625,8 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
 
   String::Utf8Value param(args[0]->ToString());
   std::string address = std::string(*param);
-  int qos = (int)args[1]->ToInteger()->Value();
-  int ttl = (int)args[2]->ToInteger()->Value();
+  int qos = static_cast<int>(args[1]->ToInteger()->Value());
+  int ttl = static_cast<int>(args[2]->ToInteger()->Value());
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("parms", name, "qos:", qos);
   Proton::Log("parms", name, "ttl:", ttl);
@@ -683,12 +685,12 @@ Handle<Value> ProtonMessenger::Subscribe(const Arguments& args)
   ProtonMessenger::Write(obj, args[3], false);
 
   Proton::Exit("ProtonMessenger::Subscribe", name, true);
-  return scope.Close(Boolean::New(true));
+  NanReturnValue(NanTrue());
 }
 
-Handle<Value> ProtonMessenger::Subscribed(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Subscribed)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -738,12 +740,12 @@ Handle<Value> ProtonMessenger::Subscribed(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Subscribed", name, subscribed);
-  return scope.Close(Boolean::New(subscribed));
+  NanReturnValue((subscribed) ? NanTrue() : NanFalse());
 }
 
-Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Unsubscribe)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -762,7 +764,7 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
   Proton::Log("parms", name, "address:", address.c_str());
   int ttl = -1;
   if (args.Length() > 1 && !args[1]->IsUndefined()) {
-    ttl = (int)args[1]->ToInteger()->Value();
+    ttl = static_cast<int>(args[1]->ToInteger()->Value());
     Proton::Log("parms", name, "ttl:", ttl);
   } else {
     Proton::Log("parms", name, "ttl:", "undefined");
@@ -829,12 +831,12 @@ Handle<Value> ProtonMessenger::Unsubscribe(const Arguments& args)
   ProtonMessenger::Write(obj, args[2], false);
 
   Proton::Exit("ProtonMessenger::Unsubscribe", name, true);
-  return scope.Close(Boolean::New(true));
+  NanReturnValue(NanTrue());
 }
 
-Handle<Value> ProtonMessenger::Unsubscribed(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Unsubscribed)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -898,13 +900,13 @@ Handle<Value> ProtonMessenger::Unsubscribed(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Unsubscribed", name, unsubscribed);
-  return scope.Close(Boolean::New(unsubscribed));
+  NanReturnValue((unsubscribed) ? NanTrue() : NanFalse());
 }
 
 /* XXX: this may need to be wrapped in a uv_async queued operation? */
-Handle<Value> ProtonMessenger::Receive(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Receive)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -940,15 +942,16 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
   while (pn_messenger_incoming(obj->messenger)) {
     Local<Value> argv[1] = {args[0]};
     Local<Object> msgObj =
-        ProtonMessage::constructor->GetFunction()->NewInstance(0, argv);
+        NanNew(ProtonMessage::constructor)->GetFunction()->NewInstance(0, argv);
     ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(msgObj);
 
     Proton::Entry("pn_messenger_get", name);
     pn_messenger_get(obj->messenger, msg->message);
     error = pn_messenger_errno(obj->messenger);
     Proton::Exit("pn_messenger_get", name, error);
-    if (msg->message == NULL)
+    if (msg->message == NULL) {
       continue;
+}
     if (error) {
       const char* text = pn_error_text(pn_messenger_error(obj->messenger));
       const char* err = GetErrorName(text);
@@ -968,7 +971,7 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
       } else {
         const char* tmpAddr =
             pn_terminus_get_address(pn_link_remote_source(link));
-        msg->linkAddr = (char*)malloc(strlen(tmpAddr) + 1);
+        msg->linkAddr = reinterpret_cast<char*>(malloc(strlen(tmpAddr) + 1));
         strcpy(msg->linkAddr, tmpAddr);
         vector.push_back(msgObj);
       }
@@ -982,20 +985,20 @@ Handle<Value> ProtonMessenger::Receive(const Arguments& args)
     }
   }
 
-  Local<Array> messages = Array::New((int)vector.size());
+  Local<Array> messages = NanNew<Array>(static_cast<int>(vector.size()));
   for (unsigned int i = 0; i < vector.size(); i++) {
-    messages->Set(Number::New(i), vector[i]);
+    messages->Set(NanNew<Number>(i), vector[i]);
   }
 
   ProtonMessenger::Write(obj, args[0], false);
 
   Proton::Exit("exit_often", "ProtonMessenger::Receive", name, 0);
-  return scope.Close(messages);
+  NanReturnValue(messages);
 }
 
-Handle<Value> ProtonMessenger::Status(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Status)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -1019,12 +1022,12 @@ Handle<Value> ProtonMessenger::Status(const Arguments& args)
   int status = pn_messenger_status(obj->messenger, msg->tracker);
 
   Proton::Exit("ProtonMessenger::Status", name, status);
-  return scope.Close(Number::New(status));
+  NanReturnValue(NanNew<Number>(status));
 }
 
-Handle<Value> ProtonMessenger::Accept(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Accept)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -1056,12 +1059,12 @@ Handle<Value> ProtonMessenger::Accept(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Accept", name, true);
-  return scope.Close(Boolean::New(true));
+  NanReturnValue(NanTrue());
 }
 
-Handle<Value> ProtonMessenger::Settle(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Settle)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -1100,12 +1103,12 @@ Handle<Value> ProtonMessenger::Settle(const Arguments& args)
   ProtonMessenger::Write(obj, args[1], false);
 
   Proton::Exit("ProtonMessenger::Settle", name, true);
-  return scope.Close(Boolean::New(true));
+  NanReturnValue(NanTrue());
 }
 
-Handle<Value> ProtonMessenger::Settled(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Settled)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -1149,12 +1152,12 @@ Handle<Value> ProtonMessenger::Settled(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Settled", name, settled);
-  return scope.Close(Boolean::New(settled));
+  NanReturnValue((settled) ? NanTrue() : NanFalse());
 }
 
-Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args)
+NAN_METHOD(ProtonMessenger::GetRemoteIdleTimeout)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -1185,12 +1188,12 @@ Handle<Value> ProtonMessenger::GetRemoteIdleTimeout(const Arguments& args)
 
   Proton::Exit(
       "ProtonMessenger::GetRemoteIdleTimeout", name, remoteIdleTimeout);
-  return scope.Close(Number::New(remoteIdleTimeout));
+  NanReturnValue(NanNew<Number>(remoteIdleTimeout));
 }
 
-Handle<Value> ProtonMessenger::Flow(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Flow)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -1207,10 +1210,11 @@ Handle<Value> ProtonMessenger::Flow(const Arguments& args)
   std::string address = std::string(*param);
   Proton::Log("parms", name, "address:", address.c_str());
 
-  long creditLong = (long) args[1]->ToInteger()->Value();
-  if (creditLong > 4294967295) creditLong = 4294967295;
-  unsigned int credit = (unsigned int)creditLong;
-  Proton::Log("parms", name, "credit:", (int)credit);
+  long creditLong = args[1]->ToInteger()->Value();
+  if (creditLong > 4294967295) { creditLong = 4294967295;
+}
+  unsigned int credit = static_cast<unsigned int>(creditLong);
+  Proton::Log("parms", name, "credit:", static_cast<int>(credit));
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -1232,12 +1236,12 @@ Handle<Value> ProtonMessenger::Flow(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Flow", name, 0);
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
-Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
+NAN_METHOD(ProtonMessenger::StatusError)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -1275,16 +1279,18 @@ Handle<Value> ProtonMessenger::StatusError(const Arguments& args)
     description = pn_condition_get_description(condition);
   }
 
-  Handle<Value> result =
-      (description == NULL) ? Undefined() : String::New(description);
   Proton::Exit("ProtonMessenger::StatusError", name,
                (description == NULL) ? "" : description);
-  return scope.Close(result);
+  if (description == NULL) {
+    NanReturnUndefined();
+  } else {
+    NanReturnValue(NanNew<String>(description));
+  }
 }
 
-Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
+NAN_METHOD(ProtonMessenger::PendingOutbound)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
 
@@ -1321,12 +1327,12 @@ Handle<Value> ProtonMessenger::PendingOutbound(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::PendingOutbound", name, result);
-  return scope.Close(Boolean::New(result));
+  NanReturnValue((result) ? NanTrue() : NanFalse());
 }
 
-Handle<Value> ProtonMessenger::Push(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Push)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
   int n;
@@ -1339,12 +1345,13 @@ Handle<Value> ProtonMessenger::Push(const Arguments& args)
   }
 
   // Pushing data requires a messenger connection
-  ssize_t length = (ssize_t)args[0]->ToInteger()->Value();
+  ssize_t length = args[0]->ToInteger()->Value();
   if (obj->messenger && obj->connection) {
     Local<Object> buffer = args[1]->ToObject();
 
     Proton::Entry("pn_connection_push", name);
-    n = pn_connection_push(obj->connection, (char *)node::Buffer::Data(buffer), length);
+    n = pn_connection_push(
+        obj->connection, node::Buffer::Data(buffer), length);
     Proton::Exit("pn_connection_push", name, n);
   } else {
     // This connection has already been closed, so this data can never be
@@ -1355,30 +1362,49 @@ Handle<Value> ProtonMessenger::Push(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Push", name, n);
-  return scope.Close(Number::New(n));
+  NanReturnValue(NanNew<Number>(n));
 }
 
-Handle<Value> ProtonMessenger::Write(ProtonMessenger* obj,
-                                     Local<Value> value, bool force)
+int ProtonMessenger::Write(ProtonMessenger* obj,
+                           Local<Value> value, bool force)
 {
-  HandleScope scope;
+  NanScope();
   const char* name = obj->name.c_str();
   Proton::Entry("entry_often", "ProtonMessenger::Write", name);
+  Proton::Log("parms", name, "force:", force);
 
   // Checking for pending data requires a messenger connection
-  int n;
+  ssize_t n = -1;
   if (obj->messenger && obj->connection) {
     // value is expected to contain a Writable Stream object
     if (value->IsObject()) {
       Local<Object> stream = value->ToObject();
       Local<Function> streamWrite = Local<Function>::Cast(
-        stream->Get(String::New("write")));
+        stream->Get(NanNew<String>("write")));
 
       pn_transport_t *transport = pn_connection_transport(obj->connection);
       if (transport) {
-        n = (int)pn_transport_pending(transport);
+        n = pn_transport_pending(transport);
+        if (n > 0) {
+          // write n bytes to stream
+          Local<Value> buffer = NanNewBufferHandle(n);
+          n = pn_transport_peek(transport, node::Buffer::Data(buffer), n);
+          Local<Value> writeArgs[1] = {buffer};
+          Local<Value> drained = streamWrite->Call(stream, 1, writeArgs);
+          Proton::Log("data_often", name, "stream drained:",
+                      drained->ToBoolean()->Value());
+
+          Proton::Entry("pn_connection_pop", name);
+          bool closed = pn_connection_pop(obj->connection, n);
+          Proton::Exit("pn_connection_pop", name, static_cast<int>(n));
+          if (closed) {
+            Proton::Log("data_often", name, "connection is closed", "");
+            obj->connection = NULL;
+          }
+        }
+
         // Force a pop, causing a heartbeat to be generated, if necessary
-        if (force) {
+        if (force /*&& n == 0*/) {
           Proton::Log("data_often", name, "forcing messenger tick", "");
           Proton::Entry("pn_connection_pop", name);
           bool closed = pn_connection_pop(obj->connection, 0);
@@ -1388,51 +1414,21 @@ Handle<Value> ProtonMessenger::Write(ProtonMessenger* obj,
             obj->connection = NULL;
           }
         }
-
-        if (obj->connection && (n > 0)) {
-          // write n bytes to stream
-          Local<Object> global = Context::GetCurrent()->Global();
-          Local<Function> constructor =
-              Local<Function>::Cast(global->Get(String::New("Buffer")));
-          Local<Value> args[1] = {v8::Integer::New(n)};
-          Local<Value> buffer = constructor->NewInstance(1, args);
-          memcpy(node::Buffer::Data(buffer),
-                 pn_transport_head(transport), n);
-          Local<Value> writeArgs[1] = {buffer};
-          Local<Value> drained = streamWrite->Call(stream, 1, writeArgs);
-          Proton::Log("data_often", name, "stream drained:",
-                      drained->ToBoolean()->Value());
-
-          Proton::Entry("pn_connection_pop", name);
-          bool closed = pn_connection_pop(obj->connection, n);
-          Proton::Exit("pn_connection_pop", name, n);
-          if (closed) {
-            Proton::Log("data_often", name, "connection is closed", "");
-            obj->connection = NULL;
-          }
-        } else {
-          n = 0;
-        }
-      } else {
-        n = -1;
       }
     } else {
       String::Utf8Value param(value->ToDetailString());
       std::string detail = std::string(*param);
       Proton::Log("data_often", name, "Invalid stream object:", detail.c_str());
-      n = -1;
     }
-  } else {
-    n = -1;
   }
 
-  Proton::Exit("exit_often", "ProtonMessenger::Write", name, n);
-  return scope.Close(Number::New(n));
+  Proton::Exit("exit_often", "ProtonMessenger::Write", name, static_cast<int>(n));
+  return static_cast<int>(n);
 }
 
-Handle<Value> ProtonMessenger::Pop(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Pop)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Pop", name);
@@ -1442,18 +1438,17 @@ Handle<Value> ProtonMessenger::Pop(const Arguments& args)
     THROW_EXCEPTION("Missing stream or force argument.",
                     "ProtonMessenger::Pop", name);
   }
-
   bool force = args[1]->ToBoolean()->Value();
-  Handle<Value> value = ProtonMessenger::Write(obj, args[0], force);
-  int n = (int)value->ToNumber()->Value();
+  Proton::Log("parms", name, "force:", force);
+  int n = ProtonMessenger::Write(obj, args[0], force);
 
   Proton::Exit("ProtonMessenger::Pop", name, n);
-  return scope.Close(value);
+  NanReturnValue(NanNew<Integer>(n));
 }
 
-Handle<Value> ProtonMessenger::Started(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Started)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Started", name);
@@ -1475,12 +1470,12 @@ Handle<Value> ProtonMessenger::Started(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Started", name, started);
-  return scope.Close(Boolean::New(started));
+  NanReturnValue((started) ? NanTrue() : NanFalse());
 }
 
-Handle<Value> ProtonMessenger::Closed(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Closed)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Closed", name);
@@ -1499,12 +1494,12 @@ Handle<Value> ProtonMessenger::Closed(const Arguments& args)
   }
 
   Proton::Exit("ProtonMessenger::Closed", name, 0);
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }
 
-Handle<Value> ProtonMessenger::Heartbeat(const Arguments& args)
+NAN_METHOD(ProtonMessenger::Heartbeat)
 {
-  HandleScope scope;
+  NanScope();
   ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Heartbeat", name);
@@ -1518,5 +1513,5 @@ Handle<Value> ProtonMessenger::Heartbeat(const Arguments& args)
   ProtonMessenger::Write(obj, args[0], true);
 
   Proton::Exit("ProtonMessenger::Heartbeat", name, 0);
-  return scope.Close(Undefined());
+  NanReturnUndefined();
 }

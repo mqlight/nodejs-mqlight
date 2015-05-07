@@ -15,9 +15,16 @@ that goes to stderr when you run your application.
 
 ### 9.9.9999999999
 
-* Minor fix to mqlight-log.js
+* Added support for sending and receiving messages with custom properties.
+* Added optional callback to confirmDelivery function.
+* Bugfix to prevent qos=0 send callback being called early.
+* Support for Node.js 0.12.x engine.
+
+### 1.0.2015031902
+
 * Dependency on OpenSSL libraries removed.
-* ...
+* Improvements to async method completion logic.
+* Minor fix to mqlight-log.js.
 
 ### 1.0.2014091000
 

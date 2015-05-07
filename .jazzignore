@@ -4,4 +4,5 @@ core.ignore= \
              {.git} \
              {build} \
              {coverage} \
+             {node_modules} \
              {proton}

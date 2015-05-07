@@ -4,7 +4,7 @@
 /*   <copyright                                                       */
 /*   notice="oco-source"                                              */
 /*   pids="5725-P60"                                                  */
-/*   years="2013"                                                     */
+/*   years="2013,2015"                                                */
 /*   crc="2536674324" >                                               */
 /*   IBM Confidential                                                 */
 /*                                                                    */
@@ -12,7 +12,7 @@
 /*                                                                    */
 /*   5725-P60                                                         */
 /*                                                                    */
-/*   (C) Copyright IBM Corp. 2013                                     */
+/*   (C) Copyright IBM Corp. 2013, 2015                               */
 /*                                                                    */
 /*   The source code for the program is not published                 */
 /*   or otherwise divested of its trade secrets,                      */
@@ -34,6 +34,7 @@
 #include <string>
 
 #include <node.h>
+#include <nan.h>
 #include <node_buffer.h>
 
 #include <proton/message.h>
@@ -44,7 +45,7 @@ class ProtonMessage : public node::ObjectWrap
  public:
   static v8::Persistent<v8::FunctionTemplate> constructor;
   static void Init(v8::Handle<v8::Object> target);
-  static v8::Handle<v8::Value> NewInstance(const v8::Arguments& args);
+  static NAN_METHOD(NewInstance);
   ProtonMessage();
   ProtonMessage(const ProtonMessage& that);
   ProtonMessage& operator=(const ProtonMessage& that);
@@ -56,41 +57,20 @@ class ProtonMessage : public node::ObjectWrap
   char name[24];
 
  protected:
-  static v8::Handle<v8::Value> New(const v8::Arguments& args);
-  static v8::Handle<v8::Value> Destroy(const v8::Arguments& args);
-  static v8::Handle<v8::Value> GetAddress(v8::Local<v8::String> property,
-                                          const v8::AccessorInfo& args);
-  static void SetAddress(v8::Local<v8::String> property,
-                         v8::Local<v8::Value> value,
-                         const v8::AccessorInfo& args);
-  static v8::Handle<v8::Value> GetBody(v8::Local<v8::String> property,
-                                       const v8::AccessorInfo& args);
-  static void PutBody(v8::Local<v8::String> property,
-                      v8::Local<v8::Value> value,
-                      const v8::AccessorInfo& args);
-  static v8::Handle<v8::Value> GetContentType(v8::Local<v8::String> property,
-                                              const v8::AccessorInfo& args);
-  static void SetContentType(v8::Local<v8::String> property,
-                             v8::Local<v8::Value> value,
-                             const v8::AccessorInfo& args);
-  static v8::Handle<v8::Value> GetLinkAddress(v8::Local<v8::String> property,
-                                              const v8::AccessorInfo& args);
-  static v8::Handle<v8::Value> GetDeliveryAnnotations(
-      v8::Local<v8::String> property,
-      const v8::AccessorInfo& info);
-
-  static v8::Handle<v8::Value> GetMessageProperties(
-      v8::Local<v8::String> property,
-      const v8::AccessorInfo& info);
-  static void SetMessageProperties(v8::Local<v8::String> property,
-                                   v8::Local<v8::Value> value,
-                                   const v8::AccessorInfo& info);
-
-  static v8::Handle<v8::Value> GetTimeToLive(v8::Local<v8::String> property,
-                                             const v8::AccessorInfo& args);
-  static void SetTimeToLive(v8::Local<v8::String> property,
-                            v8::Local<v8::Value> value,
-                            const v8::AccessorInfo& args);
+  static NAN_METHOD(New);
+  static NAN_METHOD(Destroy);
+  static NAN_GETTER(GetAddress);
+  static NAN_SETTER(SetAddress);
+  static NAN_GETTER(GetBody);
+  static NAN_SETTER(PutBody);
+  static NAN_GETTER(GetContentType);
+  static NAN_SETTER(SetContentType);
+  static NAN_GETTER(GetLinkAddress);
+  static NAN_GETTER(GetDeliveryAnnotations);
+  static NAN_GETTER(GetMessageProperties);
+  static NAN_SETTER(SetMessageProperties);
+  static NAN_GETTER(GetTimeToLive);
+  static NAN_SETTER(SetTimeToLive);
 };
 
 #endif /* MESSAGE_HPP */
