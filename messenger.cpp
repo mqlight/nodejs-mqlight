@@ -1404,7 +1404,7 @@ int ProtonMessenger::Write(ProtonMessenger* obj,
         }
 
         // Force a pop, causing a heartbeat to be generated, if necessary
-        if (force && n == 0) {
+        if (force) {
           Proton::Log("data_often", name, "forcing messenger tick", "");
           Proton::Entry("pn_connection_pop", name);
           bool closed = pn_connection_pop(obj->connection, 0);
