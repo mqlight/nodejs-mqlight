@@ -39,7 +39,11 @@ exports.logger = GLOBAL.logger;
 var logger = GLOBAL.logger;
 
 var os = require('os');
-var _system = os.platform() + '-' + process.arch;
+var util = require('util');
+var _system = util.format('node-v%s-%s-%s',
+                          process.versions.modules,
+                          os.platform(),
+                          process.arch);
 if (process.env.NODE_ENV === 'unittest') {
   var proton = require('./test/stubs/stubproton.js').createProtonStub();
   Object.defineProperty(exports, 'proton', {
@@ -62,7 +66,6 @@ if (process.env.NODE_ENV === 'unittest') {
 }
 
 var EventEmitter = require('events').EventEmitter;
-var util = require('util');
 var uuid = require('node-uuid');
 var url = require('url');
 var fs = require('fs');
