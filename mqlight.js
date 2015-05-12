@@ -1472,29 +1472,31 @@ var Client = function(service, id, securityOptions) {
 
         // Define an on stream close handler. Notify proton of the close.
         var streamClosed = function(had_error) {
-          logger.entry('Client.streamClosed', _id);
+          setImmediate(function() {
+            logger.entry('Client.streamClosed', _id);
 
-          client._pushChunks.call(client);
+            client._pushChunks.call(client);
 
-          try {
-            client._messenger.closed();
-          } catch (err) {
-            error = getNamedError(err);
-            logger.caught('Client.streamClosed', _id, error);
-            process.nextTick(function() {
-              logger.log('emit', _id, 'error', error);
-              client.emit('error', error);
-              if (shouldReconnect(error)) {
-                reconnect(client);
-              }
-            });
-          }
+            try {
+              client._messenger.closed();
+            } catch (err) {
+              error = getNamedError(err);
+              logger.caught('Client.streamClosed', _id, error);
+              process.nextTick(function() {
+                logger.log('emit', _id, 'error', error);
+                client.emit('error', error);
+                if (shouldReconnect(error)) {
+                  reconnect(client);
+                }
+              });
+            }
 
-          // Force any final data from the messenger, which may give it the
-          // chance to close any connections.
-          client._messenger.pop(client._stream, true);
+            // Force any final data from the messenger, which may give it the
+            // chance to close any connections.
+            client._messenger.pop(client._stream, true);
 
-          logger.exit('Client.streamClosed', _id, had_error);
+            logger.exit('Client.streamClosed', _id, had_error);
+          });
         };
 
         // Define a function that we can keep calling until the messenger has
