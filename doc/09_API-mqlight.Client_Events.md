@@ -20,9 +20,11 @@ client's subscriptions.
        milliseconds. This is calculated by subtracting the time the message
        spends at an MQ Light destination from the time to live value specified
        when the message is sent to IBM MQ Light.
+    *  **properties**, (Object) if defined, a set of key/value properties that
+       were attached to the message.
   *  **destination**, (Object) collects together the values that the client
-       specified when it subscribed to the destination from which the message
-       was received.
+     specified when it subscribed to the destination from which the message
+     was received.
     *  **topicPattern**, (String) the topic specified when the client subscribed
        to the destination from which the message was received.
     *  **share**, (String) the share name specified when the client subscribed
