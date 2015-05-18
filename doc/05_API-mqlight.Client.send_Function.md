@@ -1,6 +1,6 @@
 ### mqlight.Client.send(`topic`, `data`, [`options`], [`callback`])
 
-Sends the value, specified via the `data` argument to the specified topic. 
+Sends the value, specified via the `data` argument to the specified topic.
 String and Buffer values will be sent and received as-is. Other types will be
 converted to JSON before sending and automatically parsed back from JSON when
 received.
@@ -19,7 +19,9 @@ received.
      copy of the message that has not been delivered within its time to live
      period. The default time to live is 604800000 milliseconds (7 days).
      The value supplied for this argument must be greater than zero and finite,
-     otherwise a `RangeError` will be thrown when this method is called.
+     otherwise a `RangeError` will be thrown when this method is called. An
+     upper limit of 4294967295 milliseconds (49.7 days) will be applied to the
+     value.
   *  **properties**, (Object) (optional) a set of key/value properties that will
      be carried alongside the message. Values must be non-null and one of the
      following types: `boolean`, `number`, `string` or `Buffer`.
