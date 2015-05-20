@@ -56,20 +56,17 @@ using namespace v8;
 /* throw an exception of a particular named type at the default log lvl */
 #define THROW_NAMED_EXCEPTION(name, msg, fnc, id)  \
   Proton::Throw((fnc), (id), msg);                 \
-  NanThrowError(Proton::NewNamedError(name, msg)); \
-  NanReturnUndefined();
+  return NanThrowError(Proton::NewNamedError(name, msg));
 
 /* throw an exception of a particular named type at a specific log lvl */
 #define THROW_NAMED_EXCEPTION_LEVEL(name, msg, lvl, fnc, id) \
   Proton::Throw((lvl), (fnc), (id), msg);                    \
-  NanThrowError(Proton::NewNamedError(name, msg));           \
-  NanReturnUndefined();
+  return NanThrowError(Proton::NewNamedError(name, msg));
 
 /* throw an exception of a particular type at the default log lvl */
 #define THROW_EXCEPTION_TYPE(type, msg, fnc, id)          \
   Proton::Throw((fnc), (id), msg);                        \
-  NanThrowError((msg) == NULL ? "unknown error" : (msg)); \
-  NanReturnUndefined();
+  return NanThrowError((msg) == NULL ? "unknown error" : (msg));
 
 /* throw an exception of the default type (TypeError) at the default log lvl */
 #define THROW_EXCEPTION(msg, fnc, id) \
@@ -78,9 +75,8 @@ using namespace v8;
 /* throw an exception of a particular type at a specific log lvl */
 #define THROW_EXCEPTION_LEVEL_TYPE(type, msg, lvl, fnc, id)           \
   Proton::Throw((lvl), (fnc), (id), msg);                             \
-  NanThrowError(                                                      \
-      type(NanNew<String>((msg) == NULL ? "unknown error" : (msg)))); \
-  NanReturnUndefined();
+  return NanThrowError(                                               \
+      type(NanNew<String>((msg) == NULL ? "unknown error" : (msg))));
 
 /* throw an exception of the default type (TypeError) at a specific log lvl */
 #define THROW_EXCEPTION_LEVEL(msg, lvl, fnc, id) \

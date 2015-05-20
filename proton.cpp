@@ -181,12 +181,11 @@ void Proton::Throw(const char* lvl,
 
 Local<Value> Proton::NewNamedError(const char* name, const char* msg)
 {
-  NanScope();
-  Local<Value> err =
+  NanEscapableScope();
+  Local<Object> err =
       NanError((msg == NULL) ? "unknown error" : (msg))->ToObject();
-  Local<Object> obj = err.As<Object>();
-  obj->Set(NanNew<String>("name"), NanNew<String>(name));
-  return err;
+  err->Set(NanNew<String>("name"), NanNew<String>(name));
+  return NanEscapeScope(err);
 }
 
 NAN_METHOD(CreateMessage)
