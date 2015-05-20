@@ -4,23 +4,33 @@
   "description": "IBM MQ Light Client Module",
   "main": "mqlight.js",
   "gypfile": true,
+  "binary": {
+    "module_name": "proton",
+    "module_path": "lib/{node_abi}-{platform}-{arch}",
+    "host": "https://developer.ibm.com/mqlight/",
+    "remote_path": "{name}/v{version}/{toolset}/",
+    "package_name": "{node_abi}-{platform}-{arch}.tar.gz"
+  },
   "bin": {
     "mqlight-debug": "./bin/mqlight-debug.js"
   },
   "dependencies": {
     "hashmap": "~2.0.3",
-    "moment": "~2.10.2",
+    "moment": "~2.10.3",
     "nan": "^1.8.4",
+    "node-pre-gyp": "^0.6.7",
     "node-uuid": "~1.4.3",
     "nopt": "~3.0.1",
     "npmlog": "~1.2.0"
   },
+  "bundledDependencies": ["node-pre-gyp"],
   "devDependencies": {
     "istanbul": "latest",
     "nodeunit": "~0.9.1"
   },
+  "engineStrict": true,
   "engines": {
-    "node": "~0.10.x"
+    "node": "0.10.x || 0.12.x"
   },
   "licenses": [
     {

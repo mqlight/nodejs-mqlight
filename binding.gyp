@@ -16,7 +16,7 @@
     # </copyright>
 
     "targets": [{
-        "target_name": "proton",
+        "target_name": "<(module_name)",
         "type": "loadable_module",
         "sources": ["messenger.cpp", "message.cpp", "proton.cpp"],
         "conditions": [
@@ -43,5 +43,17 @@
                 "libraries": ["-lqpid-proton", "-L<!(echo $BROOT)/ship/opt/mqm/lib64", "-Wl,-install_name,@rpath/proton.node", "-Wl,-rpath,@loader_path/", "-Wl,-headerpad_max_install_names"],
             }],
         ]
+    },
+    {
+     "target_name": "action_after_build",
+      "type": "none",
+      "dependencies": [ "<(module_name)" ],
+      "copies": [
+        {
+          "files": [ "<(PRODUCT_DIR)/<(module_name).node" ],
+          "conditions": [ [ "OS=='win'", {"destination": "<(module_path)"} ] ],
+          "conditions": [ [ "OS!='win'", {"destination": "<(module_path)"} ] ],
+        }
+     ]
     }]
 }

@@ -1,0 +1,4 @@
+build/*
+binding.gyp
+*.cpp
+*.hpp
