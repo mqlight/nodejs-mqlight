@@ -51,8 +51,7 @@
       "copies": [
         {
           "files": [ "<(PRODUCT_DIR)/<(module_name).node" ],
-          "conditions": [ [ "OS=='win'", {"destination": "<(module_path)"} ] ],
-          "conditions": [ [ "OS!='win'", {"destination": "<(module_path)"} ] ],
+          "destination": "<(module_path)"
         }
      ]
     }]
