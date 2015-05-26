@@ -1,4 +1,5 @@
 build/*
+build64/*
 binding.gyp
 *.cpp
 *.hpp
