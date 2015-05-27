@@ -15,19 +15,20 @@ state.
 Each line shown in the state machine diagram represents a possible way in which
 the client can transition between states. The lines are labelled with
 information about the transitions, which includes:
+
 1. The function calls that can cause the transition to occur:
-  * `start()` corresponds to the `mqlight.Client.start` function.
-  * `stop()` corresponds to the `mqlight.Client.stop` function.
+   * `start()` corresponds to the `mqlight.Client.start` function.
+   * `stop()` corresponds to the `mqlight.Client.stop` function.
 2. Change that occur at the network level, which can cause the transition to
    occur. For example:
-  * `[broken]` occurs when an established network connection between the client
-    and the server is interrupted.
-  * `[connected]` occurs when the client successfully establishes a network
-    connection to the server.
-  * `[failed]` occurs when the client unsuccessfully attempts to establish a
-    network connection to the server.
+   * `[broken]` occurs when an established network connection between the client
+     and the server is interrupted.
+   * `[connected]` occurs when the client successfully establishes a network
+     connection to the server.
+   * `[failed]` occurs when the client unsuccessfully attempts to establish a
+     network connection to the server.
 3. Events that are emitted. Specifically:
-  * `<error>` indicates that an error event is sent.
-  * `<restarted>` indicates that a restarted event is sent.
-  * `<started>` indicates that a started event is sent.
-  * `<stopped>` indicates that a stopped event is sent.
+   * `<error>` indicates that an error event is sent.
+   * `<restarted>` indicates that a restarted event is sent.
+   * `<started>` indicates that a started event is sent.
+   * `<stopped>` indicates that a stopped event is sent.

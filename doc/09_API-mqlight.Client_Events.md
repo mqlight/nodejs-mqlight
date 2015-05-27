@@ -6,30 +6,30 @@ client's subscriptions.
 * `data` - (String | Buffer | Object) the message body.
 * `delivery` - (Object) additional information about why the event was sent.
   Properties include:
-  *  **message**, (Object) additional information about the message.  Properties
-     include:
-    *  **topic**, (Object) the topic that the message was sent to.
-    *  **confirmDelivery**, (Function) a method that can be used to confirm
-       (settle) the delivery of a "at least once" quality of service (qos:1)
-       message. This method accepts an optional callback function as its
-       argument, which will be notified when the confirmation has completed
-       successfully. This property will only be present if the message was
-       delivered due to a subscribe call that specified both `qos: 1` and
-       `autoConfirm: false` options.
-    *  **ttl**, (Number) the remaining time to live period for this message in
-       milliseconds. This is calculated by subtracting the time the message
-       spends at an MQ Light destination from the time to live value specified
-       when the message is sent to IBM MQ Light.
-    *  **properties**, (Object) if defined, a set of key/value properties that
-       were attached to the message.
-  *  **destination**, (Object) collects together the values that the client
-     specified when it subscribed to the destination from which the message
-     was received.
-    *  **topicPattern**, (String) the topic specified when the client subscribed
-       to the destination from which the message was received.
-    *  **share**, (String) the share name specified when the client subscribed
-       to the destination from which the message was received. This property
-       will not be present if the client subscribed to a private destination.
+  * **message**, (Object) additional information about the message.  Properties
+    include:
+    * **topic**, (Object) the topic that the message was sent to.
+    * **confirmDelivery**, (Function) a method that can be used to confirm
+      (settle) the delivery of a "at least once" quality of service (qos:1)
+      message. This method accepts an optional callback function as its
+      argument, which will be notified when the confirmation has completed
+      successfully. This property will only be present if the message was
+      delivered due to a subscribe call that specified both `qos: 1` and
+      `autoConfirm: false` options.
+    * **ttl**, (Number) the remaining time to live period for this message in
+      milliseconds. This is calculated by subtracting the time the message
+      spends at an MQ Light destination from the time to live value specified
+      when the message is sent to IBM MQ Light.
+    * **properties**, (Object) if defined, a set of key/value properties that
+      were attached to the message.
+  * **destination**, (Object) collects together the values that the client
+    specified when it subscribed to the destination from which the message
+    was received.
+    * **topicPattern**, (String) the topic specified when the client subscribed
+      to the destination from which the message was received.
+    * **share**, (String) the share name specified when the client subscribed
+      to the destination from which the message was received. This property
+      will not be present if the client subscribed to a private destination.
 
 ### Event: 'started'
 

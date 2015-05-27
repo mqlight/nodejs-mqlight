@@ -18,20 +18,20 @@ otherwise this method will throw a `TypeError`.
   unsubscribed from.
 * `options` - (Object) (optional) properties that determine the behaviour of the
   unsubscribe operation:
-  *  **ttl**, (Number) (optional) sets the destination's time to live as part of
-     the unsubscribe operation. The default (when this property is not
-     specified) is not to change the destination's time to live. When specified
-     the only valid value for this property is 0.
+  * **ttl**, (Number) (optional) sets the destination's time to live as part of
+    the unsubscribe operation. The default (when this property is not
+    specified) is not to change the destination's time to live. When specified
+    the only valid value for this property is 0.
 * `callback` - (Function) (optional) callback to be notified when the
   unsubscribe operation completes. The `callback` function is passed the
   following arguments:
-  *  **error**, (Error) an error object if the callback is being invoked to
-     indicate that the unsubscribe call failed. If the unsubscribe call
-     completes successfully then the value `null` is supplied for this
-     argument.
-  *  **topicPattern**, (String) the `topicPattern` argument supplied to the 
-     corresponding unsubscribe method call.
-  *  **share**, (String) the `share` argument supplied to the corresponding
-     unsubscribe method call (or `undefined` if this parameter was not
-     specified).
+  * **error**, (Error) an error object if the callback is being invoked to
+    indicate that the unsubscribe call failed. If the unsubscribe call
+    completes successfully then the value `null` is supplied for this
+    argument.
+  * **topicPattern**, (String) the `topicPattern` argument supplied to the
+    corresponding unsubscribe method call.
+  * **share**, (String) the `share` argument supplied to the corresponding
+    unsubscribe method call (or `undefined` if this parameter was not
+    specified).
 
