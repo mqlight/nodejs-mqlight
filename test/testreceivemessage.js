@@ -34,14 +34,17 @@ var testCase = require('nodeunit').testCase;
  *                 method call used to send this message.
  * @param {String} subscribedPattern the (simulated) pattern passed into the
  *                 subscribe method call used to receive this message.
+ * @param {boolean} secure (optional) request a secure amqps:// address for
+ *                 the message object.
  * @return {object} a stub to be used in place of a proton message object.
  */
-var testMessage = function(sentTopic, subscribedPattern) {
+var testMessage = function(sentTopic, subscribedPattern, secure) {
   return {
     destroyed: false,
     body: 'Hello World!',
     contentType: 'text/plain',
-    address: 'amqp://host:5672/' + sentTopic,
+    address: ((secure) ? 'amqps://host:5671/' : 'amqp://host:5672/') +
+        sentTopic,
     linkAddress: 'private:' + subscribedPattern,
     deliveryAnnotations: undefined,
     destroy: function() {
@@ -56,11 +59,28 @@ var testMessage = function(sentTopic, subscribedPattern) {
  * @param {object} test the unittest interface
  */
 module.exports.test_receive_message = function(test) {
-  var originalReceiveMethod = mqlight.proton.messenger.receive;
-  mqlight.proton.messenger.receive = function() {};
+  var messages = [
+    testMessage('/kittens/wearing/boots', '/kittens/#'),
+    testMessage('/kittens/wearing/boots', '/kittens/+/boots'),
+    testMessage('/kittens/wearing/boots', '/kittens/#', true),
+    testMessage('/kittens/wearing/boots', '/kittens/+/boots', true)
+  ];
+  var messageCount = messages.length;
+
   var subscriptions = 0;
   var cb = function() {
     subscriptions++;
+  };
+
+  var originalReceiveMethod = mqlight.proton.messenger.receive;
+  mqlight.proton.messenger.receive = function() {
+    if (subscriptions === 2) {
+      var result = messages;
+      messages = [];
+      return result;
+    } else {
+      return [];
+    }
   };
 
   var client = mqlight.createClient({
@@ -68,15 +88,16 @@ module.exports.test_receive_message = function(test) {
     id: 'test_receive_message'}
   );
 
-  var first = true;
+  var count = 0;
   client.start(function(err) {
     test.ifError(err);
     client.on('message', function(data, delivery) {
-      if (first) {
-        test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
-        first = false;
-      } else {
+      if (count % 2) {
         test.deepEqual(delivery.destination.topicPattern, '/kittens/+/boots');
+      } else {
+        test.deepEqual(delivery.destination.topicPattern, '/kittens/#');
+      }
+      if (++count === messageCount) {
         mqlight.proton.messenger.receive = originalReceiveMethod;
         client.stop(function() {
           test.done();
@@ -95,18 +116,6 @@ module.exports.test_receive_message = function(test) {
     console.log(err, 'error event should not be emitted');
     test.ok(false);
   });
-
-  var messages = [testMessage('/kittens/wearing/boots', '/kittens/#'),
-                  testMessage('/kittens/wearing/boots', '/kittens/+/boots')];
-  mqlight.proton.messenger.receive = function() {
-    if (subscriptions == 2) {
-      var result = messages;
-      messages = [];
-      return result;
-    } else {
-      return [];
-    }
-  };
 };
 
 
@@ -117,7 +126,11 @@ module.exports.test_receive_message = function(test) {
  */
 module.exports.test_receive_topic_pattern = function(test) {
   var originalReceiveMethod = mqlight.proton.messenger.receive;
-  var messages = [testMessage('/kittens/boots', '/kittens/#')];
+  var messages = [
+    testMessage('/kittens/boots', '/kittens/#'),
+    testMessage('/kittens/boots', '/kittens/#', true)
+  ];
+  var messageCount = messages.length;
   mqlight.proton.messenger.receive = function() {
     var result = messages;
     messages = [];
@@ -133,6 +146,7 @@ module.exports.test_receive_topic_pattern = function(test) {
     client.subscribe('/kittens/#');
   });
 
+  var count = 0;
   client.on('message', function(data, delivery) {
     test.deepEqual(arguments.length, 2,
                    'expected 2 arguments to message event listener');
@@ -146,13 +160,15 @@ module.exports.test_receive_topic_pattern = function(test) {
 
     // Since the defaults for subscribe are qos:0 and autoConfirm:true
     // check that there is no confirmDelivery method
-    test.ok(delivery.message.confirmDelivery == undefined,
+    test.ok(delivery.message.confirmDelivery === undefined,
             'confirmDelivery() method should not be present');
 
-    mqlight.proton.messenger.receive = originalReceiveMethod;
-    client.stop(function() {
-      test.done();
-    });
+    if (++count === messageCount) {
+      mqlight.proton.messenger.receive = originalReceiveMethod;
+      client.stop(function() {
+        test.done();
+      });
+    }
   });
 
   client.on('malformed', function() {
@@ -160,8 +176,7 @@ module.exports.test_receive_topic_pattern = function(test) {
   });
 
   client.on('error', function(err) {
-    console.log(err, 'error event should not be emitted');
-    test.ok(false);
+    test.ok(false, 'error event should not be emitted');
   });
 };
 

@@ -2857,8 +2857,9 @@ var processMessage = function(client, protonMsg) {
   }
 
   var topic = protonMsg.address;
-  if (topic.indexOf('amqp://') === 0) {
-    topic = topic.slice(7);
+  var prefixMatch = topic.match('^amqp[s]?:\/\/');
+  if (prefixMatch) {
+    topic = topic.slice(prefixMatch[0].length);
     topic = topic.slice(topic.indexOf('/') + 1);
   }
   var autoConfirm = true;

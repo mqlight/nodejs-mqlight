@@ -15,6 +15,11 @@ that goes to stderr when you run your application.
 
 ### 9.9.9999999999
 
+* Bugfix to prevent `message.delivery.topic` returning an absolute address when
+  using a secure (amqps) connection.
+
+### 1.0.2015060300
+
 * Added support for sending and receiving messages with custom properties.
 * Added optional callback to confirmDelivery function.
 * Bugfix to prevent qos=0 send callback being called early.
