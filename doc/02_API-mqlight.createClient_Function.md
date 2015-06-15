@@ -10,16 +10,17 @@ Creates an IBM MQ Light client instance in `starting` state.
     service URL(s) to a callback function that will be passed to it whenever
     it is called (in the form `function(err, service)`). User names and
     passwords may be embedded into the URL (for example, `amqp://user:pass@host`).
-  * **id**, (String, default: `AUTO_[0-9a-f]{7}`) (optional) a unique
-    identifier for this client. A maximum of one instance of the client (as
-    identified by the value of this property) can be connected the an MQ Light
-    server at a given point in time. If another instance of the same client
-    connects, then the previously connected instance will be disconnected.
-    This is reported, to the first client, as a `ReplacedError` being
-    emitted as an error event and the client transitioning into `stopped`
-    state. If the id property is not a valid client identifier (for example, it
-    contains a colon, it is too long, or it contains some other forbidden
-    character) then the function will throw an `InvalidArgumentError`
+  * **id**, (String, default: `AUTO_[0-9a-f]{7}`) (optional) a String, with a
+    maximum length of 48 characters, to serve as a unique identifier for this
+    client. A maximum of one instance of the client (as identified by the value
+    of this property) can be connected to an MQ Light server at a given point
+    in time. If another instance of the same client connects, then the
+    previously connected instance will be disconnected.  This is reported, to
+    the first client, as a `ReplacedError` being emitted as an error event and
+    the client transitioning into `stopped` state. If the id property is not a
+    valid client identifier (for example, it contains a colon, it is too long,
+    or it contains some other forbidden character) then the function will throw
+    an `InvalidArgumentError`
   * **user**, (String) (optional) user name for authentication.
     Alternatively, the user name may be embedded in the URL passed via the
     service property. If you choose to specify a user name via this property
