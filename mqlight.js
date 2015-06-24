@@ -1605,8 +1605,9 @@ var Client = function(service, id, securityOptions) {
               }
               // Hostname mismatches will produce an authorization failure. We
               // allow them if sslVerifyName is false.
-              else if (authError.message ===
-                  'Hostname/IP doesn\'t match certificate\'s altnames') {
+              else if (
+                  /Hostname\/IP doesn't match certificate's altnames/.test(
+                  authError.message)) {
                 if (securityOptions.sslVerifyName) {
                   connError(authError);
                   logger.exit('Client._tryService.connected', _id, null);
