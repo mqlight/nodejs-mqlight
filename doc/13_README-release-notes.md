@@ -15,6 +15,10 @@ that goes to stderr when you run your application.
 
 ### 9.9.9999999999
 
+* Bugfix for sslVerifyName on Node.js 0.12.x
+
+### 1.0.2015061000
+
 * Bugfix to prevent `message.delivery.topic` returning an absolute address when
   using a secure (amqps) connection.
 
