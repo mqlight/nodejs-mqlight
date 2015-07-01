@@ -733,7 +733,7 @@ module.exports.test_confirmDelivery_callback = function(test) {
     test.ok(false, 'test timed out without callback being invoked');
     stop();
     test.done();
-  }, 2500);
+  }, 5000);
 
   var callback = function() {
     clearTimeout(timer);
