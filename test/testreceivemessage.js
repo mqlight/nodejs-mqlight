@@ -205,7 +205,9 @@ module.exports.test_bad_listener = function(test) {
     var err_stack = err.stack.split('\n');
     if (err_stack[1].indexOf('testreceivemessage.js') < 0) {
       test.ok(false, 'Unexpected stack trace at ' + err_stack[1]);
-      test.done();
+      client.stop(function() {
+        test.done();
+      });
     }
   };
   process.addListener('uncaughtException', handler);
@@ -401,7 +403,7 @@ function run_receiver_credit_testcase(test, name, credit, qos, numMessages) {
             test.ok(currentCredit >= 0, 'credit should never be negative');
             if (currentCredit > 0) {
               --currentCredit;
-              return [testMessage('/kittens/wearing/boots', '/kittens/#')];
+              return [testMessage('/kittens/noises/purring', '/kittens/#')];
             } else {
               return [];
             }
@@ -543,7 +545,7 @@ module.exports.test_subscribe_credit_confirm = function(test) {
             test.ok(currentCredit >= 0, 'credit should never be negative');
             if (currentCredit > 0) {
               --currentCredit;
-              return [testMessage('/kittens/wearing/boots', '/kittens/#')];
+              return [testMessage('/kittens/cuddly', '/kittens/#')];
             } else {
               return [];
             }
@@ -591,7 +593,7 @@ module.exports.test_subscribe_credit_confirm = function(test) {
 module.exports.test_receive_client_replaced = function(test) {
   var client = mqlight.createClient({
     service: 'amqp://host',
-    id: 'test_subscribe_client_replaced'
+    id: 'test_receive_client_replaced'
   });
 
   var savedReceiveMethod = mqlight.proton.messenger.receive;
@@ -647,6 +649,8 @@ module.exports.test_presence_of_confirmDelivery_method = function(test) {
     {options: {qos: 1, autoConfirm: true}, methodPresent: false}
   ];
 
+  test.expect(testData.length);
+
   var testCase = 0;
   var originalReceiveMethod = mqlight.proton.messenger.receive;
   var messages = [];
@@ -659,7 +663,9 @@ module.exports.test_presence_of_confirmDelivery_method = function(test) {
   var client = mqlight.createClient({
     service: 'amqp://host',
     id: 'test_presence_of_confirmDelivery_method'
-  }, function() {
+  });
+
+  client.on('started', function() {
     client.subscribe('/kittens/#', testData[testCase].options);
     messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
   });
@@ -677,7 +683,7 @@ module.exports.test_presence_of_confirmDelivery_method = function(test) {
       ++testCase;
       if (testCase < testData.length) {
         client.subscribe('/kittens/#', testData[testCase].options);
-        messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
+        messages.push(testMessage('/kittens/lives/' + testCase, '/kittens/#'));
       } else {
         mqlight.proton.messenger.receive = originalReceiveMethod;
         client.stop(function() {
@@ -720,7 +726,7 @@ module.exports.test_confirmDelivery_callback = function(test) {
     id: 'test_confirmDelivery_callback'
   }, function() {
     client.subscribe('/kittens/#', options);
-    messages.push(testMessage('/kittens/blacktail', '/kittens/#'));
+    messages.push(testMessage('/kittens/curious', '/kittens/#'));
   });
 
   var stop = function() {
@@ -732,7 +738,6 @@ module.exports.test_confirmDelivery_callback = function(test) {
   var timer = setTimeout(function() {
     test.ok(false, 'test timed out without callback being invoked');
     stop();
-    test.done();
   }, 5000);
 
   var callback = function() {
