@@ -2,6 +2,13 @@
   "name": "mqlight",
   "version": "9.9.9999999999",
   "description": "IBM MQ Light Client Module",
+  "author": "IBM MQ Light <mqlight@uk.ibm.com>",
+  "homepage": "https://developer.ibm.com/messaging/mq-light/",
+  "bugs": {
+    "url": "https://ibm.biz/mqlight-forum",
+    "email": "mqlight@uk.ibm.com"
+  },
+  "keywords": ["simple", "robust", "messaging", "AMQP", "offload", "responsive"],
   "main": "mqlight.js",
   "gypfile": true,
   "binary": {
