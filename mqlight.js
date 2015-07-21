@@ -1730,10 +1730,10 @@ var Client = function(service, id, securityOptions) {
   // If client id has not been specified then generate an id
   if (!id) id = 'AUTO_' + uuid.v4().substring(0, 7);
 
-  // If the client id is incorrectly formatted then throw an error
-  if (id.length > 48) {
+  // If the client id is too long then throw an error
+  if (id.length > 256) {
     msg = "Client identifier '" + id + "' is longer than the maximum ID " +
-          'length of 48.';
+          'length of 256.';
     err = new InvalidArgumentError(msg);
     logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
     throw err;

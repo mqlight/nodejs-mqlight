@@ -11,7 +11,7 @@ Creates an IBM MQ Light client instance in `starting` state.
     it is called (in the form `function(err, service)`). User names and
     passwords may be embedded into the URL (for example, `amqp://user:pass@host`).
   * **id**, (String, default: `AUTO_[0-9a-f]{7}`) (optional) a String, with a
-    maximum length of 48 characters, to serve as a unique identifier for this
+    maximum length of 256 characters, to serve as a unique identifier for this
     client. A maximum of one instance of the client (as identified by the value
     of this property) can be connected to an MQ Light server at a given point
     in time. If another instance of the same client connects, then the
