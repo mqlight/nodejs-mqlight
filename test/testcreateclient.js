@@ -178,8 +178,8 @@ module.exports.test_id_types_values = function(test) {
                   {data: ':1234', valid: false},
                   {data: '1234:', valid: false},
                   {data: '12:34', valid: false},
-                  {data: new Array(256).join('x'), valid: true},
-                  {data: new Array(257).join('x'), valid: false},
+                  {data: new Array(257).join('x'), valid: true},
+                  {data: new Array(258).join('x'), valid: false},
                   {data: 'abcDEF._/%', valid: true}];
 
   var runTest = function(i) {
