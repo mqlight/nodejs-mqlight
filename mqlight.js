@@ -1629,7 +1629,10 @@ var Client = function(service, id, securityOptions) {
           client._stream.on('error', client._socketError);
 
           try {
-            client._messenger.connect(connectUrl);
+            // Get messenger to connect if it hasn't already.
+            if (!client._messenger.connected()) {
+              client._messenger.connect(connectUrl);
+            }
           } catch (err) {
             error = getNamedError(err);
             logger.caught('Client._tryService.connected', _id, error);

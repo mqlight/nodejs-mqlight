@@ -15,7 +15,9 @@ that goes to stderr when you run your application.
 
 ### 9.9.9999999999
 
-* Bugfix for sslVerifyName on Node.js 0.12.x
+* Bugfix for sslVerifyName on Node.js 0.12.x.
+* Bugfix for ffdcs and errors when connecting before the MQ Light server has
+  started.
 
 ### 1.0.2015061000
 

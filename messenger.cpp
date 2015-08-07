@@ -118,6 +118,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   NODE_SET_PROTOTYPE_METHOD(tpl, "sending", Sending);
   NODE_SET_PROTOTYPE_METHOD(tpl, "stop", Stop);
   NODE_SET_PROTOTYPE_METHOD(tpl, "connect", Connect);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "connected", Connected);
   NODE_SET_PROTOTYPE_METHOD(tpl, "subscribe", Subscribe);
   NODE_SET_PROTOTYPE_METHOD(tpl, "subscribed", Subscribed);
   NODE_SET_PROTOTYPE_METHOD(tpl, "unsubscribe", Unsubscribe);
@@ -538,6 +539,25 @@ NAN_METHOD(ProtonMessenger::Connect)
 
   Proton::Exit("ProtonMessenger::Connect", name, 0);
   NanReturnUndefined();
+}
+
+NAN_METHOD(ProtonMessenger::Connected)
+{
+  NanScope();
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  const char* name = obj->name.c_str();
+  Proton::Entry("ProtonMessenger::Connected", name);
+
+  bool connected;
+
+  if (obj->messenger && obj->connection) {
+    connected = true;
+  } else {
+    connected = false;
+  }
+
+  Proton::Exit("ProtonMessenger::Connected", name, connected);
+  NanReturnValue((connected) ? NanTrue() : NanFalse());
 }
 
 NAN_METHOD(ProtonMessenger::Stop)

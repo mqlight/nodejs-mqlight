@@ -64,6 +64,7 @@ class ProtonMessenger : public node::ObjectWrap
   static NAN_METHOD(Stop);
   static NAN_GETTER(Stopped);
   static NAN_METHOD(Connect);
+  static NAN_METHOD(Connected);
   static NAN_METHOD(Subscribe);
   static NAN_METHOD(Subscribed);
   static NAN_METHOD(Unsubscribe);
