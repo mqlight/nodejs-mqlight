@@ -523,7 +523,7 @@ exports.createClient = function(options, callback) {
         logger.log('debug', client.id, 'callback function queued');
       }
       process.nextTick(function() {
-        client._performConnect(true);
+        client._performConnect(true, false);
       });
     });
   } else {
@@ -536,7 +536,7 @@ exports.createClient = function(options, callback) {
       logger.log('debug', client.id, 'callback function queued');
     }
     process.nextTick(function() {
-      client._performConnect(true);
+      client._performConnect(true, false);
     });
   }
 
@@ -1064,7 +1064,7 @@ var Client = function(service, id, securityOptions) {
   };
 
   // performs the connect
-  this._performConnect = function(newClient) {
+  this._performConnect = function(newClient, retrying) {
     var client = this;
     logger.entry('Client._performConnect', _id, newClient);
 
@@ -1093,9 +1093,10 @@ var Client = function(service, id, securityOptions) {
     if (!newClient) {
       var currentState = _state;
       logger.log('debug', _id, 'currentState:', currentState);
+      logger.log('debug', _id, 'retrying:', retrying);
 
       // if we are not stopped or stopping state return with the client object
-      if (currentState !== STATE_STOPPED && currentState !== STATE_RETRYING) {
+      if (currentState !== STATE_STOPPED && !retrying) {
         if (currentState === STATE_STOPPING) {
           var stillDisconnecting = function(client) {
             logger.entry('stillDisconnecting', _id);
@@ -1106,7 +1107,7 @@ var Client = function(service, id, securityOptions) {
               });
             } else {
               process.nextTick(function() {
-                client._performConnect(newClient);
+                client._performConnect(newClient, retrying);
               });
             }
 
@@ -1341,7 +1342,7 @@ var Client = function(service, id, securityOptions) {
             var retry = function() {
               logger.entryLevel('entry_often', 'Client._tryService.retry', _id);
               if (!client.isStopped()) {
-                client._performConnect.apply(client, [false]);
+                client._performConnect.apply(client, [false, true]);
               }
               logger.exitLevel('exit_often', 'Client._tryService.retry',
                                _id, null);
@@ -1894,7 +1895,7 @@ Client.prototype.start = function(callback) {
         logger.log('debug', client.id, 'callback function queued');
       }
       process.nextTick(function() {
-        client._performConnect(false);
+        client._performConnect(false, false);
       });
     });
   } else {
@@ -1907,7 +1908,7 @@ Client.prototype.start = function(callback) {
       logger.log('debug', client.id, 'callback function queued');
     }
     process.nextTick(function() {
-      client._performConnect(false);
+      client._performConnect(false, false);
     });
   }
 
@@ -1921,7 +1922,7 @@ Client.prototype.start = function(callback) {
  *          stopProcessingCallback - callback to perform post stop processing.
  * @param {client} client - the client object to stop the messenger for.
  * @param {callback}
- *          callback, passed an error object if something goes wrong.
+ *          callback - passed an error object if something goes wrong.
  */
 
 
@@ -2181,7 +2182,7 @@ var reconnect = function(client) {
     }
     client._queuedChunks = [];
     client._queuedChunksSize = 0;
-    client._performConnect.apply(client, [false]);
+    client._performConnect.apply(client, [false, true]);
 
     logger.exit('Client.reconnect.stopProcessing', client.id, null);
   });
