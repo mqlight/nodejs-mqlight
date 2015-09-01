@@ -147,6 +147,10 @@ module.exports.createProtonStub = function() {
         }
         if (err) throw err;
       },
+      connected: function() {
+        if (DEBUG) log('stub connected function called');
+        return !this.stopped;
+      },
       receive: function() {
         // Commented - as generates a lot of output...
         // if (DEBUG) log('stub receive function called');
