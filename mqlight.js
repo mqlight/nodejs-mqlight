@@ -3109,7 +3109,7 @@ var processMessage = function(client, protonMsg) {
  * @param {Object} options (optional) affect how the subscribe method behaves.
  * @param {destCallback} callback (optional) invoked when the subscribe
  *                       operation completes.
- * @return {@link Client} the instance of the client subscribe was invoked on.
+ * @return {Client} the instance of the client subscribe was invoked on.
  * @throws {TypeError} one of the parameters is of the wrong type.
  * @throws {Error} the topic pattern parameter is undefined.
  */
@@ -3424,8 +3424,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
  *                 unsubscribe method call.
  * @param {function()} callback (optional) invoked when the subscribe operation
  *                     has completed.
- * @return {@link Client} the instance of the client that the subscribe method
- *                        was invoked on.
+ * @return {Client} the instance of the client that the subscribe method was
+ *                  invoked on.
  * @throws {TypeError} one of the  parameters is of the wrong type.
  * @throws {Error} if the topic pattern parameter is undefined.
  */
