@@ -39,12 +39,12 @@
 class Proton
 {
  public:
-  static NanCallback* loggerEntry;
-  static NanCallback* loggerExit;
-  static NanCallback* loggerLog;
-  static NanCallback* loggerBody;
-  static NanCallback* loggerFFDC;
-  static NanCallback* loggerThrow;
+  static Nan::Callback* loggerEntry;
+  static Nan::Callback* loggerExit;
+  static Nan::Callback* loggerLog;
+  static Nan::Callback* loggerBody;
+  static Nan::Callback* loggerFFDC;
+  static Nan::Callback* loggerThrow;
   static void Entry(const char* name, const char* id);
   static void Entry(const char* lvl, const char* name, const char* id);
   static void Exit(const char* name, const char* id, int rc);

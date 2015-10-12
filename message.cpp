@@ -43,44 +43,52 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 using namespace v8;
 using namespace node;
 
-#define THROW_EXCEPTION(error, fnc, id)                         \
-  Proton::Throw((fnc), (id), error);                            \
-  NanThrowTypeError((error == NULL) ? "unknown error" : error); \
-  NanReturnUndefined();
+#define THROW_EXCEPTION(error, fnc, id)                           \
+  Proton::Throw((fnc), (id), error);                              \
+  Nan::ThrowTypeError((error == NULL) ? "unknown error" : error); \
+  info.GetReturnValue().SetUndefined();
 
 #ifdef _WIN32
 #define snprintf _snprintf
 #endif
 
-Persistent<FunctionTemplate> ProtonMessage::constructor;
+Nan::Persistent<FunctionTemplate> ProtonMessage::constructor;
 void Free(ProtonMessage* msg);
 
 void ProtonMessage::Init(Handle<Object> target)
 {
-  NanScope();
+  Nan::HandleScope();
 
-  Local<FunctionTemplate> tpl = NanNew<FunctionTemplate>(ProtonMessage::New);
-  NanAssignPersistent(constructor, tpl);
+  Local<FunctionTemplate> tpl =
+      Nan::New<FunctionTemplate>(ProtonMessage::New);
+  constructor.Reset(tpl);
+  tpl->SetClassName(Nan::New<String>("ProtonMessage").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
-  tpl->SetClassName(NanNew<String>("ProtonMessage"));
 
-  NODE_SET_PROTOTYPE_METHOD(tpl, "destroy", Destroy);
+  Nan::SetPrototypeMethod(tpl, "destroy", Destroy);
 
-  tpl->InstanceTemplate()->SetAccessor(NanNew("body"), GetBody, PutBody);
-  tpl->InstanceTemplate()->SetAccessor(
-      NanNew("contentType"), GetContentType, SetContentType);
-  tpl->InstanceTemplate()->SetAccessor(
-      NanNew("address"), GetAddress, SetAddress);
-  tpl->InstanceTemplate()->SetAccessor(NanNew("linkAddress"),
-                                       GetLinkAddress);
-  tpl->InstanceTemplate()->SetAccessor(NanNew("deliveryAnnotations"),
-                                       GetDeliveryAnnotations);
-  tpl->InstanceTemplate()->SetAccessor(
-      NanNew("properties"), GetMessageProperties, SetMessageProperties);
-  tpl->InstanceTemplate()->SetAccessor(
-      NanNew("ttl"), GetTimeToLive, SetTimeToLive);
+  Nan::SetAccessor(tpl->InstanceTemplate(),
+                   Nan::New<String>("body").ToLocalChecked(), GetBody, PutBody);
+  Nan::SetAccessor(tpl->InstanceTemplate(),
+                   Nan::New<String>("contentType").ToLocalChecked(),
+                   GetContentType, SetContentType);
+  Nan::SetAccessor(tpl->InstanceTemplate(),
+                   Nan::New<String>("address").ToLocalChecked(), GetAddress,
+                   SetAddress);
+  Nan::SetAccessor(tpl->InstanceTemplate(),
+                   Nan::New<String>("linkAddress").ToLocalChecked(),
+                   GetLinkAddress);
+  Nan::SetAccessor(tpl->InstanceTemplate(),
+                   Nan::New<String>("deliveryAnnotations").ToLocalChecked(),
+                   GetDeliveryAnnotations);
+  Nan::SetAccessor(tpl->InstanceTemplate(),
+                   Nan::New<String>("properties").ToLocalChecked(),
+                   GetMessageProperties, SetMessageProperties);
+  Nan::SetAccessor(tpl->InstanceTemplate(),
+                   Nan::New<String>("ttl").ToLocalChecked(), GetTimeToLive,
+                   SetTimeToLive);
 
-  target->Set(NanNew("ProtonMessage"), NanNew(constructor)->GetFunction());
+  //target->Set(Nan::New("ProtonMessage"), Nan::New(constructor)->GetFunction());
 }
 
 ProtonMessage::ProtonMessage() : ObjectWrap()
@@ -139,24 +147,24 @@ ProtonMessage& ProtonMessage::operator=(const ProtonMessage& that)
 
 NAN_METHOD(ProtonMessage::NewInstance)
 {
-  NanScope();
+  Nan::HandleScope();
 
   Proton::Entry("ProtonMessage::NewInstance", NULL);
 
   Local<Object> instance =
-      NanNew(constructor)->GetFunction()->NewInstance();
+      Nan::New(constructor)->GetFunction()->NewInstance();
 
   Proton::Exit("ProtonMessage::NewInstance", NULL, 0);
-  NanReturnValue(instance);
+  info.GetReturnValue().Set(instance);
 }
 
 NAN_METHOD(ProtonMessage::New)
 {
-  NanScope();
+  Nan::HandleScope();
 
   Proton::Entry("ProtonMessage::New", NULL);
 
-  if (!args.IsConstructCall()) {
+  if (!info.IsConstructCall()) {
     THROW_EXCEPTION("Use the new operator to create instances of this object.",
                     "ProtonMessage::New",
                     NULL)
@@ -164,10 +172,10 @@ NAN_METHOD(ProtonMessage::New)
 
   // create a new instance of this type and wrap it in 'this' v8 Object
   ProtonMessage* msg = new ProtonMessage();
-  msg->Wrap(args.This());
+  msg->Wrap(info.This());
 
   Proton::Exit("ProtonMessage::New", msg->name, 0);
-  NanReturnValue(args.This());
+  info.GetReturnValue().Set(info.This());
 }
 
 void Free(ProtonMessage* msg)
@@ -193,21 +201,21 @@ void Free(ProtonMessage* msg)
 
 NAN_METHOD(ProtonMessage::Destroy)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
   Proton::Entry("ProtonMessage::Destroy", name);
 
   Free(msg);
 
   Proton::Exit("ProtonMessage::Destroy", NULL, 0);
-  NanReturnUndefined();
+  info.GetReturnValue().SetUndefined();
 }
 
 NAN_GETTER(ProtonMessage::GetAddress)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
   const char* addr = NULL;
 
@@ -219,16 +227,16 @@ NAN_GETTER(ProtonMessage::GetAddress)
 
   Proton::Exit("ProtonMessage::GetAddress", name, addr);
   if (addr) {
-    NanReturnValue(NanNew(addr));
+    info.GetReturnValue().Set(Nan::New(addr).ToLocalChecked());
   } else {
-    NanReturnUndefined();
+    info.GetReturnValue().SetUndefined();
   }
 }
 
 NAN_SETTER(ProtonMessage::SetAddress)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
 
   Proton::Entry("ProtonMessage::SetAddress", name);
@@ -246,8 +254,8 @@ NAN_SETTER(ProtonMessage::SetAddress)
 
 NAN_GETTER(ProtonMessage::GetBody)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
   Local<Value> result;
 
@@ -264,16 +272,14 @@ NAN_GETTER(ProtonMessage::GetBody)
       case PN_STRING:
         {
           pn_bytes_t string = pn_data_get_string(body);
-          result = NanNew(string.start, string.size);
+          result = Nan::New(string.start, string.size).ToLocalChecked();
         }
         break;
       default:
         {
           pn_bytes_t binary = pn_data_get_binary(body);
-          result = NanNewBufferHandle(binary.size);
+          result = Nan::NewBuffer(binary.size).ToLocalChecked();
           memcpy(Buffer::Data(result), binary.start, binary.size);
-          std::ofstream("/tmp/inter.bin", std::ios::binary)
-              .write(Buffer::Data(result), binary.size);
         }
         break;
     }
@@ -284,17 +290,17 @@ NAN_GETTER(ProtonMessage::GetBody)
         "debug", name, "subject:", pn_message_get_subject(msg->message));
     Proton::LogBody(name, result);
   } else {
-    result = NanNew(NanUndefined());
+    result = Nan::Undefined();
   }
 
   Proton::Exit("ProtonMessage::GetBody", name, 0);
-  NanReturnValue(result);
+  info.GetReturnValue().Set(result);
 }
 
 NAN_SETTER(ProtonMessage::PutBody)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
 
   Proton::Entry("ProtonMessage::PutBody", name);
@@ -308,7 +314,7 @@ NAN_SETTER(ProtonMessage::PutBody)
       Proton::LogBody(name, msgtext.c_str());
       pn_data_put_string(body,
                          pn_bytes(strlen(msgtext.c_str()), msgtext.c_str()));
-      NanAdjustExternalMemory(sizeof(msgtext.c_str()));
+      Nan::AdjustExternalMemory(sizeof(msgtext.c_str()));
     } else if (value->IsObject()) {
       Local<Object> buffer = value->ToObject();
       char* msgdata = Buffer::Data(buffer);
@@ -316,7 +322,7 @@ NAN_SETTER(ProtonMessage::PutBody)
       Proton::Log("data", name, "format:", "PN_BINARY");
       Proton::LogBody(name, buffer);
       pn_data_put_binary(body, pn_bytes(msglen, msgdata));
-      NanAdjustExternalMemory(msglen);
+      Nan::AdjustExternalMemory(msglen);
     }
   }
 
@@ -325,8 +331,8 @@ NAN_SETTER(ProtonMessage::PutBody)
 
 NAN_GETTER(ProtonMessage::GetContentType)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
   const char* type = NULL;
 
@@ -338,16 +344,16 @@ NAN_GETTER(ProtonMessage::GetContentType)
 
   Proton::Exit("ProtonMessage::GetContentType", name, type);
   if (type) {
-    NanReturnValue(NanNew<String>(type));
+    info.GetReturnValue().Set(Nan::New<String>(type).ToLocalChecked());
   } else { 
-    NanReturnValue(NanNew(NanNull()));
+    info.GetReturnValue().Set(Nan::Null());
   }
 }
 
 NAN_SETTER(ProtonMessage::SetContentType)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
 
   Proton::Entry("ProtonMessage::SetContentType", name);
@@ -365,8 +371,8 @@ NAN_SETTER(ProtonMessage::SetContentType)
 
 NAN_GETTER(ProtonMessage::GetLinkAddress)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
   const char* linkAddr = NULL;
 
@@ -378,9 +384,9 @@ NAN_GETTER(ProtonMessage::GetLinkAddress)
 
   Proton::Exit("ProtonMessage::GetLinkAddress", name, linkAddr);
   if (linkAddr) {
-    NanReturnValue(NanNew<String>(linkAddr));
+    info.GetReturnValue().Set(Nan::New<String>(linkAddr).ToLocalChecked());
   } else {
-    NanReturnValue(NanNew(NanUndefined()));
+    info.GetReturnValue().Set(Nan::Undefined());
   }
 }
 
@@ -395,10 +401,9 @@ NAN_GETTER(ProtonMessage::GetLinkAddress)
 // integer.
 NAN_GETTER(ProtonMessage::GetDeliveryAnnotations)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
-  Handle<Value> result;
 
   Proton::Entry("ProtonMessage::GetDeliveryAnnotations", name);
 
@@ -413,10 +418,10 @@ NAN_GETTER(ProtonMessage::GetDeliveryAnnotations)
     if (lval && pn_data_type(da) == PN_MAP) {  // Check it actually is a Map
       if (lval) {
         lval = pn_data_enter(da);  // Enter the Map
-}
+      }
       if (lval) {
         lval = pn_data_next(da);  // Position on first map key
-}
+      }
       if (lval) {
         while (true) {
           if (pn_data_type(da) == PN_SYMBOL) {
@@ -431,7 +436,7 @@ NAN_GETTER(ProtonMessage::GetDeliveryAnnotations)
               }
               if (!pn_data_next(da)) {
                 break;
-}
+              }
             } else {
               break;
             }
@@ -444,7 +449,8 @@ NAN_GETTER(ProtonMessage::GetDeliveryAnnotations)
     // Return early if there are no (interesting) delivery annotations
     if (elements == 0) {
       Proton::Exit("ProtonMessage::GetDeliveryAnnotations", name, 0);
-      NanReturnUndefined();
+      info.GetReturnValue().SetUndefined();
+      return;
     }
 
     pn_data_next(da);   // Move to Map
@@ -458,8 +464,7 @@ NAN_GETTER(ProtonMessage::GetDeliveryAnnotations)
     //   value      : the value of the delivery annotation entry
     //   value_type : the type of the delivery annotation value ('symbol',
     //   'string', or 'int32')
-    Local<Array> array = NanNew<Array>(elements);
-    result = array;
+    Local<Array> array = Nan::New<Array>(elements);
     int count = 0;
     while (true) {
       if (pn_data_type(da) == PN_SYMBOL) {
@@ -500,19 +505,21 @@ NAN_GETTER(ProtonMessage::GetDeliveryAnnotations)
           if (add_entry) {
             // e.g. {key: 'xopt-blah', key_type: 'symbol', value: 'blahblah',
             // value_type: 'string'}
-            Local<Object> obj = NanNew<Object>();
-            obj->Set(NanNew("key"), NanNew(key));
-            obj->Set(NanNew("key_type"),
-                     NanNew("symbol"));
-            obj->Set(NanNew("value"), NanNew(value));
-            obj->Set(NanNew("value_type"),
-                     NanNew(value_type));
-            array->Set(NanNew<Number>(count++), obj);
+            Local<Object> obj = Nan::New<Object>();
+            obj->Set(Nan::New("key").ToLocalChecked(),
+                     Nan::New(key).ToLocalChecked());
+            obj->Set(Nan::New("key_type").ToLocalChecked(),
+                     Nan::New("symbol").ToLocalChecked());
+            obj->Set(Nan::New("value").ToLocalChecked(),
+                     Nan::New(value).ToLocalChecked());
+            obj->Set(Nan::New("value_type").ToLocalChecked(),
+                     Nan::New(value_type).ToLocalChecked());
+            array->Set(Nan::New<Number>(count++), obj);
           }
 
           if (!pn_data_next(da)) {
             break;
-}
+          }
         } else {
           break;
         }
@@ -520,26 +527,26 @@ NAN_GETTER(ProtonMessage::GetDeliveryAnnotations)
     }
 
     pn_data_rewind(da);
+    info.GetReturnValue().Set(array);
   } else {
-    result = NanNew(NanUndefined());
+    info.GetReturnValue().SetUndefined();
   }
 
   Proton::Exit("ProtonMessage::GetDeliveryAnnotations", name, 1);
-  NanReturnValue(result);
 }
 
 NAN_GETTER(ProtonMessage::GetMessageProperties)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
-  Handle<Value> result;
 
   Proton::Entry("ProtonMessage::GetMessageProperties", name);
 
   if (!msg || !msg->message) {
     Proton::Exit("ProtonMessage::GetMessageProperties", name, 0);
-    NanReturnUndefined();
+    info.GetReturnValue().SetUndefined();
+    return;
   }
 
   pn_data_t* data = pn_message_properties(msg->message);
@@ -547,17 +554,18 @@ NAN_GETTER(ProtonMessage::GetMessageProperties)
   size_t size = pn_data_get_map(data);
   if (size == 0) {
     Proton::Exit("ProtonMessage::GetMessageProperties", name, 0);
-    NanReturnUndefined();
+    info.GetReturnValue().SetUndefined();
+    return;
   }
 
   pn_data_enter(data);
   pn_data_next(data);
 
-  Local<Object> obj = NanNew<Object>();
-  result = obj;
+  Local<Object> obj = Nan::New<Object>();
   for (size_t i = 0; i < size; i += 2) {
     if (pn_data_type(data) == PN_STRING) {
-      Handle<String> key = NanNew(pn_data_get_string(data).start);
+      Handle<String> key =
+          Nan::New(pn_data_get_string(data).start).ToLocalChecked();
 
       if (pn_data_next(data)) {
         Handle<Value> value;
@@ -566,45 +574,45 @@ NAN_GETTER(ProtonMessage::GetMessageProperties)
         pn_type_t type = pn_data_type(data);
         switch (type) {
           case PN_NULL:
-            value = NanNew(NanNull());
+            value = Nan::Null();
             break;
           case PN_BOOL:
-            value = (pn_data_get_bool(data)) ? NanTrue() : NanFalse();
+            value = (pn_data_get_bool(data)) ? Nan::True() : Nan::False();
             break;
           case PN_SHORT:
-            value = NanNew<Number>(pn_data_get_short(data));
+            value = Nan::New<Number>(pn_data_get_short(data));
             break;
           case PN_INT:
-            value = NanNew<Number>(pn_data_get_int(data));
+            value = Nan::New<Number>(pn_data_get_int(data));
             break;
           case PN_LONG:
-            value = NanNew<Number>(pn_data_get_long(data));
+            value = Nan::New<Number>(pn_data_get_long(data));
             break;
           case PN_FLOAT:
-            value = NanNew<Number>(pn_data_get_float(data));
+            value = Nan::New<Number>(pn_data_get_float(data));
             break;
           case PN_DOUBLE:
-            value = NanNew<Number>(pn_data_get_double(data));
+            value = Nan::New<Number>(pn_data_get_double(data));
             break;
           case PN_BYTE:
           case PN_BINARY: {
             if (type == PN_BINARY) {
               pn_bytes_t binary = pn_data_get_binary(data);
-              value = NanNewBufferHandle(binary.size);
+              value = Nan::NewBuffer(binary.size).ToLocalChecked();
               memcpy(Buffer::Data(value), binary.start, binary.size);
             } else {
               int8_t byte = pn_data_get_byte(data);
-              value = NanNewBufferHandle(1);
+              value = Nan::NewBuffer(1).ToLocalChecked();
               Local<Object> buffer = value->ToObject();
-              Local<Function> bufferWrite =
-                  Local<Function>::Cast(buffer->Get(NanNew("writeInt8")));
-              Local<Value> writeArgs[2] = {NanNew<Integer>(byte),
-                                           NanNew<Integer>(0)};
+              Local<Function> bufferWrite = Local<Function>::Cast(
+                  buffer->Get(Nan::New("writeInt8").ToLocalChecked()));
+              Local<Value> writeArgs[2] = {Nan::New<Integer>(byte),
+                                           Nan::New<Integer>(0)};
               bufferWrite->Call(buffer, 2, writeArgs);
             }
           } break;
           case PN_STRING:
-            value = NanNew(pn_data_get_string(data).start);
+            value = Nan::New(pn_data_get_string(data).start).ToLocalChecked();
             break;
           default:
             add_entry = false;
@@ -627,13 +635,13 @@ NAN_GETTER(ProtonMessage::GetMessageProperties)
   pn_data_rewind(data);
 
   Proton::Exit("ProtonMessage::GetMessageProperties", name, 1);
-  NanReturnValue(result);
+  info.GetReturnValue().Set(obj);
 }
 
 NAN_SETTER(ProtonMessage::SetMessageProperties)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
 
   Proton::Entry("ProtonMessage::SetMessageProperties", name);
@@ -668,10 +676,11 @@ NAN_SETTER(ProtonMessage::SetMessageProperties)
           pn_data_put_string(data,
                              pn_bytes(strlen(val.c_str()), val.c_str()));
         } else if (value->IsObject()) {
-          Local<Object> global = NanGetCurrentContext()->Global();
+          Local<Object> global = Nan::GetCurrentContext()->Global();
           Local<Value> bufferPrototype =
-              global->Get(NanNew("Buffer"))->ToObject()->Get(
-                  NanNew("prototype"));
+              global->Get(Nan::New("Buffer").ToLocalChecked())
+                  ->ToObject()
+                  ->Get(Nan::New("prototype").ToLocalChecked());
           if (bufferPrototype->Equals(value->ToObject()->GetPrototype())) {
             Local<Object> buffer = value->ToObject();
             char* bufdata = Buffer::Data(buffer);
@@ -692,8 +701,8 @@ NAN_SETTER(ProtonMessage::SetMessageProperties)
 
 NAN_GETTER(ProtonMessage::GetTimeToLive)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
   unsigned int ttl = 0;
 
@@ -706,13 +715,13 @@ NAN_GETTER(ProtonMessage::GetTimeToLive)
   char ttlString[16];
   sprintf(ttlString, "%d", ttl);
   Proton::Exit("ProtonMessage::GetTimeToLive", name, ttlString);
-  NanReturnValue(NanNew<Number>(ttl));
+  info.GetReturnValue().Set(Nan::New<Number>(ttl));
 }
 
 NAN_SETTER(ProtonMessage::SetTimeToLive)
 {
-  NanScope();
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args.This());
+  Nan::HandleScope();
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info.This());
   const char* name = msg ? msg->name : NULL;
 
   Proton::Entry("ProtonMessage::SetTimeToLive", name);

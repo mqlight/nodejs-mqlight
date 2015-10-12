@@ -36,12 +36,12 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 
 using namespace v8;
 
-NanCallback* Proton::loggerEntry;
-NanCallback* Proton::loggerExit;
-NanCallback* Proton::loggerLog;
-NanCallback* Proton::loggerBody;
-NanCallback* Proton::loggerFFDC;
-NanCallback* Proton::loggerThrow;
+Nan::Callback* Proton::loggerEntry;
+Nan::Callback* Proton::loggerExit;
+Nan::Callback* Proton::loggerLog;
+Nan::Callback* Proton::loggerBody;
+Nan::Callback* Proton::loggerFFDC;
+Nan::Callback* Proton::loggerThrow;
 
 #define NO_CLIENT_ID "*"
 
@@ -52,12 +52,12 @@ void Proton::Entry(const char* name, const char* id)
 
 void Proton::Entry(const char* lvl, const char* name, const char* id)
 {
-  NanScope();
+  Nan::HandleScope();
   Local<Value> args[3] = {
-      NanNew<String>(lvl),
-      NanNew<String>(name),
-      NanNew<String>(id ? id : NO_CLIENT_ID)};
-  Proton::loggerEntry->Call(NanGetCurrentContext()->Global(), 3, args);
+      Nan::New<String>(lvl).ToLocalChecked(),
+      Nan::New<String>(name).ToLocalChecked(),
+      Nan::New<String>(id ? id : NO_CLIENT_ID).ToLocalChecked()};
+  Proton::loggerEntry->Call(Nan::GetCurrentContext()->Global(), 3, args);
 }
 
 void Proton::Exit(const char* name, const char* id, int rc)
@@ -91,13 +91,13 @@ void Proton::Exit(const char* lvl,
                   const char* id,
                   const char* rc)
 {
-  NanScope();
+  Nan::HandleScope();
   Local<Value> args[4] = {
-      NanNew<String>(lvl),
-      NanNew<String>(name),
-      NanNew<String>(id ? id : NO_CLIENT_ID),
-      NanNew<String>(rc ? rc : "null")};
-  Proton::loggerExit->Call(NanGetCurrentContext()->Global(), 4, args);
+      Nan::New<String>(lvl).ToLocalChecked(),
+      Nan::New<String>(name).ToLocalChecked(),
+      Nan::New<String>(id ? id : NO_CLIENT_ID).ToLocalChecked(),
+      Nan::New<String>(rc ? rc : "null").ToLocalChecked()};
+  Proton::loggerExit->Call(Nan::GetCurrentContext()->Global(), 4, args);
 }
 
 void Proton::EntryTracer(const char* name, const char* message)
@@ -120,13 +120,13 @@ void Proton::Log(const char* lvl,
                  const char* prefix,
                  const char* data)
 {
-  NanScope();
+  Nan::HandleScope();
   Local<Value> args[4] = {
-      NanNew<String>(lvl),
-      NanNew<String>(id ? id : NO_CLIENT_ID),
-      NanNew<String>(prefix),
-      NanNew<String>(data ? data : "")};
-  Proton::loggerLog->Call(NanGetCurrentContext()->Global(), 4, args);
+      Nan::New<String>(lvl).ToLocalChecked(),
+      Nan::New<String>(id ? id : NO_CLIENT_ID).ToLocalChecked(),
+      Nan::New<String>(prefix).ToLocalChecked(),
+      Nan::New<String>(data ? data : "").ToLocalChecked()};
+  Proton::loggerLog->Call(Nan::GetCurrentContext()->Global(), 4, args);
 }
 
 void Proton::Log(const char* lvl, const char* id, const char* prefix, int data)
@@ -138,26 +138,26 @@ void Proton::Log(const char* lvl, const char* id, const char* prefix, int data)
 
 void Proton::LogBody(const char* id, const char* data)
 {
-  Proton::LogBody(id, NanNew<String>(data ? data : ""));
+  Proton::LogBody(id, Nan::New<String>(data ? data : "").ToLocalChecked());
 }
 
 void Proton::LogBody(const char* id, Local<Value> data)
 {
-  NanScope();
+  Nan::HandleScope();
   Local<Value> args[2] = {
-      NanNew<String>(id ? id : NO_CLIENT_ID),
+      Nan::New<String>(id ? id : NO_CLIENT_ID).ToLocalChecked(),
       data};
-  Proton::loggerBody->Call(NanGetCurrentContext()->Global(), 2, args);
+  Proton::loggerBody->Call(Nan::GetCurrentContext()->Global(), 2, args);
 }
 
 void Proton::FFDC(const char* fnc, int probeId, const char* data)
 {
-  NanScope();
-  Local<Value> args[4] = {NanNew<String>(fnc),
-                          NanNew<Integer>(probeId),
-                          NanNew(NanUndefined()),
-                          NanNew<String>(data ? data : "")};
-  Proton::loggerFFDC->Call(NanGetCurrentContext()->Global(), 4, args);
+  Nan::HandleScope();
+  Local<Value> args[4] = {Nan::New<String>(fnc).ToLocalChecked(),
+                          Nan::New<Integer>(probeId),
+                          Nan::Undefined(),
+                          Nan::New<String>(data ? data : "").ToLocalChecked()};
+  Proton::loggerFFDC->Call(Nan::GetCurrentContext()->Global(), 4, args);
 }
 
 void Proton::Throw(const char* name, const char* id, const char* err)
@@ -170,70 +170,70 @@ void Proton::Throw(const char* lvl,
                    const char* id,
                    const char* err)
 {
-  NanScope();
+  Nan::HandleScope();
   Local<Value> args[4] = {
-      NanNew<String>(lvl),
-      NanNew<String>(name),
-      NanNew<String>(id ? id : NO_CLIENT_ID),
-      NanNew<String>(err ? err : "null")};
-  Proton::loggerThrow->Call(NanGetCurrentContext()->Global(), 4, args);
+      Nan::New<String>(lvl).ToLocalChecked(),
+      Nan::New<String>(name).ToLocalChecked(),
+      Nan::New<String>(id ? id : NO_CLIENT_ID).ToLocalChecked(),
+      Nan::New<String>(err ? err : "null").ToLocalChecked()};
+  Proton::loggerThrow->Call(Nan::GetCurrentContext()->Global(), 4, args);
 }
 
 Local<Value> Proton::NewNamedError(const char* name, const char* msg)
 {
-  NanEscapableScope();
+  Nan::EscapableHandleScope scope;
   Local<Object> err =
-      NanError((msg == NULL) ? "unknown error" : (msg))->ToObject();
-  err->Set(NanNew<String>("name"), NanNew<String>(name));
-  return NanEscapeScope(err);
+      Nan::Error((msg == NULL) ? "unknown error" : (msg))->ToObject();
+  err->Set(Nan::New<String>("name").ToLocalChecked(),
+           Nan::New<String>(name).ToLocalChecked());
+  return scope.Escape(err);
 }
 
 NAN_METHOD(CreateMessage)
 {
-  NanScope();
-  return ProtonMessage::NewInstance(args);
+  Nan::HandleScope();
+  return ProtonMessage::NewInstance(info);
 }
 
 NAN_METHOD(CreateMessenger)
 {
-  NanScope();
-  return ProtonMessenger::NewInstance(args);
+  Nan::HandleScope();
+  return ProtonMessenger::NewInstance(info);
 }
 
 void RegisterModule(Handle<Object> exports, Handle<Object> module)
 {
   ProtonMessenger::Init(exports);
   ProtonMessage::Init(exports);
-  exports->Set(NanNew("createMessage"),
-               NanNew<FunctionTemplate>(CreateMessage)->GetFunction());
-  exports->Set(NanNew("createMessenger"),
-               NanNew<FunctionTemplate>(CreateMessenger)->GetFunction());
 
-  Local<Value> logVal =
-      NanGetCurrentContext()->Global()->Get(NanNew<String>("logger"));
+  Nan::Export(exports, "createMessage", CreateMessage);
+  Nan::Export(exports, "createMessenger", CreateMessenger);
+
+  Local<Value> logVal = Nan::GetCurrentContext()->Global()->Get(
+      Nan::New<String>("logger").ToLocalChecked());
   if (logVal->IsUndefined()) {
-    NanThrowTypeError("global 'logger' object is undefined");
+    Nan::ThrowTypeError("global 'logger' object is undefined");
     return;
   }
   Local<Object> logObj = Local<Object>::Cast(logVal);
-  Local<Function> entryFnc =
-      Local<Function>::Cast(logObj->Get(NanNew<String>("entryLevel")));
-  Local<Function> exitFnc =
-      Local<Function>::Cast(logObj->Get(NanNew<String>("exitLevel")));
-  Local<Function> logFnc =
-      Local<Function>::Cast(logObj->Get(NanNew<String>("log")));
-  Local<Function> bodyFnc =
-      Local<Function>::Cast(logObj->Get(NanNew<String>("body")));
-  Local<Function> ffdcFnc =
-      Local<Function>::Cast(logObj->Get(NanNew<String>("ffdc")));
-  Local<Function> throwFnc =
-      Local<Function>::Cast(logObj->Get(NanNew<String>("throwLevel")));
-  Proton::loggerEntry = new NanCallback(entryFnc);
-  Proton::loggerExit = new NanCallback(exitFnc);
-  Proton::loggerLog = new NanCallback(logFnc);
-  Proton::loggerBody = new NanCallback(bodyFnc);
-  Proton::loggerFFDC = new NanCallback(ffdcFnc);
-  Proton::loggerThrow = new NanCallback(throwFnc);
+  Local<Function> entryFnc = Local<Function>::Cast(
+      logObj->Get(Nan::New<String>("entryLevel").ToLocalChecked()));
+  Local<Function> exitFnc = Local<Function>::Cast(
+      logObj->Get(Nan::New<String>("exitLevel").ToLocalChecked()));
+  Local<Function> logFnc = Local<Function>::Cast(
+      logObj->Get(Nan::New<String>("log").ToLocalChecked()));
+  Local<Function> bodyFnc = Local<Function>::Cast(
+      logObj->Get(Nan::New<String>("body").ToLocalChecked()));
+  Local<Function> ffdcFnc = Local<Function>::Cast(
+      logObj->Get(Nan::New<String>("ffdc").ToLocalChecked()));
+  Local<Function> throwFnc = Local<Function>::Cast(
+      logObj->Get(Nan::New<String>("throwLevel").ToLocalChecked()));
+  Proton::loggerEntry = new Nan::Callback(entryFnc);
+  Proton::loggerExit = new Nan::Callback(exitFnc);
+  Proton::loggerLog = new Nan::Callback(logFnc);
+  Proton::loggerBody = new Nan::Callback(bodyFnc);
+  Proton::loggerFFDC = new Nan::Callback(ffdcFnc);
+  Proton::loggerThrow = new Nan::Callback(throwFnc);
 
   // Enable qpid-proton function entry, data and exit tracing
   pn_set_fnc_entry_tracer(Proton::EntryTracer);

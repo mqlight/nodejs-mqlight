@@ -56,17 +56,17 @@ using namespace v8;
 /* throw an exception of a particular named type at the default log lvl */
 #define THROW_NAMED_EXCEPTION(name, msg, fnc, id)  \
   Proton::Throw((fnc), (id), msg);                 \
-  return NanThrowError(Proton::NewNamedError(name, msg));
+  return Nan::ThrowError(Proton::NewNamedError(name, msg));
 
 /* throw an exception of a particular named type at a specific log lvl */
 #define THROW_NAMED_EXCEPTION_LEVEL(name, msg, lvl, fnc, id) \
   Proton::Throw((lvl), (fnc), (id), msg);                    \
-  return NanThrowError(Proton::NewNamedError(name, msg));
+  return Nan::ThrowError(Proton::NewNamedError(name, msg));
 
 /* throw an exception of a particular type at the default log lvl */
 #define THROW_EXCEPTION_TYPE(type, msg, fnc, id)          \
   Proton::Throw((fnc), (id), msg);                        \
-  return NanThrowError((msg) == NULL ? "unknown error" : (msg));
+  return Nan::ThrowError((msg) == NULL ? "unknown error" : (msg));
 
 /* throw an exception of the default type (TypeError) at the default log lvl */
 #define THROW_EXCEPTION(msg, fnc, id) \
@@ -75,8 +75,8 @@ using namespace v8;
 /* throw an exception of a particular type at a specific log lvl */
 #define THROW_EXCEPTION_LEVEL_TYPE(type, msg, lvl, fnc, id)           \
   Proton::Throw((lvl), (fnc), (id), msg);                             \
-  return NanThrowError(                                               \
-      type(NanNew<String>((msg) == NULL ? "unknown error" : (msg))));
+  return Nan::ThrowError(                                               \
+      type(Nan::New<String>((msg) == NULL ? "unknown error" : (msg))));
 
 /* throw an exception of the default type (TypeError) at a specific log lvl */
 #define THROW_EXCEPTION_LEVEL(msg, lvl, fnc, id) \
@@ -101,46 +101,47 @@ const char* GetErrorName(const char* text)
   return "NetworkError";
 }
 
-Persistent<FunctionTemplate> ProtonMessenger::constructor;
+Nan::Persistent<FunctionTemplate> ProtonMessenger::constructor;
 
 void ProtonMessenger::Init(Handle<Object> target)
 {
-  NanScope();
+  Nan::HandleScope scope;
 
-  Local<FunctionTemplate> tpl = NanNew<FunctionTemplate>(ProtonMessenger::New);
-  NanAssignPersistent(constructor, tpl);
+  Local<FunctionTemplate> tpl =
+      Nan::New<FunctionTemplate>(ProtonMessenger::New);
+  constructor.Reset(tpl);
+  tpl->SetClassName(Nan::New<String>("ProtonMessenger").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
-  tpl->SetClassName(NanNew<String>("ProtonMessenger"));
 
-  NODE_SET_PROTOTYPE_METHOD(tpl, "accept", Accept);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "put", Put);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "send", Send);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "sending", Sending);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "stop", Stop);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "connect", Connect);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "connected", Connected);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "subscribe", Subscribe);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "subscribed", Subscribed);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "unsubscribe", Unsubscribe);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "unsubscribed", Unsubscribed);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "receive", Receive);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "status", Status);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "statusError", StatusError);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "settle", Settle);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "settled", Settled);
-  NODE_SET_PROTOTYPE_METHOD(
-      tpl, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "flow", Flow);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "pendingOutbound", PendingOutbound);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "push", Push);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "pop", Pop);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "started", Started);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "closed", Closed);
-  NODE_SET_PROTOTYPE_METHOD(tpl, "heartbeat", Heartbeat);
+  Nan::SetPrototypeMethod(tpl, "accept", Accept);
+  Nan::SetPrototypeMethod(tpl, "put", Put);
+  Nan::SetPrototypeMethod(tpl, "send", Send);
+  Nan::SetPrototypeMethod(tpl, "sending", Sending);
+  Nan::SetPrototypeMethod(tpl, "stop", Stop);
+  Nan::SetPrototypeMethod(tpl, "connect", Connect);
+  Nan::SetPrototypeMethod(tpl, "connected", Connected);
+  Nan::SetPrototypeMethod(tpl, "subscribe", Subscribe);
+  Nan::SetPrototypeMethod(tpl, "subscribed", Subscribed);
+  Nan::SetPrototypeMethod(tpl, "unsubscribe", Unsubscribe);
+  Nan::SetPrototypeMethod(tpl, "unsubscribed", Unsubscribed);
+  Nan::SetPrototypeMethod(tpl, "receive", Receive);
+  Nan::SetPrototypeMethod(tpl, "status", Status);
+  Nan::SetPrototypeMethod(tpl, "statusError", StatusError);
+  Nan::SetPrototypeMethod(tpl, "settle", Settle);
+  Nan::SetPrototypeMethod(tpl, "settled", Settled);
+  Nan::SetPrototypeMethod(tpl, "getRemoteIdleTimeout", GetRemoteIdleTimeout);
+  Nan::SetPrototypeMethod(tpl, "flow", Flow);
+  Nan::SetPrototypeMethod(tpl, "pendingOutbound", PendingOutbound);
+  Nan::SetPrototypeMethod(tpl, "push", Push);
+  Nan::SetPrototypeMethod(tpl, "pop", Pop);
+  Nan::SetPrototypeMethod(tpl, "started", Started);
+  Nan::SetPrototypeMethod(tpl, "closed", Closed);
+  Nan::SetPrototypeMethod(tpl, "heartbeat", Heartbeat);
 
-  tpl->InstanceTemplate()->SetAccessor(NanNew<String>("stopped"), Stopped);
+  Nan::SetAccessor(tpl->InstanceTemplate(),
+                   Nan::New<String>("stopped").ToLocalChecked(), Stopped);
 
-  target->Set(NanNew("ProtonMessenger"), NanNew(constructor)->GetFunction());
+  //target->Set(Nan::New("ProtonMessenger"), Nan::New(constructor)->GetFunction());
 }
 
 void ProtonMessenger::Tracer(pn_transport_t* transport, const char* message)
@@ -188,32 +189,32 @@ ProtonMessenger::~ProtonMessenger()
 
 NAN_METHOD(ProtonMessenger::NewInstance)
 {
-  NanScope();
+  Nan::HandleScope scope;
 
   Proton::Entry("ProtonMessenger::NewInstance", NULL);
 
-  const unsigned argc = args.Length();
+  const unsigned argc = info.Length();
   Handle<Value>* argv = new Handle<Value>[argc];
   for (uint32_t i = 0; i < argc; i++) {
-    argv[i] = args[i];
+    argv[i] = info[i];
   }
 
   Local<Object> instance =
-      NanNew(constructor)->GetFunction()->NewInstance(argc, argv);
+      Nan::New(constructor)->GetFunction()->NewInstance(argc, argv);
 
   delete [] argv;
 
   Proton::Exit("ProtonMessenger::NewInstance", NULL, 0);
-  NanReturnValue(instance);
+  info.GetReturnValue().Set(instance);
 }
 
 NAN_METHOD(ProtonMessenger::New)
 {
-  NanScope();
+  Nan::HandleScope scope;
 
   Proton::Entry("ProtonMessenger::New", NULL);
 
-  if (!args.IsConstructCall()) {
+  if (!info.IsConstructCall()) {
     THROW_EXCEPTION("Use the new operator to create instances of this object.",
                     "ProtonMessenger::New",
                     NULL)
@@ -222,20 +223,20 @@ NAN_METHOD(ProtonMessenger::New)
   std::string name;
   std::string username;
   std::string password;
-  if (args.Length() < 1) {
+  if (info.Length() < 1) {
     name = "";
   } else {
     // parse the 'name' parameter out of the args
-    String::Utf8Value param(args[0]->ToString());
+    String::Utf8Value param(info[0]->ToString());
     name = std::string(*param);
 
     // look for the username and password parameters
-    if (!args[1]->IsUndefined()) {
-      String::Utf8Value userparam(args[1]->ToString());
+    if (!info[1]->IsUndefined()) {
+      String::Utf8Value userparam(info[1]->ToString());
       username = std::string(*userparam);
 
-      if (!args[2]->IsUndefined()) {
-        String::Utf8Value passwordparam(args[2]->ToString());
+      if (!info[2]->IsUndefined()) {
+        String::Utf8Value passwordparam(info[2]->ToString());
         password = std::string(*passwordparam);
       }
     }
@@ -249,30 +250,30 @@ NAN_METHOD(ProtonMessenger::New)
   // create a new instance of this type and wrap it in 'this' v8 Object
   ProtonMessenger* obj = new ProtonMessenger(name, username, password);
 
-  obj->Wrap(args.This());
+  obj->Wrap(info.This());
 
   Proton::Exit("ProtonMessenger::New", NULL, 0);
-  NanReturnValue(args.This());
+  info.GetReturnValue().Set(info.This());
 }
 
 NAN_METHOD(ProtonMessenger::Put)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   ProtonMessage* msg;
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Put", name);
 
   // throw exception if not enough args
-  if (args.Length() < 2 || args[0].IsEmpty() || args[1].IsEmpty()) {
+  if (info.Length() < 2 || info[0].IsEmpty() || info[1].IsEmpty()) {
     THROW_EXCEPTION("Missing required message or qos argument.",
                     "ProtonMessenger::Put",
                     name);
   }
 
-  msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
-  Local<Integer> integer = args[1]->ToInteger();
+  msg = ObjectWrap::Unwrap<ProtonMessage>(info[0]->ToObject());
+  Local<Integer> integer = info[1]->ToInteger();
   int qos = static_cast<int>(integer->Value());
   Proton::Log("parms", name, "qos:", qos);
 
@@ -316,19 +317,19 @@ NAN_METHOD(ProtonMessenger::Put)
   }
 
   Proton::Exit("ProtonMessenger::Put", name, true);
-  NanReturnValue(NanTrue());
+  info.GetReturnValue().Set(Nan::True());
 }
 
 NAN_METHOD(ProtonMessenger::Send)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Send", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
+  if (info.Length() < 1 || info[0].IsEmpty()) {
     THROW_EXCEPTION("Missing stream argument.",
                     "ProtonMessenger::Send", name);
   }
@@ -349,28 +350,28 @@ NAN_METHOD(ProtonMessenger::Send)
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Send", name)
   }
 
-  ProtonMessenger::Write(obj, args[0], false);
+  ProtonMessenger::Write(obj, info[0], false);
 
   Proton::Exit("ProtonMessenger::Send", name, true);
-  NanReturnValue(NanTrue());
+  info.GetReturnValue().Set(Nan::True());
 }
 
 NAN_METHOD(ProtonMessenger::Sending)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Sending", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
+  if (info.Length() < 1 || info[0].IsEmpty()) {
     THROW_EXCEPTION("Missing required argument",
                     "ProtonMessenger::Sending",
                     name);
   }
 
-  String::Utf8Value param(args[0]->ToString());
+  String::Utf8Value param(info[0]->ToString());
   std::string address = std::string(*param);
   Proton::Log("parms", name, "address:", address.c_str());
 
@@ -402,32 +403,37 @@ NAN_METHOD(ProtonMessenger::Sending)
   bool sending = (pn_link_state(link) & PN_REMOTE_ACTIVE);
 
   Proton::Exit("ProtonMessenger::Sending", name, sending);
-  NanReturnValue((sending) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((sending) ? Nan::True() : Nan::False());
 }
 
 NAN_METHOD(ProtonMessenger::Connect)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Connect", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 1) {
+  if (info.Length() < 1) {
     THROW_EXCEPTION(
         "Missing required address argument.", "ProtonMessenger::Connect", name);
   }
 
   // First argument is expected to contain a url.parse object
-  Local<Object> url = args[0]->ToObject();
-  String::Utf8Value urlHref(url->Get(NanNew<String>("href")));
+  Local<Object> url = info[0]->ToObject();
+  String::Utf8Value urlHref(
+      url->Get(Nan::New<String>("href").ToLocalChecked()));
   std::string address = std::string(*urlHref);
-  Local<RegExp> regex = RegExp::New(NanNew<String>(":[^\\/:]+@"), RegExp::kNone);
+  Local<RegExp> regex = RegExp::New(
+      Nan::New<String>(":[^\\/:]+@").ToLocalChecked(), RegExp::kNone);
   Handle<Function> replace = Handle<Function>::Cast(
-      NanNew<String>(address.c_str())->ToObject()->Get(NanNew<String>("replace")));
-  Handle<Value> argv[] = {regex, NanNew<String>(":********@")};
-  String::Utf8Value traceUrlHref(
-      replace->Call(NanNew<String>(address.c_str())->ToObject(), 2, argv));
+      Nan::New<String>(address.c_str()).ToLocalChecked()
+          ->ToObject()
+          ->Get(Nan::New<String>("replace").ToLocalChecked()));
+  Handle<Value> argv[] = {regex,
+                          Nan::New<String>(":********@").ToLocalChecked()};
+  String::Utf8Value traceUrlHref(replace->Call(
+      Nan::New<String>(address.c_str()).ToLocalChecked()->ToObject(), 2, argv));
   std::string traceAddress = std::string(*traceUrlHref);
   Proton::Log("parms", name, "address:", traceAddress.c_str());
 
@@ -473,9 +479,11 @@ NAN_METHOD(ProtonMessenger::Connect)
    * confirms that it can connect at startup.
    */
   int error;
-  String::Utf8Value urlProtocol(url->Get(NanNew<String>("protocol")));
+  String::Utf8Value urlProtocol(
+      url->Get(Nan::New<String>("protocol").ToLocalChecked()));
   std::string protocol = std::string(*urlProtocol);
-  String::Utf8Value urlHost(url->Get(NanNew<String>("host")));
+  String::Utf8Value urlHost(
+      url->Get(Nan::New<String>("host").ToLocalChecked()));
   std::string hostandport = std::string(*urlHost);
   std::string pattern = protocol + "//" + hostandport + "/*";
   std::string validationAddress  = address + "/$1";
@@ -538,13 +546,13 @@ NAN_METHOD(ProtonMessenger::Connect)
   }
 
   Proton::Exit("ProtonMessenger::Connect", name, 0);
-  NanReturnUndefined();
+  info.GetReturnValue().SetUndefined();
 }
 
 NAN_METHOD(ProtonMessenger::Connected)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Connected", name);
 
@@ -557,19 +565,19 @@ NAN_METHOD(ProtonMessenger::Connected)
   }
 
   Proton::Exit("ProtonMessenger::Connected", name, connected);
-  NanReturnValue((connected) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((connected) ? Nan::True() : Nan::False());
 }
 
 NAN_METHOD(ProtonMessenger::Stop)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Stop", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
+  if (info.Length() < 1 || info[0].IsEmpty()) {
     THROW_EXCEPTION("Missing stream argument.",
                     "ProtonMessenger::Stop", name);
   }
@@ -577,14 +585,14 @@ NAN_METHOD(ProtonMessenger::Stop)
   // If already stopped then simply return true
   if (!obj->messenger) {
     Proton::Exit("ProtonMessenger::Stop", name, true);
-    NanReturnValue(NanTrue());
+    info.GetReturnValue().Set(Nan::True());
   }
 
   Proton::Entry("pn_messenger_stop", name);
   int err = pn_messenger_stop(obj->messenger);
   Proton::Exit("pn_messenger_stop", name, err);
 
-  ProtonMessenger::Write(obj, args[0], false);
+  ProtonMessenger::Write(obj, info[0], false);
 
   Proton::Entry("pn_messenger_stopped", name);
   bool stopped = pn_messenger_stopped(obj->messenger);
@@ -599,13 +607,13 @@ NAN_METHOD(ProtonMessenger::Stop)
   }
 
   Proton::Exit("ProtonMessenger::Stop", name, stopped);
-  NanReturnValue((stopped) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((stopped) ? Nan::True() : Nan::False());
 }
 
 NAN_GETTER(ProtonMessenger::Stopped)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Stopped", name);
@@ -620,29 +628,29 @@ NAN_GETTER(ProtonMessenger::Stopped)
   }
 
   Proton::Exit("ProtonMessenger::Stopped", name, stopped);
-  NanReturnValue((stopped) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((stopped) ? Nan::True() : Nan::False());
 }
 
 NAN_METHOD(ProtonMessenger::Subscribe)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Subscribe", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 4 || args[0].IsEmpty() || args[1].IsEmpty() ||
-      args[2].IsEmpty(), args[3].IsEmpty()) {
+  if (info.Length() < 4 || info[0].IsEmpty() || info[1].IsEmpty() ||
+      info[2].IsEmpty(), info[3].IsEmpty()) {
     THROW_EXCEPTION("Missing required argument",
                     "ProtonMessenger::Subscribe",
                     name);
   }
 
-  String::Utf8Value param(args[0]->ToString());
+  String::Utf8Value param(info[0]->ToString());
   std::string address = std::string(*param);
-  int qos = static_cast<int>(args[1]->ToInteger()->Value());
-  int ttl = static_cast<int>(args[2]->ToInteger()->Value());
+  int qos = static_cast<int>(info[1]->ToInteger()->Value());
+  int ttl = static_cast<int>(info[2]->ToInteger()->Value());
   Proton::Log("parms", name, "address:", address.c_str());
   Proton::Log("parms", name, "qos:", qos);
   Proton::Log("parms", name, "ttl:", ttl);
@@ -698,28 +706,28 @@ NAN_METHOD(ProtonMessenger::Subscribe)
     THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Subscribe", name)
   }
 
-  ProtonMessenger::Write(obj, args[3], false);
+  ProtonMessenger::Write(obj, info[3], false);
 
   Proton::Exit("ProtonMessenger::Subscribe", name, true);
-  NanReturnValue(NanTrue());
+  info.GetReturnValue().Set(Nan::True());
 }
 
 NAN_METHOD(ProtonMessenger::Subscribed)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Subscribed", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
+  if (info.Length() < 1 || info[0].IsEmpty()) {
     THROW_EXCEPTION("Missing required argument",
                     "ProtonMessenger::Subscribed",
                     name);
   }
 
-  String::Utf8Value param(args[0]->ToString());
+  String::Utf8Value param(info[0]->ToString());
   std::string address = std::string(*param);
   Proton::Log("parms", name, "address:", address.c_str());
 
@@ -756,31 +764,31 @@ NAN_METHOD(ProtonMessenger::Subscribed)
   }
 
   Proton::Exit("ProtonMessenger::Subscribed", name, subscribed);
-  NanReturnValue((subscribed) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((subscribed) ? Nan::True() : Nan::False());
 }
 
 NAN_METHOD(ProtonMessenger::Unsubscribe)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Unsubscribe", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 3 || args[0].IsEmpty() || args[1].IsEmpty() ||
-      args[2].IsEmpty()) {
+  if (info.Length() < 3 || info[0].IsEmpty() || info[1].IsEmpty() ||
+      info[2].IsEmpty()) {
     THROW_EXCEPTION("Missing required argument",
                     "ProtonMessenger::Unsubscribe",
                     name);
   }
 
-  String::Utf8Value param(args[0]->ToString());
+  String::Utf8Value param(info[0]->ToString());
   std::string address = std::string(*param);
   Proton::Log("parms", name, "address:", address.c_str());
   int ttl = -1;
-  if (args.Length() > 1 && !args[1]->IsUndefined()) {
-    ttl = static_cast<int>(args[1]->ToInteger()->Value());
+  if (info.Length() > 1 && !info[1]->IsUndefined()) {
+    ttl = static_cast<int>(info[1]->ToInteger()->Value());
     Proton::Log("parms", name, "ttl:", ttl);
   } else {
     Proton::Log("parms", name, "ttl:", "undefined");
@@ -844,28 +852,28 @@ NAN_METHOD(ProtonMessenger::Unsubscribe)
     Proton::Exit("pn_link_detach", name, 0);
   }
 
-  ProtonMessenger::Write(obj, args[2], false);
+  ProtonMessenger::Write(obj, info[2], false);
 
   Proton::Exit("ProtonMessenger::Unsubscribe", name, true);
-  NanReturnValue(NanTrue());
+  info.GetReturnValue().Set(Nan::True());
 }
 
 NAN_METHOD(ProtonMessenger::Unsubscribed)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Unsubscribed", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
+  if (info.Length() < 1 || info[0].IsEmpty()) {
     THROW_EXCEPTION("Missing required argument",
                     "ProtonMessenger::Unsubscribed",
                     name);
   }
 
-  String::Utf8Value param(args[0]->ToString());
+  String::Utf8Value param(info[0]->ToString());
   std::string address = std::string(*param);
   Proton::Log("parms", name, "address:", address.c_str());
 
@@ -916,20 +924,20 @@ NAN_METHOD(ProtonMessenger::Unsubscribed)
   }
 
   Proton::Exit("ProtonMessenger::Unsubscribed", name, unsubscribed);
-  NanReturnValue((unsubscribed) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((unsubscribed) ? Nan::True() : Nan::False());
 }
 
 /* XXX: this may need to be wrapped in a uv_async queued operation? */
 NAN_METHOD(ProtonMessenger::Receive)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("entry_often", "ProtonMessenger::Receive", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
+  if (info.Length() < 1 || info[0].IsEmpty()) {
     THROW_EXCEPTION("Missing stream argument.",
                     "ProtonMessenger::Receive", name);
   }
@@ -956,9 +964,9 @@ NAN_METHOD(ProtonMessenger::Receive)
 
   std::vector<Local<Object> > vector;
   while (pn_messenger_incoming(obj->messenger)) {
-    Local<Value> argv[1] = {args[0]};
+    Local<Value> argv[1] = {info[0]};
     Local<Object> msgObj =
-        NanNew(ProtonMessage::constructor)->GetFunction()->NewInstance(0, argv);
+        Nan::New(ProtonMessage::constructor)->GetFunction()->NewInstance(0, argv);
     ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(msgObj);
 
     Proton::Entry("pn_messenger_get", name);
@@ -1001,33 +1009,33 @@ NAN_METHOD(ProtonMessenger::Receive)
     }
   }
 
-  Local<Array> messages = NanNew<Array>(static_cast<int>(vector.size()));
+  Local<Array> messages = Nan::New<Array>(static_cast<int>(vector.size()));
   for (unsigned int i = 0; i < vector.size(); i++) {
-    messages->Set(NanNew<Number>(i), vector[i]);
+    messages->Set(Nan::New<Number>(i), vector[i]);
   }
 
-  ProtonMessenger::Write(obj, args[0], false);
+  ProtonMessenger::Write(obj, info[0], false);
 
   Proton::Exit("exit_often", "ProtonMessenger::Receive", name, 0);
-  NanReturnValue(messages);
+  info.GetReturnValue().Set(messages);
 }
 
 NAN_METHOD(ProtonMessenger::Status)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Status", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
+  if (info.Length() < 1 || info[0].IsEmpty() || info[0]->IsNull() ||
+      info[0]->IsUndefined()) {
     THROW_EXCEPTION(
         "Missing required message argument.", "ProtonMessenger::Status", name);
   }
 
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info[0]->ToObject());
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -1038,25 +1046,25 @@ NAN_METHOD(ProtonMessenger::Status)
   int status = pn_messenger_status(obj->messenger, msg->tracker);
 
   Proton::Exit("ProtonMessenger::Status", name, status);
-  NanReturnValue(NanNew<Number>(status));
+  info.GetReturnValue().Set(Nan::New<Number>(status));
 }
 
 NAN_METHOD(ProtonMessenger::Accept)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Accept", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
+  if (info.Length() < 1 || info[0].IsEmpty() || info[0]->IsNull() ||
+      info[0]->IsUndefined()) {
     THROW_EXCEPTION(
         "Missing required message argument.", "ProtonMessenger::Accept", name);
   }
 
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info[0]->ToObject());
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -1075,25 +1083,25 @@ NAN_METHOD(ProtonMessenger::Accept)
   }
 
   Proton::Exit("ProtonMessenger::Accept", name, true);
-  NanReturnValue(NanTrue());
+  info.GetReturnValue().Set(Nan::True());
 }
 
 NAN_METHOD(ProtonMessenger::Settle)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Settle", name);
 
   // throw exception if not enough args
-  if (args.Length() < 2 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined() || args[1].IsEmpty()) {
+  if (info.Length() < 2 || info[0].IsEmpty() || info[0]->IsNull() ||
+      info[0]->IsUndefined() || info[1].IsEmpty()) {
     THROW_EXCEPTION(
         "Missing required message argument.", "ProtonMessenger::Settle", name);
   }
 
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info[0]->ToObject());
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -1116,28 +1124,28 @@ NAN_METHOD(ProtonMessenger::Settle)
         "NetworkError", "Failed to settle", "ProtonMessenger::Settle", name);
   }
 
-  ProtonMessenger::Write(obj, args[1], false);
+  ProtonMessenger::Write(obj, info[1], false);
 
   Proton::Exit("ProtonMessenger::Settle", name, true);
-  NanReturnValue(NanTrue());
+  info.GetReturnValue().Set(Nan::True());
 }
 
 NAN_METHOD(ProtonMessenger::Settled)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Settled", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
+  if (info.Length() < 1 || info[0].IsEmpty() || info[0]->IsNull() ||
+      info[0]->IsUndefined()) {
     THROW_EXCEPTION(
         "Missing required message argument.", "ProtonMessenger::Settled", name);
   }
 
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info[0]->ToObject());
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -1168,26 +1176,26 @@ NAN_METHOD(ProtonMessenger::Settled)
   }
 
   Proton::Exit("ProtonMessenger::Settled", name, settled);
-  NanReturnValue((settled) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((settled) ? Nan::True() : Nan::False());
 }
 
 NAN_METHOD(ProtonMessenger::GetRemoteIdleTimeout)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::GetRemoteIdleTimeout", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
+  if (info.Length() < 1 || info[0].IsEmpty() || info[0]->IsNull() ||
+      info[0]->IsUndefined()) {
     THROW_EXCEPTION("Missing required address argument.",
                     "ProtonMessenger::GetRemoteIdleTimeout",
                     name);
   }
 
-  String::Utf8Value param(args[0]->ToString());
+  String::Utf8Value param(info[0]->ToString());
   std::string address = std::string(*param);
   Proton::Log("parms", name, "address:", address.c_str());
 
@@ -1204,29 +1212,29 @@ NAN_METHOD(ProtonMessenger::GetRemoteIdleTimeout)
 
   Proton::Exit(
       "ProtonMessenger::GetRemoteIdleTimeout", name, remoteIdleTimeout);
-  NanReturnValue(NanNew<Number>(remoteIdleTimeout));
+  info.GetReturnValue().Set(Nan::New<Number>(remoteIdleTimeout));
 }
 
 NAN_METHOD(ProtonMessenger::Flow)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::Flow", name);
 
   // throw exception if not enough args
-  if (args.Length() < 3 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined() || args[1].IsEmpty() || args[2].IsEmpty()) {
+  if (info.Length() < 3 || info[0].IsEmpty() || info[0]->IsNull() ||
+      info[0]->IsUndefined() || info[1].IsEmpty() || info[2].IsEmpty()) {
     THROW_EXCEPTION(
         "Missing required argument", "ProtonMessenger::Flow", name);
   }
 
-  String::Utf8Value param(args[0]->ToString());
+  String::Utf8Value param(info[0]->ToString());
   std::string address = std::string(*param);
   Proton::Log("parms", name, "address:", address.c_str());
 
-  long creditLong = args[1]->ToInteger()->Value();
+  long creditLong = info[1]->ToInteger()->Value();
   if (creditLong > 4294967295) { creditLong = 4294967295;
 }
   unsigned int credit = static_cast<unsigned int>(creditLong);
@@ -1246,32 +1254,32 @@ NAN_METHOD(ProtonMessenger::Flow)
   if (link) {
     pn_link_flow(link, credit);
 
-    ProtonMessenger::Write(obj, args[2], false);
+    ProtonMessenger::Write(obj, info[2], false);
   } else {
     Proton::Log("parms", name, "link:", "null");
   }
 
   Proton::Exit("ProtonMessenger::Flow", name, 0);
-  NanReturnUndefined();
+  info.GetReturnValue().SetUndefined();
 }
 
 NAN_METHOD(ProtonMessenger::StatusError)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::StatusError", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined()) {
+  if (info.Length() < 1 || info[0].IsEmpty() || info[0]->IsNull() ||
+      info[0]->IsUndefined()) {
     THROW_EXCEPTION("Missing required message argument.",
                     "ProtonMessenger::StatusError",
                     name);
   }
 
-  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(args[0]->ToObject());
+  ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(info[0]->ToObject());
 
   // throw exception if not connected
   if (!obj->messenger) {
@@ -1298,28 +1306,28 @@ NAN_METHOD(ProtonMessenger::StatusError)
   Proton::Exit("ProtonMessenger::StatusError", name,
                (description == NULL) ? "" : description);
   if (description == NULL) {
-    NanReturnUndefined();
+    info.GetReturnValue().SetUndefined();
   } else {
-    NanReturnValue(NanNew<String>(description));
+    info.GetReturnValue().Set(Nan::New<String>(description).ToLocalChecked());
   }
 }
 
 NAN_METHOD(ProtonMessenger::PendingOutbound)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
 
   Proton::Entry("ProtonMessenger::PendingOutbound", name);
 
   // throw exception if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty() || args[0]->IsNull() ||
-      args[0]->IsUndefined() || args[1].IsEmpty()) {
+  if (info.Length() < 1 || info[0].IsEmpty() || info[0]->IsNull() ||
+      info[0]->IsUndefined() || info[1].IsEmpty()) {
     THROW_EXCEPTION(
         "Missing required argument", "ProtonMessenger::PendingOutbound", name);
   }
 
-  String::Utf8Value param(args[0]->ToString());
+  String::Utf8Value param(info[0]->ToString());
   std::string address = std::string(*param);
   Proton::Log("parms", name, "address:", address.c_str());
 
@@ -1343,27 +1351,27 @@ NAN_METHOD(ProtonMessenger::PendingOutbound)
   }
 
   Proton::Exit("ProtonMessenger::PendingOutbound", name, result);
-  NanReturnValue((result) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((result) ? Nan::True() : Nan::False());
 }
 
 NAN_METHOD(ProtonMessenger::Push)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
   int n;
   Proton::Entry("ProtonMessenger::Push", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 2 || args[0].IsEmpty() || args[1].IsEmpty()) {
+  if (info.Length() < 2 || info[0].IsEmpty() || info[1].IsEmpty()) {
     THROW_EXCEPTION(
         "Missing chunk.", "ProtonMessenger::Push", name);
   }
 
   // Pushing data requires a messenger connection
-  ssize_t length = args[0]->ToInteger()->Value();
+  ssize_t length = info[0]->ToInteger()->Value();
   if (obj->messenger && obj->connection) {
-    Local<Object> buffer = args[1]->ToObject();
+    Local<Object> buffer = info[1]->ToObject();
 
     Proton::Entry("pn_connection_push", name);
     n = pn_connection_push(
@@ -1378,13 +1386,13 @@ NAN_METHOD(ProtonMessenger::Push)
   }
 
   Proton::Exit("ProtonMessenger::Push", name, n);
-  NanReturnValue(NanNew<Number>(n));
+  info.GetReturnValue().Set(Nan::New<Number>(n));
 }
 
 int ProtonMessenger::Write(ProtonMessenger* obj,
                            Local<Value> value, bool force)
 {
-  NanScope();
+  Nan::HandleScope scope;
   const char* name = obj->name.c_str();
   Proton::Entry("entry_often", "ProtonMessenger::Write", name);
   Proton::Log("parms", name, "force:", force);
@@ -1396,17 +1404,20 @@ int ProtonMessenger::Write(ProtonMessenger* obj,
     if (value->IsObject()) {
       Local<Object> stream = value->ToObject();
       Local<Function> streamWrite = Local<Function>::Cast(
-        stream->Get(NanNew<String>("write")));
+        stream->Get(Nan::New<String>("write").ToLocalChecked()));
 
       pn_transport_t *transport = pn_connection_transport(obj->connection);
       if (transport) {
         n = pn_transport_pending(transport);
         if (n > 0) {
           // write n bytes to stream
-          Local<Value> buffer = NanNewBufferHandle(n);
-          n = pn_transport_peek(transport, node::Buffer::Data(buffer), n);
-          Local<Value> writeArgs[1] = {buffer};
-          Local<Value> drained = streamWrite->Call(stream, 1, writeArgs);
+          Nan::MaybeLocal<Object> buffer = Nan::NewBuffer(n);
+          n = pn_transport_peek(transport,
+                                node::Buffer::Data(buffer.ToLocalChecked()),
+                                n);
+          Local<Value> writeArgs[1] = {buffer.ToLocalChecked()};
+          Local<Value> drained = Nan::MakeCallback(stream, streamWrite, 1,
+                                                   writeArgs);
           Proton::Log("data_often", name, "stream drained:",
                       drained->ToBoolean()->Value());
 
@@ -1444,28 +1455,28 @@ int ProtonMessenger::Write(ProtonMessenger* obj,
 
 NAN_METHOD(ProtonMessenger::Pop)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Pop", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 2 || args[0].IsEmpty() || args[1].IsEmpty()) {
+  if (info.Length() < 2 || info[0].IsEmpty() || info[1].IsEmpty()) {
     THROW_EXCEPTION("Missing stream or force argument.",
                     "ProtonMessenger::Pop", name);
   }
-  bool force = args[1]->ToBoolean()->Value();
+  bool force = info[1]->ToBoolean()->Value();
   Proton::Log("parms", name, "force:", force);
-  int n = ProtonMessenger::Write(obj, args[0], force);
+  int n = ProtonMessenger::Write(obj, info[0], force);
 
   Proton::Exit("ProtonMessenger::Pop", name, n);
-  NanReturnValue(NanNew<Integer>(n));
+  info.GetReturnValue().Set(Nan::New<Integer>(n));
 }
 
 NAN_METHOD(ProtonMessenger::Started)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Started", name);
 
@@ -1486,13 +1497,13 @@ NAN_METHOD(ProtonMessenger::Started)
   }
 
   Proton::Exit("ProtonMessenger::Started", name, started);
-  NanReturnValue((started) ? NanTrue() : NanFalse());
+  info.GetReturnValue().Set((started) ? Nan::True() : Nan::False());
 }
 
 NAN_METHOD(ProtonMessenger::Closed)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Closed", name);
 
@@ -1510,24 +1521,24 @@ NAN_METHOD(ProtonMessenger::Closed)
   }
 
   Proton::Exit("ProtonMessenger::Closed", name, 0);
-  NanReturnUndefined();
+  info.GetReturnValue().SetUndefined();
 }
 
 NAN_METHOD(ProtonMessenger::Heartbeat)
 {
-  NanScope();
-  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(args.This());
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::Heartbeat", name);
 
   // throw TypeError if not enough args
-  if (args.Length() < 1 || args[0].IsEmpty()) {
+  if (info.Length() < 1 || info[0].IsEmpty()) {
     THROW_EXCEPTION("Missing stream argument.",
                     "ProtonMessenger::Heartbeat", name);
   }
 
-  ProtonMessenger::Write(obj, args[0], true);
+  ProtonMessenger::Write(obj, info[0], true);
 
   Proton::Exit("ProtonMessenger::Heartbeat", name, 0);
-  NanReturnUndefined();
+  info.GetReturnValue().SetUndefined();
 }

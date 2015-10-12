@@ -50,7 +50,7 @@
 class ProtonMessenger : public node::ObjectWrap
 {
  public:
-  static v8::Persistent<v8::FunctionTemplate> constructor;
+  static Nan::Persistent<v8::FunctionTemplate> constructor;
   static void Init(v8::Handle<v8::Object> target);
   static NAN_METHOD(NewInstance);
   ProtonMessenger(std::string name, std::string username, std::string password);
