@@ -33,7 +33,8 @@ var childProcess = require('child_process');
 module.exports.test_gjslint_strict = testCase({
   'Test strict conformance to the Google JavaScript Style Guide': testCase({
     'test_gjslint_strict': function(test) {
-      var child = childProcess.spawn('gjslint', [
+      var gjslint = (process.platform === 'win32') ? 'gjslint.exe' : 'gjslint';
+      var child = childProcess.spawn(gjslint, [
         '--jslint_error=all',
         '--strict',
         '--unix_mode',
@@ -57,6 +58,9 @@ module.exports.test_gjslint_strict = testCase({
       }).on('error', function(err) {
         console.error('Unable to run gjslint for reason: ');
         console.error('  ' + err);
+        if (err && 'errno' in err && err.errno === 'ENOENT') {
+          console.error('PATH=%s', process.env.PATH);
+        }
         test.ok(false, 'Error running gjslint');
         test.done();
       });

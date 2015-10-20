@@ -725,8 +725,9 @@ module.exports.test_confirmDelivery_callback = function(test) {
     service: 'amqp://host',
     id: 'test_confirmDelivery_callback'
   }, function() {
-    client.subscribe('/kittens/#', options);
-    messages.push(testMessage('/kittens/curious', '/kittens/#'));
+    client.subscribe('/kittens/#', options, function() {
+      messages.push(testMessage('/kittens/curious', '/kittens/#'));
+    });
   });
 
   var stop = function() {
