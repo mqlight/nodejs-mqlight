@@ -46,6 +46,6 @@
     }
   ],
   "scripts": {
-    "test": "./node_modules/.bin/istanbul cover ./node_modules/nodeunit/bin/nodeunit --config test/nodeunit.json test"
+    "test": "node ./node_modules/istanbul/lib/cli.js cover ./node_modules/nodeunit/bin/nodeunit --config test/nodeunit.json test"
   }
 }
