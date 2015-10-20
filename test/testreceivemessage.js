@@ -726,7 +726,9 @@ module.exports.test_confirmDelivery_callback = function(test) {
     id: 'test_confirmDelivery_callback'
   }, function() {
     client.subscribe('/kittens/#', options, function() {
-      messages.push(testMessage('/kittens/curious', '/kittens/#'));
+      setTimeout(function() {
+        messages.push(testMessage('/kittens/curious', '/kittens/#'));
+      }, 100);
     });
   });
 
@@ -760,7 +762,7 @@ module.exports.test_confirmDelivery_callback = function(test) {
   });
 
   client.on('error', function(err) {
-    test.ok(false, 'error event should not be emitted');
+    test.ok(false, 'error event should not be emitted ' + err);
   });
 
 };
