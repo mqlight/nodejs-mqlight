@@ -137,6 +137,7 @@ void ProtonMessenger::Init(Handle<Object> target)
   Nan::SetPrototypeMethod(tpl, "started", Started);
   Nan::SetPrototypeMethod(tpl, "closed", Closed);
   Nan::SetPrototypeMethod(tpl, "heartbeat", Heartbeat);
+  Nan::SetPrototypeMethod(tpl, "sasl", SASL);
 
   Nan::SetAccessor(tpl->InstanceTemplate(),
                    Nan::New<String>("stopped").ToLocalChecked(), Stopped);
@@ -1471,6 +1472,32 @@ NAN_METHOD(ProtonMessenger::Pop)
 
   Proton::Exit("ProtonMessenger::Pop", name, n);
   info.GetReturnValue().Set(Nan::New<Integer>(n));
+}
+
+NAN_METHOD(ProtonMessenger::SASL)
+{
+  Nan::HandleScope scope;
+  ProtonMessenger* obj = ObjectWrap::Unwrap<ProtonMessenger>(info.This());
+  const char* name = obj->name.c_str();
+  Proton::Entry("ProtonMessenger::SASL", name);
+
+  pn_transport_t *transport = pn_connection_transport(obj->connection);
+  if (transport) {
+    pn_sasl_outcome_t outcome;
+    const char* text = NULL;
+    outcome = pn_sasl_outcome((pn_sasl_t *)transport);
+    if (outcome == PN_SASL_AUTH) {
+      text = "sasl authentication failed";
+    } else if (outcome >  PN_SASL_AUTH) {
+      text  = "sasl negotiation failed";
+    }
+    if (text) {
+      THROW_NAMED_EXCEPTION(GetErrorName(text), text, "ProtonMessenger::SASL", name)
+    }
+  }
+
+  Proton::Exit("ProtonMessenger::SASL", name, 0);
+  info.GetReturnValue().SetUndefined();
 }
 
 NAN_METHOD(ProtonMessenger::Started)

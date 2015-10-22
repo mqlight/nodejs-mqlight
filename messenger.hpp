@@ -46,6 +46,7 @@
 #include <proton/session.h>
 #include <proton/terminus.h>
 #include <proton/transport.h>
+#include <proton/sasl.h>
 
 class ProtonMessenger : public node::ObjectWrap
 {
@@ -83,6 +84,7 @@ class ProtonMessenger : public node::ObjectWrap
   static NAN_METHOD(Started);
   static NAN_METHOD(Closed);
   static NAN_METHOD(Heartbeat);
+  static NAN_METHOD(SASL);
 
   static int Write(ProtonMessenger* obj,
                    v8::Local<v8::Value> value,
