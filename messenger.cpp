@@ -587,6 +587,7 @@ NAN_METHOD(ProtonMessenger::Stop)
   if (!obj->messenger) {
     Proton::Exit("ProtonMessenger::Stop", name, true);
     info.GetReturnValue().Set(Nan::True());
+    return;
   }
 
   Proton::Entry("pn_messenger_stop", name);
