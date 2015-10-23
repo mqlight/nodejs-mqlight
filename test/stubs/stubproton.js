@@ -265,6 +265,9 @@ module.exports.createProtonStub = function() {
       heartbeat: function() {
         if (DEBUG) log('stub heartbeat function called');
         if (workCallback) workCallback.apply();
+      },
+      sasl: function() {
+        if (DEBUG) log('stub sasl function called');
       }
     },
 

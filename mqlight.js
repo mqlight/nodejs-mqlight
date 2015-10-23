@@ -1258,12 +1258,11 @@ var Client = function(service, id, securityOptions) {
         client._messenger.sasl();
       }
       catch (err) {
-        logger.caughtLevel('entry_often', 'processMessage',
-                               client.id, err);
+        logger.caughtLevel('entry_often', 'processMessage', client.id, err);
         logger.log('emit', client.id, 'error', err);
         client.emit('error', err);
       }
-      
+
       // A push into proton may mean data also needs to be written. Force
       // a messenger tick.
       client._messenger.pop(client._stream, true);
