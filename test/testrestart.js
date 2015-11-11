@@ -37,7 +37,6 @@ var util = require('util');
  * @param {object} test the unittest interface
  */
 module.exports.test_successful_restart = function(test) {
-  test.expect(3);
   var client = mqlight.createClient({id: 'test_successful_restart', service:
         'amqp://host'});
   var timeout = setTimeout(function() {
@@ -50,7 +49,9 @@ module.exports.test_successful_restart = function(test) {
     test.deepEqual(client.state, 'started',
         'client status started after start');
     stubproton.setConnectStatus(2);
-    mqlight.reconnect(client);
+    setImmediate(function() {
+      mqlight.reconnect(client);
+    });
   });
 
   client.on('error', function(err) {
