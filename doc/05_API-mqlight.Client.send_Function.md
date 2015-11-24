@@ -17,11 +17,10 @@ received.
   * **ttl**, (Number) (optional) a time to live value for the message in
     milliseconds. MQ Light will discard, without delivering, any
     copy of the message that has not been delivered within its time to live
-    period. The default time to live is 604800000 milliseconds (7 days).
-    The value supplied for this argument must be greater than zero and finite,
-    otherwise a `RangeError` will be thrown when this method is called. An
-    upper limit of 4294967295 milliseconds (49.7 days) will be applied to the
-    value.
+    period. The value supplied for this argument must be greater than zero and
+    finite, otherwise a `RangeError` will be thrown when this method is called.
+    Refer to the server product documentation for the default and maximum
+    permitted time to live.
   * **properties**, (Object) (optional) a set of key/value properties that will
     be carried alongside the message. Values must be non-null and one of the
     following types: `boolean`, `number`, `string` or `Buffer`.
