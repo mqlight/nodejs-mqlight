@@ -90,7 +90,7 @@ const char* GetErrorName(const char* text)
     return "SecurityError";
   }
 
-  if (strstr(text, "_Takeover")) {
+  if (strstr(text, "amqp:link:stolen")) {
     return "ReplacedError";
   }
 
