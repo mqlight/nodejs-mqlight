@@ -1081,7 +1081,7 @@ var Client = function(service, id, securityOptions) {
     } else if (client !== activeClient) {
       logger.log('debug', _id,
           'Not connecting because client has been replaced');
-      if (!client.isStopping()) {
+      if (!client.isStopped()) {
         logger.ffdc('Client._performConnect', 'ffdc005', client,
                     'Replaced client not in stopped state');
       }
