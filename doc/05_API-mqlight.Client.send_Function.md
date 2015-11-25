@@ -20,7 +20,7 @@ received.
     period. The value supplied for this argument must be greater than zero and
     finite, otherwise a `RangeError` will be thrown when this method is called.
     Refer to the server product documentation for the default and maximum
-    permitted time to live.
+    permitted time-to-live values.
   * **properties**, (Object) (optional) a set of key/value properties that will
     be carried alongside the message. Values must be non-null and one of the
     following types: `boolean`, `number`, `string` or `Buffer`.
