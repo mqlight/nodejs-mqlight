@@ -531,11 +531,11 @@ logger.ffdc = function(opt_fnc, opt_probeId, opt_client, opt_data) {
   }
 
   logger.exit('logger.ffdc', opts.clientId, null);
-  
+
   // Exit if fail on FFDC is required.
   if (process.env.MQLIGHT_NODE_FAIL_ON_FFDC) {
-	  console.error('Aborting due to FFDC');
-	  process.abort();
+    console.error('Aborting due to FFDC');
+    process.abort();
   }
 };
 
