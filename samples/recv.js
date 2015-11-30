@@ -155,13 +155,16 @@ client.on('started', function() {
   client.subscribe(pattern, share, options, function(err, pattern) {
     if (err) {
       console.error('Problem with subscribe request: %s', err.message);
-      process.exit(1);
-    }
-    if (pattern) {
-      if (share) {
-        console.log('Subscribed to share: %s, pattern: %s', share, pattern);
-      } else {
-        console.log('Subscribed to pattern: %s', pattern);
+      setImmediate(function() {
+        process.exit(1);
+      });
+    } else {
+      if (pattern) {
+        if (share) {
+          console.log('Subscribed to share: %s, pattern: %s', share, pattern);
+        } else {
+          console.log('Subscribed to pattern: %s', pattern);
+        }
       }
     }
   });
@@ -205,4 +208,5 @@ client.on('error', function(error) {
   console.error('Exiting.');
   process.exit(1);
 });
+
 

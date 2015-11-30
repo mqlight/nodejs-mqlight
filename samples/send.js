@@ -163,6 +163,7 @@ client.on('started', function() {
   // queue all messages for sending
   var i = 0;
   var sequenceNum = 0;
+  var sentMessages = 0;
   var sendMessage = function() {
     var buffered = null;
     var msgNum = i++;
@@ -173,11 +174,29 @@ client.on('started', function() {
       var options = { qos: mqlight.QOS_AT_LEAST_ONCE };
       var callback = function(err, topic, data, options) {
         if (err) {
-          console.error('Problem with send request: %s', err.message);
-          process.exit(1);
+          console.error('**** Problem with send request: %s', err.message);
+          setImmediate(function() {
+            client.stop(function() {
+              process.exit(1);
+            });
+          });
+        } else {
+          if (data) {
+            console.log(data);
+          }
         }
-        if (data) {
-          console.log(data);
+        sentMessages++;
+        // if no more messages to be sent, disconnect
+        if (messages.length == i) {
+          client.stop(function(err) {
+            if (err) {
+              console.error('Problem with stopping client: %s', err.message);
+              process.exit(1);
+            } else {
+              console.log('stopping client');
+              process.exit(0);
+            }
+          });
         }
       };
 
@@ -198,10 +217,7 @@ client.on('started', function() {
     }
 
     // check if all our messages have been sent
-    if (messages.length == i) {
-      // no more messages to send, so disconnect
-      client.stop();
-    } else {
+    if (messages.length != i) {
       if (buffered) {
         // there's a backlog of messages to send, so wait until the backlog is
         // cleared before sending any more
@@ -213,7 +229,7 @@ client.on('started', function() {
     }
   };
 
-  sendMessage();
+  setImmediate(sendMessage);
 });
 
 client.on('error', function(error) {
@@ -225,4 +241,3 @@ client.on('error', function(error) {
   console.error('Exiting.');
   process.exit(1);
 });
-

@@ -1379,6 +1379,13 @@ NAN_METHOD(ProtonMessenger::Push)
     n = pn_connection_push(
         obj->connection, node::Buffer::Data(buffer), length);
     Proton::Exit("pn_connection_push", name, n);
+    
+    int error = pn_messenger_errno(obj->messenger);
+    if (error) {
+      const char* text = pn_error_text(pn_messenger_error(obj->messenger));
+      const char* err = GetErrorName(text);
+      THROW_NAMED_EXCEPTION(err, text, "ProtonMessenger::Push", name)
+    }
   } else {
     // This connection has already been closed, so this data can never be
     // pushed in, so just return saying it has so the data will be
