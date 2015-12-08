@@ -22,13 +22,13 @@
     "mqlight-debug": "./bin/mqlight-debug.js"
   },
   "dependencies": {
-    "hashmap": "~2.0.3",
-    "moment": "~2.10.3",
-    "nan": "^1.8.4",
-    "node-pre-gyp": "^0.6.7",
-    "node-uuid": "~1.4.3",
-    "nopt": "~3.0.1",
-    "npmlog": "~1.2.0"
+    "hashmap": "~2.0.4",
+    "moment": "~2.10.6",
+    "nan": "^2.1.0",
+    "node-pre-gyp": "^0.6.17",
+    "node-uuid": "~1.4.7",
+    "nopt": "~3.0.6",
+    "npmlog": "~2.0.0"
   },
   "bundledDependencies": ["node-pre-gyp"],
   "devDependencies": {
