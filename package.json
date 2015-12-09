@@ -4,6 +4,7 @@
   "description": "IBM MQ Light Client Module",
   "author": "IBM MQ Light <mqlight@uk.ibm.com>",
   "homepage": "https://developer.ibm.com/messaging/mq-light/",
+  "tonicExampleFilename": "example.js",
   "bugs": {
     "url": "https://ibm.biz/mqlight-forum",
     "email": "mqlight@uk.ibm.com"
