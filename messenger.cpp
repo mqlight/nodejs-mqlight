@@ -141,8 +141,6 @@ void ProtonMessenger::Init(Handle<Object> target)
 
   Nan::SetAccessor(tpl->InstanceTemplate(),
                    Nan::New<String>("stopped").ToLocalChecked(), Stopped);
-
-  //target->Set(Nan::New("ProtonMessenger"), Nan::New(constructor)->GetFunction());
 }
 
 void ProtonMessenger::Tracer(pn_transport_t* transport, const char* message)
@@ -537,7 +535,8 @@ NAN_METHOD(ProtonMessenger::Connect)
   // Get a pointer to the proton connection by resolving the route
   char *pn_name = NULL;
   Proton::Entry("pn_messenger_resolve", name);
-  obj->connection = pn_messenger_resolve(obj->messenger, pattern.c_str(), &pn_name);
+  obj->connection =
+      pn_messenger_resolve(obj->messenger, pattern.c_str(), &pn_name);
   Proton::Exit("pn_messenger_resolve", name, obj->connection ? 1 : 0);
   if (!obj->connection) {
     pn_messenger_free(obj->messenger);
@@ -808,17 +807,17 @@ NAN_METHOD(ProtonMessenger::Unsubscribe)
 
   if (!link) {
     // find link based on address, in any state.
-    if(pn_messenger_get_stated_link(obj->messenger, address.c_str(), false, 0)) {
+    if (pn_messenger_get_stated_link(obj->messenger, address.c_str(), false,
+                                     0)) {
       // throw UnsubscribedError if able to find an inactive matching Link
-      THROW_NAMED_EXCEPTION(
-          "UnsubscribedError", "client is not subscribed to this address",
-          "ProtonMessenger::Unsubscribe", name);
+      THROW_NAMED_EXCEPTION("UnsubscribedError",
+                            "client is not subscribed to this address",
+                            "ProtonMessenger::Unsubscribe", name);
     } else {
       // throw Error if unable to find an active matching Link
       THROW_EXCEPTION_TYPE(Exception::Error,
                            ("unable to locate link for " + address).c_str(),
-                           "ProtonMessenger::Unsubscribe",
-                           name)
+                           "ProtonMessenger::Unsubscribe", name)
     }
   }
 
@@ -967,8 +966,9 @@ NAN_METHOD(ProtonMessenger::Receive)
   std::vector<Local<Object> > vector;
   while (pn_messenger_incoming(obj->messenger)) {
     Local<Value> argv[1] = {info[0]};
-    Local<Object> msgObj =
-        Nan::New(ProtonMessage::constructor)->GetFunction()->NewInstance(0, argv);
+    Local<Object> msgObj = Nan::New(ProtonMessage::constructor)
+                               ->GetFunction()
+                               ->NewInstance(0, argv);
     ProtonMessage* msg = ObjectWrap::Unwrap<ProtonMessage>(msgObj);
 
     Proton::Entry("pn_messenger_get", name);
@@ -1458,7 +1458,8 @@ int ProtonMessenger::Write(ProtonMessenger* obj,
     }
   }
 
-  Proton::Exit("exit_often", "ProtonMessenger::Write", name, static_cast<int>(n));
+  Proton::Exit("exit_often", "ProtonMessenger::Write", name,
+               static_cast<int>(n));
   return static_cast<int>(n);
 }
 
@@ -1489,18 +1490,21 @@ NAN_METHOD(ProtonMessenger::SASL)
   const char* name = obj->name.c_str();
   Proton::Entry("ProtonMessenger::SASL", name);
 
-  pn_transport_t *transport = pn_connection_transport(obj->connection);
-  if (transport) {
-    pn_sasl_outcome_t outcome;
-    const char* text = NULL;
-    outcome = pn_sasl_outcome((pn_sasl_t *)transport);
-    if (outcome == PN_SASL_AUTH) {
-      text = "sasl authentication failed";
-    } else if (outcome >  PN_SASL_AUTH) {
-      text  = "sasl negotiation failed";
-    }
-    if (text) {
-      THROW_NAMED_EXCEPTION(GetErrorName(text), text, "ProtonMessenger::SASL", name)
+  if (obj->messenger && obj->connection) {
+    pn_transport_t* transport = pn_connection_transport(obj->connection);
+    if (transport) {
+      pn_sasl_outcome_t outcome;
+      const char* text = NULL;
+      outcome = pn_sasl_outcome((pn_sasl_t*)transport);
+      if (outcome == PN_SASL_AUTH) {
+        text = "sasl authentication failed";
+      } else if (outcome > PN_SASL_AUTH) {
+        text = "sasl negotiation failed";
+      }
+      if (text) {
+        THROW_NAMED_EXCEPTION(GetErrorName(text), text, "ProtonMessenger::SASL",
+                              name)
+      }
     }
   }
 
