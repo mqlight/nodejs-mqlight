@@ -561,7 +561,7 @@ module.exports.test_invalid_ssl_options = function(test) {
  * @param {object} test - test case.
  */
 module.exports.test_createClient_multiple_with_same_id = function(test) {
-  test.expect(14);
+  test.expect(4);
   var optsA = { service: 'amqp://localhost', id: 'Aname' };
   var optsB = { service: 'amqp://localhost', id: 'Bname' };
 
@@ -581,29 +581,14 @@ module.exports.test_createClient_multiple_with_same_id = function(test) {
       var clientB2 = mqlight.createClient(optsB);
       clientB2.on('started', function(err) {
         test.equal(undefined, err);
-        test.ok(clientB1Stopped);
-        test.equal('started', clientA.state);
-        test.equal('stopped', clientB1.state);
-        test.equal('started', clientB2.state);
-
-        clientB1.start(function(err) {
-          test.equal(undefined, err);
-          test.equal('started', clientA.state);
-          test.equal('started', clientB1.state);
-          test.equal('stopped', clientB2.state);
-
-          clientA.stop(function() {
-            clientB1.stop(function() {
-              test.done();
-            });
-          });
-        });
       });
       clientB1.on('error', function(err) {
         test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
-      });
-      clientB2.on('error', function(err) {
-        test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
+        clientA.stop(function() {
+          clientB2.stop(function() {
+            test.done();
+          });
+        });
       });
     });
   });
