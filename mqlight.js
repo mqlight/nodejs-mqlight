@@ -1420,8 +1420,9 @@ var Client = function(service, id, securityOptions) {
             logger.entry('Client._tryService.connError.stopProcessing',
                          client.id);
 
+            // Close our end of the socket.
             if (client._stream) {
-              // Close our end of the socket.
+              client._stream.removeAllListeners('close');
               client._stream.end();
               client._stream = null;
             }
@@ -1485,6 +1486,7 @@ var Client = function(service, id, securityOptions) {
         var streamClosed = function(had_error) {
           setImmediate(function() {
             logger.entry('Client.streamClosed', _id);
+            logger.log('parms', _id, 'had_error:', had_error);
 
             client._pushChunks.call(client);
 
@@ -1497,14 +1499,20 @@ var Client = function(service, id, securityOptions) {
                 logger.log('emit', _id, 'error', error);
                 client.emit('error', error);
                 if (shouldReconnect(error)) {
-                  reconnect(client);
+                  setImmediate(function() {
+                    reconnect(client);
+                  });
                 }
               });
             }
 
             // Force any final data from the messenger, which may give it the
             // chance to close any connections.
-            client._messenger.pop(client._stream, true);
+            try {
+              client._messenger.pop(client._stream, true);
+            } catch (err) {
+              // ignore
+            }
 
             logger.exit('Client.streamClosed', _id, had_error);
           });
@@ -2064,6 +2072,7 @@ Client.prototype.stop = function(callback) {
         }
         // Close our end of the socket
         if (client._stream) {
+          client._stream.removeAllListeners('close');
           client._stream.end();
           client._stream = null;
         }
@@ -2075,7 +2084,7 @@ Client.prototype.stop = function(callback) {
         // Remove ourself from the active client list
         var activeClient = activeClientList.get(client.id);
         if (client === activeClient) activeClientList.remove(client.id);
-        process.nextTick(function() {
+        setImmediate(function() {
           if (!client._firstStart) {
             client._firstStart = true;
             logger.log('emit', client.id, STATE_STOPPED);
@@ -2187,6 +2196,7 @@ var reconnect = function(client) {
     });
     // Close our end of the socket
     if (client._stream) {
+      client._stream.removeAllListeners('close');
       client._stream.end();
       client._stream = null;
     }
