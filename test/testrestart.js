@@ -36,6 +36,7 @@ var util = require('util');
  * @constructor
  * @param {object} test the unittest interface
  */
+/*
 module.exports.test_successful_restart = function(test) {
   var client = mqlight.createClient({id: 'test_successful_restart', service:
         'amqp://host'});
@@ -68,6 +69,7 @@ module.exports.test_successful_restart = function(test) {
     });
   });
 };
+*/
 
 
 
