@@ -561,17 +561,14 @@ module.exports.test_invalid_ssl_options = function(test) {
  * @param {object} test - test case.
  */
 module.exports.test_createClient_multiple_with_same_id = function(test) {
-  test.expect(4);
   var optsA = { service: 'amqp://localhost', id: 'Aname' };
   var optsB = { service: 'amqp://localhost', id: 'Bname' };
 
   var clientA = mqlight.createClient(optsA);
   clientA.on('started', function(err) {
     var clientB1 = mqlight.createClient(optsB);
-    var clientB1Stopped = false;
     clientB1.on('stopped', function(err) {
       test.equal(undefined, err);
-      clientB1Stopped = true;
     });
     var firstTime = true;
     clientB1.on('started', function(err) {
