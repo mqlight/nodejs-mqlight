@@ -29,7 +29,13 @@ var fs = require('fs');
 var types = {
   help: Boolean,
   service: String,
+  'keystore': String,
+  'keystore-passphrase': String,
+  'client-certificate': String,
+  'client-key': String,
+  'client-key-passphrase': String,
   'trust-certificate': String,
+  'verify-name': String,
   'topic-pattern': String,
   id: String,
   'destination-ttl': Number,
@@ -41,6 +47,8 @@ var types = {
 var shorthands = {
   h: ['--help'],
   s: ['--service'],
+  k: ['--keystore'],
+  p: ['--keystore-passphrase'],
   c: ['--trust-certificate'],
   t: ['--topic-pattern'],
   i: ['--id'],
@@ -53,6 +61,7 @@ var remain = parsed.argv.remain;
 
 var showUsage = function() {
   var puts = console.log;
+
   puts('Usage: recv.js [options]');
   puts('');
   puts('Options:');
@@ -61,14 +70,47 @@ var showUsage = function() {
        '                        amqp://user:password@host:5672 or\n' +
        '                        amqps://host:5671 to use SSL/TLS\n' +
        '                        (default: amqp://localhost)');
-  puts('  -c FILE, --trust-certificate=FILE\n' +
-       '                        use the certificate contained in FILE (in PEM' +
+  puts('  -k FILE, --keystore=FILE\n' +
+       '                         use key store contained in FILE (in PKCS#12' +
        ' format) to\n' +
-       '                        validate the identity of the server. The' +
+       '                         supply the client certificate, private key' +
+       ' and trust\n' +
+       '                         certificates.\n' +
+       '                         The Connection must be secured with SSL/TLS' +
+       ' (e.g. the\n' +
+       "                         service URL must start with 'amqps://').\n" +
+       '                         Option is mutually exclusive with the' +
+       ' client-key,\n' +
+       '                         client-certificate and trust-certifcate' +
+       ' options');
+  puts('  -p PASSPHRASE, --keystore-passphrase=PASSPHRASE\n' +
+       '                         use PASSPHRASE to access the keystore');
+  puts('  --client-certificate=FILE\n' +
+       '                         use the certificate contained in FILE (in' +
+       ' PEM format) to\n' +
+       '                         supply the identity of the client. The' +
        ' connection must\n' +
-       '                        be secured with SSL/TLS (e.g. the service URL' +
-       ' must start\n' +
-       "                        with 'amqps://')");
+       '                         be secured with SSL/TLS');
+  puts('  --client-key=FILE      use the private key contained in FILE (in' +
+       ' PEM format)\n' +
+       '                         for encrypting the specified client' +
+       ' certificate');
+  puts('  --client-key-passphrase=PASSPHRASE\n' +
+       '                         use PASSPHRASE to access the client private' +
+       ' key');
+  puts('  -c FILE, --trust-certificate=FILE\n' +
+       '                         use the certificate contained in FILE (in' +
+       ' PEM format) to\n' +
+       '                         validate the identity of the server. The' +
+       ' connection must\n' +
+       '                         be secured with SSL/TLS');
+  puts('  --verify-name=TRUE|FALSE\n' +
+       '                         specify whether or not to additionally check' +
+       ' the\n' +
+       "                         server's common name in the specified trust" +
+       ' certificate\n' +
+       "                         matches the actual server's DNS name\n" +
+       '                         (default: TRUE)');
   puts('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN\n' +
        '                        subscribe to receive messages matching' +
        ' TOPICPATTERN');
@@ -120,14 +162,67 @@ var opts = {
   service: service,
   id: id
 };
+var checkService = false;
+if (parsed['keystore']) {
+  /** the keystore to use for a TLS/SSL connection */
+  opts.sslKeystore = parsed['keystore'];
+  checkService = true;
+}
+if (parsed['keystore-passphrase']) {
+  /** the keystore-passphrase to use for a TLS/SSL connection */
+  opts.sslKeystorePassphrase = parsed['keystore-passphrase'];
+  checkService = true;
+}
+if (parsed['client-certificate']) {
+  /** the client-certificate to use for a TLS/SSL connection */
+  opts.sslClientCertificate = parsed['client-certificate'];
+  checkService = true;
+}
+if (parsed['client-key']) {
+  /** the client-key to use for a TLS/SSL connection */
+  opts.sslClientKey = parsed['client-key'];
+  checkService = true;
+}
+if (parsed['client-key-passphrase']) {
+  /** the client-key-passphrase to use for a TLS/SSL connection */
+  opts.sslClientKeyPassphrase = parsed['client-key-passphrase'];
+  checkService = true;
+}
 if (parsed['trust-certificate']) {
   /** the trust-certificate to use for a TLS/SSL connection */
   opts.sslTrustCertificate = parsed['trust-certificate'];
+  checkService = true;
+}
+if (parsed['verify-name']) {
+  var value = (parsed['verify-name']).toLowerCase();
+  if (value === 'true') {
+    /**
+     * Indicates to additionally check the MQ Light server's
+     * common name in the certificate matches the actual server's DNS name.
+     */
+    opts.sslVerifyName = true;
+  } else if (value === 'false') {
+    /**
+     * Indicate not to additionally check the MQ Light server's
+     * common name in the certificate matches the actual server's DNS name.
+     */
+    opts.sslVerifyName = false;
+  } else {
+    console.error('*** error ***');
+    console.error('The verify-name option must be specified with a value of' +
+                  ' TRUE or FALSE');
+    console.error('Exiting.');
+    process.exit(1);
+  }
+  checkService = true;
+}
+
+if (checkService) {
   if (parsed.service) {
     if (service.indexOf('amqps', 0) !== 0) {
       console.error('*** error ***');
-      console.error("The service URL must start with 'amqps://' when using a " +
-                    'trust certificate.');
+      console.error("The service URL must start with 'amqps://' when using " +
+                    'SSL/TLS options.');
       console.error('Exiting.');
       process.exit(1);
     }

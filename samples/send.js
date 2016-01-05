@@ -29,7 +29,13 @@ var fs = require('fs');
 var types = {
   help: Boolean,
   service: String,
+  'keystore': String,
+  'keystore-passphrase': String,
+  'client-certificate': String,
+  'client-key': String,
+  'client-key-passphrase': String,
   'trust-certificate': String,
+  'verify-name': String,
   topic: String,
   id: String,
   'message-ttl': Number,
@@ -41,6 +47,8 @@ var types = {
 var shorthands = {
   h: ['--help'],
   s: ['--service'],
+  k: ['--keystore'],
+  p: ['--keystore-passphrase'],
   c: ['--trust-certificate'],
   t: ['--topic'],
   i: ['--id'],
@@ -55,32 +63,65 @@ var showUsage = function() {
   puts('Usage: send.js [options] <msg_1> ... <msg_n>');
   puts('');
   puts('Options:');
-  puts('  -h, --help            show this help message and exit');
-  puts('  -s URL, --service=URL service to connect to, for example:\n' +
-       '                        amqp://user:password@host:5672 or\n' +
-       '                        amqps://host:5671 to use SSL/TLS\n' +
-       '                        (default: amqp://localhost)');
-  puts('  -c FILE, --trust-certificate=FILE\n' +
-       '                        use the certificate contained in FILE (in PEM' +
+  puts('  -h, --help             show this help message and exit');
+  puts('  -s URL, --service=URL  service to connect to, for example:\n' +
+       '                         amqp://user:password@host:5672 or\n' +
+       '                         amqps://host:5671 to use SSL/TLS\n' +
+       '                         (default: amqp://localhost)');
+  puts('  -k FILE, --keystore=FILE\n' +
+       '                         use key store contained in FILE (in PKCS#12' +
        ' format) to\n' +
-       '                        validate the identity of the server. The' +
+       '                         supply the client certificate, private key' +
+       ' and trust\n' +
+       '                         certificates.\n' +
+       '                         The Connection must be secured with SSL/TLS' +
+       ' (e.g. the\n' +
+       "                         service URL must start with 'amqps://').\n" +
+       '                         Option is mutually exclusive with the' +
+       ' client-key,\n' +
+       '                         client-certificate and trust-certifcate' +
+       ' options');
+  puts('  -p PASSPHRASE, --keystore-passphrase=PASSPHRASE\n' +
+       '                         use PASSPHRASE to access the keystore');
+  puts('  --client-certificate=FILE\n' +
+       '                         use the certificate contained in FILE (in' +
+       ' PEM format) to\n' +
+       '                         supply the identity of the client. The' +
        ' connection must\n' +
-       '                        be secured with SSL/TLS (e.g. the service URL' +
-       ' must start\n' +
-       "                        with 'amqps://')");
+       '                         be secured with SSL/TLS');
+  puts('  --client-key=FILE      use the private key contained in FILE (in' +
+       ' PEM format)\n' +
+       '                         for encrypting the specified client' +
+       ' certificate');
+  puts('  --client-key-passphrase=PASSPHRASE\n' +
+       '                         use PASSPHRASE to access the client private' +
+       ' key');
+  puts('  -c FILE, --trust-certificate=FILE\n' +
+       '                         use the certificate contained in FILE (in' +
+       ' PEM format) to\n' +
+       '                         validate the identity of the server. The' +
+       ' connection must\n' +
+       '                         be secured with SSL/TLS');
+  puts('  --verify-name=TRUE|FALSE\n' +
+       '                         specify whether or not to additionally check' +
+       ' the\n' +
+       "                         server's common name in the specified trust" +
+       ' certificate\n' +
+       "                         matches the actual server's DNS name\n" +
+       '                         (default: TRUE)');
   puts('  -t TOPIC, --topic=TOPIC');
-  puts('                        send messages to topic TOPIC\n' +
-       '                        (default: public)');
-  puts('  -i ID, --id=ID        the ID to use when connecting to MQ Light\n' +
-       '                        (default: send_[0-9a-f]{7})');
-  puts('  --message-ttl=NUM     set message time-to-live to NUM seconds');
-  puts('  -d NUM, --delay=NUM   add NUM seconds delay between each request');
-  puts('  -r NUM, --repeat=NUM  send messages NUM times, default is 1, if\n' +
-       '                        NUM <= 0 then repeat forever');
-  puts('   --sequence           prefix a sequence number to the message\n' +
-       '                        payload (ignored for binary messages)');
-  puts('  -f FILE, --file=FILE  send FILE as binary data. Cannot be\n' +
-       '                        specified at the same time as <msg1>');
+  puts('                         send messages to topic TOPIC\n' +
+       '                         (default: public)');
+  puts('  -i ID, --id=ID         the ID to use when connecting to MQ Light\n' +
+       '                         (default: send_[0-9a-f]{7})');
+  puts('  --message-ttl=NUM      set message time-to-live to NUM seconds');
+  puts('  -d NUM, --delay=NUM    add NUM seconds delay between each request');
+  puts('  -r NUM, --repeat=NUM   send messages NUM times, default is 1, if\n' +
+       '                         NUM <= 0 then repeat forever');
+  puts('   --sequence            prefix a sequence number to the message\n' +
+       '                         payload (ignored for binary messages)');
+  puts('  -f FILE, --file=FILE   send FILE as binary data. Cannot be\n' +
+       '                         specified at the same time as <msg1>');
   puts('');
 };
 
@@ -108,14 +149,67 @@ var opts = {
   service: service,
   id: id
 };
+var checkService = false;
+if (parsed['keystore']) {
+  /** the keystore to use for a TLS/SSL connection */
+  opts.sslKeystore = parsed['keystore'];
+  checkService = true;
+}
+if (parsed['keystore-passphrase']) {
+  /** the keystore-passphrase to use for a TLS/SSL connection */
+  opts.sslKeystorePassphrase = parsed['keystore-passphrase'];
+  checkService = true;
+}
+if (parsed['client-certificate']) {
+  /** the client-certificate to use for a TLS/SSL connection */
+  opts.sslClientCertificate = parsed['client-certificate'];
+  checkService = true;
+}
+if (parsed['client-key']) {
+  /** the client-key to use for a TLS/SSL connection */
+  opts.sslClientKey = parsed['client-key'];
+  checkService = true;
+}
+if (parsed['client-key-passphrase']) {
+  /** the client-key-passphrase to use for a TLS/SSL connection */
+  opts.sslClientKeyPassphrase = parsed['client-key-passphrase'];
+  checkService = true;
+}
 if (parsed['trust-certificate']) {
   /** the trust-certificate to use for a TLS/SSL connection */
   opts.sslTrustCertificate = parsed['trust-certificate'];
+  checkService = true;
+}
+if (parsed['verify-name']) {
+  var value = (parsed['verify-name']).toLowerCase();
+  if (value === 'true') {
+    /**
+     * Indicate to additionally check the MQ Light server's
+     * common name in the certificate matches the actual server's DNS name.
+     */
+    opts.sslVerifyName = true;
+  } else if (value === 'false') {
+    /**
+     * Indicate not to additionally check the MQ Light server's
+     * common name in the certificate matches the actual server's DNS name.
+     */
+    opts.sslVerifyName = false;
+  } else {
+    console.error('*** error ***');
+    console.error('The verify-name option must be specified with a value of' +
+                  ' TRUE or FALSE');
+    console.error('Exiting.');
+    process.exit(1);
+  }
+  checkService = true;
+}
+
+if (checkService) {
   if (parsed.service) {
     if (service.indexOf('amqps', 0) !== 0) {
       console.error('*** error ***');
-      console.error("The service URL must start with 'amqps://' when using a " +
-                    'trust certificate.');
+      console.error("The service URL must start with 'amqps://' when using " +
+                    'SSL/TLS options.');
       console.error('Exiting.');
       process.exit(1);
     }
@@ -124,6 +218,7 @@ if (parsed['trust-certificate']) {
     opts.service = 'amqps://localhost';
   }
 }
+
 var client = mqlight.createClient(opts);
 
 // get message body data to send
