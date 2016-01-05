@@ -468,9 +468,14 @@ exports.createClient = function(options, callback) {
     propertyPassword: options.password,
     urlUser: undefined,
     urlPassword: undefined,
+    sslKeystore: options.sslKeystore,
+    sslKeystorePassphrase: options.sslKeystorePassphrase,
+    sslClientCertificate: options.sslClientCertificate,
+    sslClientKey: options.sslClientKey,
+    sslClientKeyPassphrase: options.sslClientKeyPassphrase,
     sslTrustCertificate: options.sslTrustCertificate,
     sslVerifyName: (typeof options.sslVerifyName === 'undefined') ? true :
-                           Boolean(options.sslVerifyName),
+        options.sslVerifyName,
     toString: function() {
       return '[\n' +
           ' propertyUser: ' + this.propertyUser + '\n' +
@@ -479,6 +484,13 @@ exports.createClient = function(options, callback) {
           ' propertyUser: ' + this.urlUser + '\n' +
           ' urlPassword: ' + (this.urlPassword ? '********' : undefined) +
           '\n' +
+          ' sslKeystore: ' + this.sslKeystore + '\n' +
+          ' sslKeystorePassphrase: ' +
+          (this.sslKeystorePassphrase ? '********' : undefined) + '\n' +
+          ' sslClientCertificate: ' + this.sslClientCertificate + '\n' +
+          ' sslClientKey: ' + this.sslClientKey + '\n' +
+          ' sslClientKeyPassphrase: ' +
+          (this.sslClientKeyPassphrase ? '********' : undefined) + '\n' +
           ' sslTrustCertificate: ' + this.sslTrustCertificate + '\n' +
           ' sslVerifyName: ' + this.sslVerifyName + '\n' + ']';
     }
@@ -1374,7 +1386,12 @@ var Client = function(service, id, securityOptions) {
             setTimeout(retry, interval);
             if (error) {
               logger.log('emit', _id, 'error', error);
-              client.emit('error', error);
+              try {
+                client.emit('error', error);
+              } catch (err) {
+                logger.log('debug', _id, 'client.emit threw error ' + error +
+                    '\n (ignoring as only seems to occur when logging errors)');
+              }
             }
           } else {
             // Try the next service in the list
@@ -1413,6 +1430,19 @@ var Client = function(service, id, securityOptions) {
             // Convert CERT_HAS_EXPIRED into a clearer error message.
             err = new SecurityError('SSL Failure: certificate verify failed ' +
                                     '- certificate has expired');
+          } else if (/mac verify failure/.test(err)) {
+            err = new SecurityError('SSL Failure: ' + err +
+                ' (likely due to a keystore access failure)');
+          } else if (/wrong tag/.test(err)) {
+            err = new SecurityError('SSL Failure: ' + err +
+                ' (likely due to the specified keystore being invalid)');
+          } else if (/bad decrypt/.test(err)) {
+            err = new SecurityError('SSL Failure: ' + err +
+                ' (likely due to the specified passphrase being wrong)');
+          } else if (/no start line/.test(err)) {
+            err = new SecurityError('SSL Failure: ' + err +
+                ' (likely due to an invalid certificate PEM file being ' +
+                'specified)');
           }
 
           // Don't leave an invalid messenger object lying around.
@@ -1680,10 +1710,26 @@ var Client = function(service, id, securityOptions) {
           sslVerifyName: securityOptions.sslVerifyName
         };
 
-        // Read the pem file and load multiple certs up into a separate entry
-        if (typeof securityOptions.sslTrustCertificate !== 'undefined') {
-          connOpts.ca = fs.readFileSync(securityOptions.sslTrustCertificate,
-                                        'utf-8').match(pemCertRegex);
+        // Read the client keystore or pem files as appropriate, setting the
+        // required security related connection options
+        if (typeof securityOptions.sslKeystore !== 'undefined') {
+          connOpts.pfx = fs.readFileSync(securityOptions.sslKeystore);
+          connOpts.passphrase = securityOptions.sslKeystorePassphrase;
+        } else {
+          if (typeof securityOptions.sslClientCertificate !== 'undefined') {
+            connOpts.cert =
+                fs.readFileSync(securityOptions.sslClientCertificate, 'utf-8');
+          }
+          if (typeof securityOptions.sslClientKey !== 'undefined') {
+            connOpts.key = fs.readFileSync(securityOptions.sslClientKey,
+                                           'utf-8');
+            connOpts.passphrase = securityOptions.sslClientKeyPassphrase;
+          }
+          // Read the pem file and load multiple certs up into a separate entry
+          if (typeof securityOptions.sslTrustCertificate !== 'undefined') {
+            connOpts.ca = fs.readFileSync(securityOptions.sslTrustCertificate,
+                                          'utf-8').match(pemCertRegex);
+          }
         }
 
         if (process.env.NODE_ENV === 'unittest') {
@@ -1693,7 +1739,14 @@ var Client = function(service, id, securityOptions) {
         } else if (serviceUrl.protocol === 'amqps:') {
           // If the amqps protocol is being used, then do a tls connect.
           logger.log('debug', _id, 'connecting via tls');
-          client._stream = tls.connect(connOpts, connected);
+          try {
+            client._stream = tls.connect(connOpts, connected);
+          } catch (err) {
+            logger.log('data', _id, 'authorization error occurred:', err);
+            connError(err);
+            logger.exit('Client._tryService', _id, null);
+            return;
+          }
         } else {
           // Otherwise do a standard net connect.
           // In all cases we register a connected callback, and an error
@@ -1782,28 +1835,118 @@ var Client = function(service, id, securityOptions) {
   }
 
   // Validate the ssl security options
+  var keystoreOption = '';
+  var keystoreOptionCount = 0;
+  if (typeof securityOptions.sslKeystorePassphrase !== 'undefined') {
+    keystoreOption = 'sslKeystorePassphrase';
+    keystoreOptionCount++;
+  }
+  if (typeof securityOptions.sslKeystore !== 'undefined') {
+    if (keystoreOptionCount > 0) keystoreOption = keystoreOption + ', ';
+    keystoreOption = keystoreOption + 'sslKeystore';
+    keystoreOptionCount++;
+  }
+
+  var clientCertOption = '';
+  var clientCertOptionCount = 0;
+  if (typeof securityOptions.sslClientCertificate !== 'undefined') {
+    clientCertOption = 'sslClientCertificate';
+    clientCertOptionCount++;
+  }
+  if (typeof securityOptions.sslClientKey !== 'undefined') {
+    if (clientCertOptionCount > 0) clientCertOption = clientCertOption + ', ';
+    clientCertOption = clientCertOption + 'sslClientKey';
+    clientCertOptionCount++;
+  }
+  if (typeof securityOptions.sslClientKeyPassphrase !== 'undefined') {
+    if (clientCertOptionCount > 0) clientCertOption = clientCertOption + ', ';
+    clientCertOption = clientCertOption + 'sslClientKeyPassphrase';
+    clientCertOptionCount++;
+  }
+
+  var certificateOption = '';
   if (typeof securityOptions.sslTrustCertificate !== 'undefined') {
-    if (typeof securityOptions.sslTrustCertificate !== 'string') {
-      err = new TypeError("sslTrustCertificate value '" +
-                          securityOptions.sslTrustCertificate +
-                          "' is invalid. Must be of type String");
-      logger.throw('Client.constructor', _id, err);
-      throw err;
+    if (clientCertOptionCount > 0) certificateOption = clientCertOption + ', ';
+    certificateOption = certificateOption + 'sslTrustCertificate';
+  } else {
+    certificateOption = clientCertOption;
+  }
+
+  if ((keystoreOption.length > 0) && (certificateOption.length > 0)) {
+    err = new TypeError(keystoreOption + ' and ' + certificateOption +
+                        ' options cannot be specified together');
+    logger.throw('Client.constructor', _id, err);
+    throw err;
+  }
+  if ((keystoreOption.length > 0) && (keystoreOptionCount !== 2)) {
+    err = new TypeError('sslKeystore and sslClientKeyPassphrase options' +
+                        ' must both be specified');
+    logger.throw('Client.constructor', _id, err);
+    throw err;
+  }
+  if ((clientCertOption.length > 0) && (clientCertOptionCount !== 3)) {
+    err = new TypeError('sslClientCertificate, sslClientKey and' +
+                        ' sslClientKeyPassphrase options must all be' +
+                        ' specified');
+    logger.throw('Client.constructor', _id, err);
+    throw err;
+  }
+
+  var sslOptions = [
+    { name: 'sslKeystore', value: securityOptions.sslKeystore },
+    { name: 'sslTrustCertificate', value: securityOptions.sslTrustCertificate },
+    { name: 'sslClientCertificate',
+      value: securityOptions.sslClientCertificate },
+    { name: 'sslClientKey', value: securityOptions.sslClientKey }
+  ];
+  for (var i = 0; i < sslOptions.length; i++) {
+    var sslOption = sslOptions[i];
+    if (typeof sslOption.value !== 'undefined') {
+      if (typeof sslOption.value !== 'string') {
+        err = new TypeError(sslOption.name + " value '" +
+                            sslOption.value +
+                            "' is invalid. Must be of type String");
+        logger.throw('Client.constructor', _id, err);
+        throw err;
+      }
+      if (!fs.existsSync(sslOption.value)) {
+        err = new TypeError('The file specified for ' + sslOption.name + " '" +
+                            sslOption.value +
+                            "' does not exist");
+        logger.throw('Client.constructor', _id, err);
+        throw err;
+      }
+      if (!fs.statSync(sslOption.value).isFile()) {
+        err = new TypeError('The file specified for ' + sslOption.name + " '" +
+                            sslOption.value +
+                            "' is not a regular file");
+        logger.throw('Client.constructor', _id, err);
+        throw err;
+      }
     }
-    if (!fs.existsSync(securityOptions.sslTrustCertificate)) {
-      err = new TypeError("The file specified for sslTrustCertificate '" +
-                          securityOptions.sslTrustCertificate +
-                          "' does not exist");
-      logger.throw('Client.constructor', _id, err);
-      throw err;
-    }
-    if (!fs.statSync(securityOptions.sslTrustCertificate).isFile()) {
-      err = new TypeError("The file specified for sslTrustCertificate '" +
-                          securityOptions.sslTrustCertificate +
-                          "' is not a regular file");
-      logger.throw('Client.constructor', _id, err);
-      throw err;
-    }
+  }
+  if ((typeof securityOptions.sslKeystorePassphrase !== 'undefined') &&
+      (typeof securityOptions.sslKeystorePassphrase !== 'string')) {
+    err = new TypeError("sslKeystorePassphrase value '" +
+                        securityOptions.sslKeystorePassphrase +
+                        "' is invalid. Must be of type String");
+    logger.throw('Client.constructor', _id, err);
+    throw err;
+  }
+  if ((typeof securityOptions.sslClientKeyPassphrase !== 'undefined') &&
+      (typeof securityOptions.sslClientKeyPassphrase !== 'string')) {
+    err = new TypeError("sslClientKeyPassphrase value '" +
+                        securityOptions.sslClientKeyPassphrase +
+                        "' is invalid. Must be of type String");
+    logger.throw('Client.constructor', _id, err);
+    throw err;
+  }
+  if (typeof securityOptions.sslVerifyName !== 'boolean') {
+    err = new TypeError("sslVerifyName value '" +
+        securityOptions.sslVerifyName +
+        "' is invalid. Must be of type Boolean");
+    logger.throw('Client.constructor', _id, err);
+    throw err;
   }
 
   // Save the required data as client fields
