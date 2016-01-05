@@ -15,7 +15,7 @@ See https://developer.ibm.com/messaging/mq-light/ for more details.
 
 ### Prerequisites
 
-You will need a Node.js 0.10 or 0.12 runtime environment to use the MQ Light
+You will need a Node.js 0.10, 0.12 or 4.2 runtime environment to use the MQ Light
 API module. This can be installed from http://nodejs.org/download/, or by using
 your operating system's package manager.
 
