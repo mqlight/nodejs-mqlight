@@ -3,13 +3,13 @@
  * <copyright
  * notice="lm-source-program"
  * pids="5725-P60"
- * years="2013,2015"
+ * years="2013,2016"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
  * 5725-P60
  *
- * (C) Copyright IBM Corp. 2013, 2015
+ * (C) Copyright IBM Corp. 2013, 2016
  *
  * US Government Users Restricted Rights - Use, duplication or
  * disclosure restricted by GSA ADP Schedule Contract with
@@ -378,7 +378,7 @@ module.exports.test_createClient_too_many_arguments = function(test) {
 
 
 /**
- * Test that bad ssl options cause createClient to fail
+ * Test that bad SSL options cause createClient to fail
  * @param {object} test - test case.
  */
 module.exports.test_bad_ssl_options = function(test) {
@@ -392,25 +392,96 @@ module.exports.test_bad_ssl_options = function(test) {
                   {sslTrustCertificate: 'MissingCertificate',
                     sslVerifyName: true},
                   {sslTrustCertificate: 'dirCertificate',
-                    sslVerifyName: true}];
+                    sslVerifyName: true},
+                  {sslClientCertificate: 1, sslClientKey: 'ValidKey',
+                    sslClientKeyPassphrase: 'b' },
+                  {sslClientCertificate: {a: 1}, sslClientKey: 'ValidKey',
+                    sslClientKeyPassphrase: 'b' },
+                  {sslClientCertificate: true, sslClientKey: 'ValidKey',
+                    sslClientKeyPassphrase: 'b' },
+                  {sslClientCertificate: 'MissingCertificate',
+                    sslClientKey: 'ValidKey',
+                    sslClientKeyPassphrase: 'b' },
+                  {sslClientCertificate: 'dirCertificate',
+                    sslClientKey: 'ValidKey', sslClientKeyPassphrase: 'b' },
+                  {sslClientCertificate: 'ValidCertificate',
+                    sslClientKey: 1, sslClientKeyPassphrase: 'b' },
+                  {sslClientCertificate: 'ValidCertificate',
+                    sslClientKey: {a: 1}, sslClientKeyPassphrase: 'b'},
+                  {sslClientCertificate: 'ValidCertificate',
+                    sslClientKey: 'MissingKey', sslClientKeyPassphrase: 1},
+                  {sslClientCertificate: 'ValidCertificate',
+                    sslClientKey: 'dirCertificate', sslClientKeyPassphrase: 1},
+                  {sslClientCertificate: 'ValidCertificate',
+                    sslClientKey: 'ValidKey', sslClientKeyPassphrase: 1},
+                  {sslClientCertificate: 'ValidCertificate',
+                    sslClientKey: 'ValidKey', sslClientKeyPassphrase: {a: 1}},
+                  {sslClientCertificate: 'ValidCertificate' },
+                  {sslClientCertificate: 'ValidCertificate',
+                    sslClientKey: 'ValidKey' },
+                  {sslClientCertificate: 'ValidCertificate',
+                    sslClientKeyPassphrase: 'b' },
+                  {sslClientKey: 'ValidKey' },
+                  {sslClientKey: 'ValidKey', sslClientKeyPassphrase: 'b' },
+                  {sslClientKeyPassphrase: 'b' },
+                  {sslKeystore: 'ValidKeystore'},
+                  {sslKeystore: 1, sslKeystorePassphrase: 'a'},
+                  {sslKeystore: {a: 1}, sslKeystorePassphrase: 'a'},
+                  {sslKeystore: true, sslKeystorePassphrase: 'a'},
+                  {sslKeystore: 'ValidKeystore', sslKeystorePassphrase: 1},
+                  {sslKeystore: 'ValidKeystore',
+                    sslKeystorePassphrase: {a: 1}},
+                  {sslKeystore: 'MissingKeystore', sslKeystorePassphrase: 'a'},
+                  {sslKeystore: 'dirCertificate', sslKeystorePassphrase: 'a'},
+                  {sslKeystore: 'ValidKeystore', sslKeystorePassphrase: 'a',
+                    sslTrustCertificate: 'ValidCertificate'},
+                  {sslKeystore: 'ValidKeystore', sslKeystorePassphrase: 'a',
+                    sslClientCertificate: 'ValidCertificate'},
+                  {sslKeystore: 'ValidKeystore', sslKeystorePassphrase: 'a',
+                    sslClientKey: 'ValidCertificate'}];
+  var validCertificateFd = fs.openSync('ValidCertificate', 'w');
+  var validKeyFd = fs.openSync('ValidKey', 'w');
+  var validKeystoreFd = fs.openSync('ValidKeystore', 'w');
   fs.mkdirSync('dirCertificate');
   test.expect(testData.length);
   for (var i = 0; i < testData.length; i++) {
     test.throws(function() {
       var opts = {
         service: 'amqps://host',
-        sslTrustCertificate: testData[i].sslTrustCertificate,
-        sslVerifyName: testData[i].sslVerifyName,
         id: 'test_bad_ssl_options_' + i
       };
+      if (testData[i].sslTrustCertificate !== undefined) {
+        opts.sslTrustCertificate = testData[i].sslTrustCertificate;
+      }
+      if (testData[i].sslVerifyName !== undefined) {
+        opts.sslVerifyName = testData[i].sslVerifyName;
+      }
+      if (testData[i].sslKeystore !== undefined) {
+        opts.sslKeystore = testData[i].sslKeystore;
+      }
+      if (testData[i].sslKeystorePassphrase !== undefined) {
+        opts.sslKeystorePassphrase = testData[i].sslKeystorePassphrase;
+      }
+      if (testData[i].sslClientCertificate !== undefined) {
+        opts.sslClientCertificate = testData[i].sslClientCertificate;
+      }
+      if (testData[i].sslClientKey !== undefined) {
+        opts.sslClientKey = testData[i].sslClientKey;
+      }
+      if (testData[i].sslClientKeyPassphrase !== undefined) {
+        opts.sslClientKeyPassphrase = testData[i].sslClientKeyPassphrase;
+      }
       mqlight.createClient(opts);
     }, function(err) {
       if (err instanceof TypeError) {
-        return true;
+        return true;   
       }
     }, 'invalid bad ssl options test (' + i + '): ' + testData[i]);
   }
   test.done();
+  fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
+  fs.close(validKeyFd); fs.unlinkSync('ValidKey');
+  fs.close(validKeystoreFd); fs.unlinkSync('ValidKeystore');
   fs.rmdirSync('dirCertificate');
 };
 
@@ -432,22 +503,62 @@ module.exports.test_valid_ssl_options = function(test) {
   {
     sslTrustCertificate: 'BadVerify',
     sslVerifyName: false
+  },
+  {
+    sslTrustCertificate: 'ValidCertificate',
+    sslVerifyName: 2 > 1
+  },
+  {
+    sslTrustCertificate: 'BadVerify',
+    sslVerifyName: 1 > 2
+  },
+  {
+    sslClientCertificate: 'ValidCertificate',
+    sslClientKey: 'ValidKey',
+    sslClientKeyPassphrase: 'ValidKeyPassphrase'
+  },
+  {
+    sslKeystore: 'ValidKeystore',
+    sslKeystorePassphrase: 'ValidKeystorePassphrase'
   }];
+  var validKeystoreFd = fs.openSync('ValidKeystore', 'w');
+  var validKeyFd = fs.openSync('ValidKey', 'w');
   var validCertificateFd = fs.openSync('ValidCertificate', 'w');
   var badVerifyFd = fs.openSync('BadVerify', 'w');
   var count = 0;
-  var validSSLTest = function(sslTrustCertificate, sslVerifyName) {
+  var validSSLTest = function(options) {
     var opts = {
       service: 'amqps://host',
-      sslTrustCertificate: testData[count].sslTrustCertificate,
-      sslVerifyName: testData[count].sslVerifyName,
       id: 'test_valid_ssl_options'+count
     };
+    if (options.sslTrustCertificate !== undefined) {
+      opts.sslTrustCertificate = options.sslTrustCertificate;
+    }
+    if (options.sslVerifyName !== undefined) {
+      opts.sslVerifyName = options.sslVerifyName;
+    }
+    if (options.sslKeystore !== undefined) {
+      opts.sslKeystore = options.sslKeystore;
+    }
+    if (options.sslKeystorePassphrase !== undefined) {
+      opts.sslKeystorePassphrase = options.sslKeystorePassphrase;
+    }
+    if (options.sslClientCertificate !== undefined) {
+      opts.sslClientCertificate = options.sslClientCertificate;
+    }
+    if (options.sslClientKey !== undefined) {
+      opts.sslClientKey = options.sslClientKey;
+    }
+    if (options.sslClientKeyPassphrase !== undefined) {
+      opts.sslClientKeyPassphrase = options.sslClientKeyPassphrase;
+    }
     var client = mqlight.createClient(opts);
     client.on('error', function(err) {
       client.stop();
       test.ok(!err, 'unexpected error event: ' + err);
       test.done();
+      fs.close(validKeystoreFd); fs.unlinkSync('ValidKeystore');
+      fs.close(validKeyFd); fs.unlinkSync('ValidKey');
       fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
       fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
     });
@@ -457,17 +568,17 @@ module.exports.test_valid_ssl_options = function(test) {
       ++count;
       if (count == testData.length) {
         test.done();
+        fs.close(validKeystoreFd); fs.unlinkSync('ValidKeystore');
+        fs.close(validKeyFd); fs.unlinkSync('ValidKey');
         fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
         fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
       } else {
-        validSSLTest(testData[count].sslTrustCertificate,
-            testData[count].sslVerifyName);
+        validSSLTest(testData[count]);
       }
     });
   };
 
-  validSSLTest(testData[count].sslTrustCertificate,
-      testData[count].sslVerifyName);
+  validSSLTest(testData[count]);
 };
 
 
@@ -503,20 +614,57 @@ module.exports.test_invalid_ssl_options = function(test) {
   {
     sslTrustCertificate: 'ExpiredCertificate',
     sslVerifyName: false
+  },
+  {
+    sslClientCertificate: 'BadCertificate',
+    sslClientKey: 'ValidKey',
+    sslClientKeyPassphrase: 'ValidKeyPassphrase'
+  },
+  {
+    sslClientCertificate: 'ValidCertificate',
+    sslClientKey: 'BadKey',
+    sslClientKeyPassphrase: 'BadKeyPassphrase'
+  },
+  {
+    sslKeystore: 'BadKeystore',
+    sslKeystorePassphrase: 'BadKeystorePassphrase'
   }];
+  var badKeystoreFd = fs.openSync('BadKeystore', 'w');
+  var badKeyFd = fs.openSync('BadKey', 'w');
+  var validKeyFd = fs.openSync('ValidKey', 'w');
   var badCertificateFd = fs.openSync('BadCertificate', 'w');
+  var validCertificateFd = fs.openSync('ValidCertificate', 'w');
   var badVerifyFd = fs.openSync('BadVerify', 'w');
   var selfSignedFd = fs.openSync('SelfSignedCertificate', 'w');
   var expiredFd = fs.openSync('ExpiredCertificate', 'w');
   var count = 0;
-  var invalidSSLTest = function(sslTrustCertificate, sslVerifyName) {
+  var invalidSSLTest = function(options) {
     var firstError = true;
     var opts = {
       service: 'amqps://host',
-      sslTrustCertificate: testData[count].sslTrustCertificate,
-      sslVerifyName: testData[count].sslVerifyName,
       id: 'test_invalid_ssl_options'+count
     };
+    if (options.sslTrustCertificate !== undefined) {
+      opts.sslTrustCertificate = options.sslTrustCertificate;
+    }
+    if (options.sslVerifyName !== undefined) {
+      opts.sslVerifyName = options.sslVerifyName;
+    }
+    if (options.sslKeystore !== undefined) {
+      opts.sslKeystore = options.sslKeystore;
+    }
+    if (options.sslKeystorePassphrase !== undefined) {
+      opts.sslKeystorePassphrase = options.sslKeystorePassphrase;
+    }
+    if (options.sslClientCertificate !== undefined) {
+      opts.sslClientCertificate = options.sslClientCertificate;
+    }
+    if (options.sslClientKey !== undefined) {
+      opts.sslClientKey = options.sslClientKey;
+    }
+    if (options.sslClientKeyPassphrase !== undefined) {
+      opts.sslClientKeyPassphrase = options.sslClientKeyPassphrase;
+    }
     var client = mqlight.createClient(opts);
     client.on('error', function(err) {
       test.ok(err);
@@ -527,13 +675,16 @@ module.exports.test_invalid_ssl_options = function(test) {
           ++count;
           if (count == testData.length) {
             test.done();
+            fs.close(badKeystoreFd); fs.unlinkSync('BadKeystore');
+            fs.close(badKeyFd); fs.unlinkSync('BadKey');
+            fs.close(validKeyFd); fs.unlinkSync('ValidKey');
             fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
+            fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
             fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
             fs.close(selfSignedFd); fs.unlinkSync('SelfSignedCertificate');
             fs.close(expiredFd); fs.unlinkSync('ExpiredCertificate');
           } else {
-            invalidSSLTest(testData[count].sslTrustCertificate,
-                testData[count].sslVerifyName);
+            invalidSSLTest(testData[count]);
           }
         });
       }
@@ -542,7 +693,11 @@ module.exports.test_invalid_ssl_options = function(test) {
       client.stop();
       test.ok(!err, 'unexpected started event');
       test.done();
+      fs.close(badKeystoreFd); fs.unlinkSync('BadKeystore');
+      fs.close(badKeyFd); fs.unlinkSync('BadKey');
+      fs.close(validKeyFd); fs.unlinkSync('ValidKey');
       fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
+      fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
       fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
       fs.close(selfSignedFd); fs.unlinkSync('SelfSignedCertificate');
       fs.close(expiredFd); fs.unlinkSync('ExpiredCertificate');
@@ -550,8 +705,7 @@ module.exports.test_invalid_ssl_options = function(test) {
     client.start();
   };
 
-  invalidSSLTest(testData[count].sslTrustCertificate,
-      testData[count].sslVerifyName);
+  invalidSSLTest(testData[count]);
 };
 
 

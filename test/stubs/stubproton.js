@@ -3,13 +3,13 @@
  * <copyright
  * notice="lm-source-program"
  * pids="5725-P60"
- * years="2013,2015"
+ * years="2013,2016"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
  * 5725-P60
  *
- * (C) Copyright IBM Corp. 2013, 2015
+ * (C) Copyright IBM Corp. 2013, 2016
  *
  * US Government Users Restricted Rights - Use, duplication or
  * disclosure restricted by GSA ADP Schedule Contract with
@@ -342,6 +342,18 @@ var StubStream = function(options, callback) {
     if (DEBUG) log('StubStream received expired certificate');
     stream.authorized = false;
     stream.authorizationError = new Error('CERT_HAS_EXPIRED').message;
+  } else if (options.sslClientCertificate === 'BadCertificate') {
+    if (DEBUG) log('StubStream received bad client certificate');
+    stream.authorized = false;
+    stream.authorizationError = new Error('Bad Certificate').message;
+  } else if (options.sslClientKey === 'BadKey') {
+    if (DEBUG) log('StubStream received bad client key');
+    stream.authorized = false;
+    stream.authorizationError = new Error('Bad Key').message;  
+  } else if (options.sslKeystore === 'BadKeystore') {
+    if (DEBUG) log('StubStream received bad keystore');
+    stream.authorized = false;
+    stream.authorizationError = new Error('Bad Keystore').message;    
   } else if (connectStatus !== 0) {
     if (DEBUG) log('StubStream received connect error');
     err = new Error('connect error: ' + connectStatus);
