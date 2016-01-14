@@ -32,9 +32,24 @@ Creates an IBM MQ Light client instance in `starting` state.
   * **password**, (String) (optional) password for authentication.
     Alternatively, a password can be embedded in the URL passed via the service
     property.
+  * **sslKeystore**, (String) (optional) SSL key store to use when authentication is
+    required for the MQ Light server and to authenticate the client with the
+    MQ Light server. A PKCS#12 format key store file is supported. Only used when
+    service specifies the amqps scheme. This option is mutually exclusive with the
+    'sslTrustCertificate', 'sslClientCerfiicate' and 'sslClientKey' options.
+  * **sslKeystorePassphrase**, (String) (optional) passphase used to access the
+    SSL key store specified for the 'sslKeystore' option.
   * **sslTrustCertificate**, (String) (optional) SSL trust certificate to use
     when authentication is required for the MQ Light server. Only used when
     service specifies the amqps scheme.
+  * **sslClientCertificate**, (String) (optional) SSL client certificate to use
+    when client authentication is required with the MQ Light server. Only used
+    when service specifies the amqps scheme.
+  * **sslClientKey**, (String) (optional) SSL client private key to use
+    when client authentication is required with the MQ Light server. Only used
+    when service specifies the amqps scheme.
+  * **sslClientKeyPassphrase**, (String) (optional) passphase used to decrypt
+    the client private key specified for the 'sslClientKey' option.
   * **sslVerifyName**, (Boolean, default: true) (optional) whether or not to
     additionally check the MQ Light server's common name in the certificate
     matches the actual server's DNS name.
