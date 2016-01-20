@@ -68,7 +68,7 @@ var types = {
   'client-key': String,
   'client-key-passphrase': String,
   'trust-certificate': String,
-  'verify-name': String
+  'verify-name': Boolean
 };
 var shorthands = {
   h: ['--help'],
@@ -84,11 +84,11 @@ var showUsage = function() {
   puts('Usage: uiworkout.js [options]');
   puts('');
   puts('Options:');
-  puts('  -h, --help            show this help message and exit');
-  puts('  -s URL, --service=URL service to connect to, for example:\n' +
-       '                        amqp://user:password@host:5672 or\n' +
-       '                        amqps://host:5671 to use SSL/TLS\n' +
-       '                        (default: amqp://localhost)');
+  puts('  -h, --help             show this help message and exit');
+  puts('  -s URL, --service=URL  service to connect to, for example:\n' +
+       '                         amqp://user:password@host:5672 or\n' +
+       '                         amqps://host:5671 to use SSL/TLS\n' +
+       '                         (default: amqp://localhost)');
   puts('  -k FILE, --keystore=FILE\n' +
        '                         use key store contained in FILE (in PKCS#12' +
        ' format) to\n' +
@@ -123,13 +123,11 @@ var showUsage = function() {
        '                         validate the identity of the server. The' +
        ' connection must\n' +
        '                         be secured with SSL/TLS');
-  puts('  --verify-name=TRUE|FALSE\n' +
-       '                         specify whether or not to additionally check' +
-       ' the\n' +
-       "                         server's common name in the specified trust" +
-       ' certificate\n' +
-       "                         matches the actual server's DNS name\n" +
-       '                         (default: TRUE)');
+  puts('  --no-verify-name       specify to not additionally check the' +
+       " server's common\n" +
+       '                         name in the specified trust certificate' +
+       ' matches the\n' +
+       "                         actual server's DNS name");
   puts('');
 };
 
@@ -250,33 +248,18 @@ function startClient(topic, share) {
     opts.sslTrustCertificate = parsed['trust-certificate'];
     checkService = true;
   }
-  if (parsed['verify-name']) {
-    var value = (parsed['verify-name']).toLowerCase();
-    if (value === 'true') {
-      /**
-       * Indicate to additionally check the MQ Light server's
-       * common name in the certificate matches the actual server's DNS name.
-       */
-      opts.sslVerifyName = true;
-    } else if (value === 'false') {
-      /**
-       * Indicate not to additionally check the MQ Light server's
-       * common name in the certificate matches the actual server's DNS name.
-       */
-      opts.sslVerifyName = false;
-    } else {
-      console.error('*** error ***');
-      console.error('The verify-name option must be specified with a value of' +
-                    ' TRUE or FALSE');
-      console.error('Exiting.');
-      process.exit(1);
-    }
+  if (parsed['verify-name'] === false) {
+    /**
+     * Indicate not to additionally check the MQ Light server's
+     * common name in the certificate matches the actual server's DNS name.
+     */
+    opts.sslVerifyName = false;
     checkService = true;
   }
 
   if (checkService) {
     if (parsed.service) {
-      if (service.indexOf('amqps', 0) !== 0) {
+      if (opts.service.indexOf('amqps', 0) !== 0) {
         console.error('*** error ***');
         console.error("The service URL must start with 'amqps://' when using " +
                       'SSL/TLS options.');
@@ -339,4 +322,13 @@ function startClient(topic, share) {
     sendMessages();
   });
 
+  client.on('error', function(error) {
+    console.error('*** error ***');
+    if (error) {
+      if (error.message) console.error('message: %s', error.toString());
+      else if (error.stack) console.error(error.stack);
+    }
+    console.error('Exiting.');
+    process.exit(1);
+  });
 }

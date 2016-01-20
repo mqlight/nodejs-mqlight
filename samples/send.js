@@ -35,7 +35,7 @@ var types = {
   'client-key': String,
   'client-key-passphrase': String,
   'trust-certificate': String,
-  'verify-name': String,
+  'verify-name': Boolean,
   topic: String,
   id: String,
   'message-ttl': Number,
@@ -102,13 +102,11 @@ var showUsage = function() {
        '                         validate the identity of the server. The' +
        ' connection must\n' +
        '                         be secured with SSL/TLS');
-  puts('  --verify-name=TRUE|FALSE\n' +
-       '                         specify whether or not to additionally check' +
-       ' the\n' +
-       "                         server's common name in the specified trust" +
-       ' certificate\n' +
-       "                         matches the actual server's DNS name\n" +
-       '                         (default: TRUE)');
+  puts('  --no-verify-name       specify to not additionally check the' +
+       " server's common\n" +
+       '                         name in the specified trust certificate' +
+       ' matches the\n' +
+       "                         actual server's DNS name");
   puts('  -t TOPIC, --topic=TOPIC');
   puts('                         send messages to topic TOPIC\n' +
        '                         (default: public)');
@@ -180,27 +178,12 @@ if (parsed['trust-certificate']) {
   opts.sslTrustCertificate = parsed['trust-certificate'];
   checkService = true;
 }
-if (parsed['verify-name']) {
-  var value = (parsed['verify-name']).toLowerCase();
-  if (value === 'true') {
-    /**
-     * Indicate to additionally check the MQ Light server's
-     * common name in the certificate matches the actual server's DNS name.
-     */
-    opts.sslVerifyName = true;
-  } else if (value === 'false') {
-    /**
-     * Indicate not to additionally check the MQ Light server's
-     * common name in the certificate matches the actual server's DNS name.
-     */
-    opts.sslVerifyName = false;
-  } else {
-    console.error('*** error ***');
-    console.error('The verify-name option must be specified with a value of' +
-                  ' TRUE or FALSE');
-    console.error('Exiting.');
-    process.exit(1);
-  }
+if (parsed['verify-name'] === false) {
+  /**
+   * Indicate not to additionally check the MQ Light server's
+   * common name in the certificate matches the actual server's DNS name.
+   */
+  opts.sslVerifyName = false;
   checkService = true;
 }
 

@@ -35,7 +35,7 @@ var types = {
   'client-key': String,
   'client-key-passphrase': String,
   'trust-certificate': String,
-  'verify-name': String,
+  'verify-name': Boolean,
   'topic-pattern': String,
   id: String,
   'destination-ttl': Number,
@@ -65,11 +65,11 @@ var showUsage = function() {
   puts('Usage: recv.js [options]');
   puts('');
   puts('Options:');
-  puts('  -h, --help            show this help message and exit');
-  puts('  -s URL, --service=URL service to connect to, for example:\n' +
-       '                        amqp://user:password@host:5672 or\n' +
-       '                        amqps://host:5671 to use SSL/TLS\n' +
-       '                        (default: amqp://localhost)');
+  puts('  -h, --help             show this help message and exit');
+  puts('  -s URL, --service=URL  service to connect to, for example:\n' +
+       '                         amqp://user:password@host:5672 or\n' +
+       '                         amqps://host:5671 to use SSL/TLS\n' +
+       '                         (default: amqp://localhost)');
   puts('  -k FILE, --keystore=FILE\n' +
        '                         use key store contained in FILE (in PKCS#12' +
        ' format) to\n' +
@@ -104,34 +104,32 @@ var showUsage = function() {
        '                         validate the identity of the server. The' +
        ' connection must\n' +
        '                         be secured with SSL/TLS');
-  puts('  --verify-name=TRUE|FALSE\n' +
-       '                         specify whether or not to additionally check' +
-       ' the\n' +
-       "                         server's common name in the specified trust" +
-       ' certificate\n' +
-       "                         matches the actual server's DNS name\n" +
-       '                         (default: TRUE)');
+  puts('  --no-verify-name       specify to not additionally check the' +
+       " server's common\n" +
+       '                         name in the specified trust certificate' +
+       ' matches the\n' +
+       "                         actual server's DNS name");
   puts('  -t TOPICPATTERN, --topic-pattern=TOPICPATTERN\n' +
-       '                        subscribe to receive messages matching' +
+       '                         subscribe to receive messages matching' +
        ' TOPICPATTERN');
-  puts('                        (default: public)');
-  puts('  -i ID, --id=ID        the ID to use when connecting to MQ Light\n' +
-       '                        (default: recv_[0-9a-f]{7})');
-  puts('  --destination-ttl=NUM set destination time-to-live to NUM seconds');
+  puts('                         (default: public)');
+  puts('  -i ID, --id=ID         the ID to use when connecting to MQ Light\n' +
+       '                         (default: recv_[0-9a-f]{7})');
+  puts('  --destination-ttl=NUM  set destination time-to-live to NUM seconds');
   puts('  -n NAME, --share-name NAME');
-  puts('                        optionally, subscribe to a shared' +
+  puts('                         optionally, subscribe to a shared' +
        ' destination using\n' +
-       '                        NAME as the share name.');
-  puts('  -f FILE, --file=FILE  write the payload of the next message' +
+       '                         NAME as the share name.');
+  puts('  -f FILE, --file=FILE   write the payload of the next message' +
        ' received to\n' +
-       '                        FILE (overwriting previous file contents)' +
+       '                         FILE (overwriting previous file contents)' +
        ' then end.\n' +
-       '                        (default is to print messages to stdout)');
-  puts('  -d NUM, --delay=NUM   delay for NUM seconds each time a message' +
+       '                         (default is to print messages to stdout)');
+  puts('  -d NUM, --delay=NUM    delay for NUM seconds each time a message' +
        ' is received.');
-  puts('  --verbose             print additional information about each' +
+  puts('  --verbose              print additional information about each' +
        ' message\n' +
-       '                        received.');
+       '                         received.');
   puts('');
 };
 
@@ -193,27 +191,12 @@ if (parsed['trust-certificate']) {
   opts.sslTrustCertificate = parsed['trust-certificate'];
   checkService = true;
 }
-if (parsed['verify-name']) {
-  var value = (parsed['verify-name']).toLowerCase();
-  if (value === 'true') {
-    /**
-     * Indicates to additionally check the MQ Light server's
-     * common name in the certificate matches the actual server's DNS name.
-     */
-    opts.sslVerifyName = true;
-  } else if (value === 'false') {
-    /**
-     * Indicate not to additionally check the MQ Light server's
-     * common name in the certificate matches the actual server's DNS name.
-     */
-    opts.sslVerifyName = false;
-  } else {
-    console.error('*** error ***');
-    console.error('The verify-name option must be specified with a value of' +
-                  ' TRUE or FALSE');
-    console.error('Exiting.');
-    process.exit(1);
-  }
+if (parsed['verify-name'] === false) {
+  /**
+   * Indicate not to additionally check the MQ Light server's
+   * common name in the certificate matches the actual server's DNS name.
+   */
+  opts.sslVerifyName = false;
   checkService = true;
 }
 
@@ -303,5 +286,3 @@ client.on('error', function(error) {
   console.error('Exiting.');
   process.exit(1);
 });
-
-
