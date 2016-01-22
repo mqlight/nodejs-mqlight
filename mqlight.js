@@ -1879,7 +1879,7 @@ var Client = function(service, id, securityOptions) {
     throw err;
   }
   if ((keystoreOption.length > 0) && (keystoreOptionCount !== 2)) {
-    err = new TypeError('sslKeystore and sslClientKeyPassphrase options' +
+    err = new TypeError('sslKeystore and sslKeystorePassphrase options' +
                         ' must both be specified');
     logger.throw('Client.constructor', _id, err);
     throw err;
