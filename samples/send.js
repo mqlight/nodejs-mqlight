@@ -82,7 +82,7 @@ var showUsage = function() {
        '                         client-certificate and trust-certifcate' +
        ' options');
   puts('  -p PASSPHRASE, --keystore-passphrase=PASSPHRASE\n' +
-       '                         use PASSPHRASE to access the keystore');
+       '                         use PASSPHRASE to access the key store');
   puts('  --client-certificate=FILE\n' +
        '                         use the certificate contained in FILE (in' +
        ' PEM format) to\n' +
