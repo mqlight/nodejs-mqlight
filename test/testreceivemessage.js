@@ -591,6 +591,7 @@ module.exports.test_subscribe_credit_confirm = function(test) {
  * @param {object} test the unittest interface
  */
 module.exports.test_receive_client_replaced = function(test) {
+  var done = false;
   var client = mqlight.createClient({
     service: 'amqp://host',
     id: 'test_receive_client_replaced'
@@ -609,7 +610,11 @@ module.exports.test_receive_client_replaced = function(test) {
     test.ok(/ReplacedError: /.test(err.toString()));
     mqlight.proton.messenger.receive = savedReceiveMethod;
     client.stop(function() {
-      test.done();
+      var isdone = done;
+      done = true;
+      // Ensure test.done() is only called once, as a second call can cause
+      // following tests to fail.
+      if (!isdone) test.done();
     });
   });
 
