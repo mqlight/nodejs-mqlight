@@ -11,7 +11,7 @@ const static char sccsid[] = "%Z% %W% %I% %E% %U%";
 /*                                                                    */
 /*   5725-P60                                                         */
 /*                                                                    */
-/*   (C) Copyright IBM Corp. 2013, 2015                               */
+/*   (C) Copyright IBM Corp. 2013, 2016                               */
 /*                                                                    */
 /*   The source code for the program is not published                 */
 /*   or otherwise divested of its trade secrets,                      */
@@ -502,7 +502,8 @@ NAN_METHOD(ProtonMessenger::Connect)
   }
 
   // Indicate that the route should be validated
-  if (pn_messenger_set_flags(obj->messenger, PN_FLAGS_CHECK_ROUTES)) {
+  // and PLAIN mechanism is allowed on an unencrypted connection
+  if (pn_messenger_set_flags(obj->messenger, PN_FLAGS_CHECK_ROUTES | PN_FLAGS_ALLOW_INSECURE_MECHS)) {
     pn_messenger_free(obj->messenger);
     obj->messenger = NULL;
     // throw TypeError if unable to set flags
