@@ -1364,7 +1364,9 @@ var Client = function(service, id, securityOptions) {
             var retry = function() {
               logger.entryLevel('entry_often', 'Client._tryService.retry', _id);
               if (!client.isStopped()) {
-                client._performConnect.apply(client, [false, true]);
+                process.nextTick(function() {
+                  client._performConnect.apply(client, [false, true]);
+                });
               }
               logger.exitLevel('exit_often', 'Client._tryService.retry',
                                _id, null);
@@ -1387,7 +1389,9 @@ var Client = function(service, id, securityOptions) {
             if (error) {
               logger.log('emit', _id, 'error', error);
               try {
-                client.emit('error', error);
+                process.nextTick(function() {
+                  client.emit('error', error);
+                });
               } catch (err) {
                 logger.log('debug', _id, 'client.emit threw error ' + error +
                     '\n (ignoring as only seems to occur when logging errors)');
@@ -1526,13 +1530,11 @@ var Client = function(service, id, securityOptions) {
               error = getNamedError(err);
               logger.caught('Client.streamClosed', _id, error);
               process.nextTick(function() {
+                if (shouldReconnect(error)) {
+                  reconnect(client);
+                }
                 logger.log('emit', _id, 'error', error);
                 client.emit('error', error);
-                if (shouldReconnect(error)) {
-                  setImmediate(function() {
-                    reconnect(client);
-                  });
-                }
               });
             }
 
@@ -2315,39 +2317,42 @@ var reconnect = function(client) {
   }
   client._setState(STATE_RETRYING);
 
-  // stop the messenger to free the object then attempt a reconnect
-  stopMessenger(client, function(client) {
-    logger.entry('Client.reconnect.stopProcessing', client.id);
+  setImmediate(function() {
 
-    if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
+    // stop the messenger to free the object then attempt a reconnect
+    stopMessenger(client, function(client) {
+      logger.entry('Client.reconnect.stopProcessing', client.id);
 
-    // clear the subscriptions list, if the cause of the reconnect happens
-    // during check for messages we need a 0 length so it will check once
-    // reconnected.
-    logger.log('data', client.id, 'client._subscriptions:',
-               client._subscriptions);
-    while (client._subscriptions.length > 0) {
-      client._queuedSubscriptions.push(client._subscriptions.shift());
-    }
-    // also clear any left over outstanding sends
-    while (client._outstandingSends.length > 0) {
-      client._outstandingSends.shift();
-    }
-    client._queuedStartCallbacks.push({
-      callback: processQueuedActions,
-      create: false
+      if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
+
+      // clear the subscriptions list, if the cause of the reconnect happens
+      // during check for messages we need a 0 length so it will check once
+      // reconnected.
+      logger.log('data', client.id, 'client._subscriptions:',
+              client._subscriptions);
+      while (client._subscriptions.length > 0) {
+        client._queuedSubscriptions.push(client._subscriptions.shift());
+      }
+      // also clear any left over outstanding sends
+      while (client._outstandingSends.length > 0) {
+        client._outstandingSends.shift();
+      }
+      client._queuedStartCallbacks.push({
+        callback: processQueuedActions,
+        create: false
+      });
+      // Close our end of the socket
+      if (client._stream) {
+        client._stream.removeAllListeners('close');
+        client._stream.end();
+        client._stream = null;
+      }
+      client._queuedChunks = [];
+      client._queuedChunksSize = 0;
+      client._performConnect.apply(client, [false, true]);
+
+      logger.exit('Client.reconnect.stopProcessing', client.id, null);
     });
-    // Close our end of the socket
-    if (client._stream) {
-      client._stream.removeAllListeners('close');
-      client._stream.end();
-      client._stream = null;
-    }
-    client._queuedChunks = [];
-    client._queuedChunksSize = 0;
-    client._performConnect.apply(client, [false, true]);
-
-    logger.exit('Client.reconnect.stopProcessing', client.id, null);
   });
 
   logger.exit('Client.reconnect', client.id, client);
@@ -2855,14 +2860,17 @@ Client.prototype.send = function(topic, data, options, callback) {
             }
           }
 
-          if (error) {
-            logger.log('emit', client.id, 'error', error);
-            client.emit('error', error);
-          }
           inFlight.msg.destroy();
 
           if (shouldReconnect(error)) {
             reconnect(client);
+          }
+
+          if (error) {
+            process.nextTick(function() {
+              logger.log('emit', client.id, 'error', error);
+              client.emit('error', error);
+            });
           }
 
           if (callbackError !== null) {
@@ -2926,13 +2934,16 @@ Client.prototype.send = function(topic, data, options, callback) {
               logger.exit('Client.send.callback', client.id, null);
             }
           }
-          logger.log('emit', client.id, 'error', invocation.error);
-          client.emit('error', invocation.error);
           doReconnect |= shouldReconnect(invocation.error);
         }
         if (doReconnect) {
           reconnect(client);
         }
+
+        process.nextTick(function() {
+          logger.log('emit', client.id, 'error', invocation.error);
+          client.emit('error', invocation.error);
+        });
       });
     }
 
@@ -2992,11 +3003,11 @@ Client.prototype.checkForMessages = function() {
     err = getNamedError(e);
     logger.caughtLevel('entry_often', 'checkForMessages', client.id, err);
     process.nextTick(function() {
-      logger.log('emit', client.id, 'error', err);
-      client.emit('error', err);
       if (shouldReconnect(err)) {
         reconnect(client);
       }
+      logger.log('emit', client.id, 'error', err);
+      client.emit('error', err);
     });
   }
 
@@ -3487,10 +3498,6 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     }
 
     if (err) {
-      setImmediate(function() {
-        logger.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      });
       if (shouldReconnect(err)) {
         logger.log('data', client.id, 'queued subscription and calling ' +
                    'reconnect');
@@ -3505,10 +3512,13 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
           callback: callback
         });
         // schedule a reconnect
-        setImmediate(function() {
-          reconnect(client);
-        });
+        reconnect(client);
       }
+
+      process.nextTick(function() {
+        logger.log('emit', client.id, 'error', err);
+        client.emit('error', err);
+      });
     } else {
       // if no errors, add this to the stored list of subscriptions
       client._subscriptions.push({
@@ -3790,19 +3800,18 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     }
 
     if (err) {
-      setImmediate(function() {
-        logger.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      });
       if (shouldReconnect(err)) {
         logger.log('data', client.id, 'client error "' + err + '" during ' +
                    'messenger.unsubscribe call so queueing the unsubscribe ' +
                    'request');
         queueUnsubscribe();
-        setImmediate(function() {
-          reconnect(client);
-        });
+        reconnect(client);
       }
+
+      process.nextTick(function() {
+        logger.log('emit', client.id, 'error', err);
+        client.emit('error', err);
+      });
     } else {
       // if no errors, remove this from the stored list of subscriptions
       for (i = 0; i < client._subscriptions.length; i++) {

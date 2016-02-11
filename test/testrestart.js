@@ -3,13 +3,13 @@
  * <copyright
  * notice="lm-source-program"
  * pids="5725-P60"
- * years="2013,2014"
+ * years="2013,2016"
  * crc="3568777996" >
  * Licensed Materials - Property of IBM
  *
  * 5725-P60
  *
- * (C) Copyright IBM Corp. 2014
+ * (C) Copyright IBM Corp. 2016
  *
  * US Government Users Restricted Rights - Use, duplication or
  * disclosure restricted by GSA ADP Schedule Contract with
@@ -588,7 +588,7 @@ module.exports.test_queued_before_connect_unsubscribe_nop = function(test) {
 
 /**
  * Test that a queued subscribe and unsubscribe for the same address cancel
- * each other out. We'll do this by submitting 4 subscribes and 4 unsubscribes
+ * each other out. We'll do this by submitting 4 subscribes and 2 unsubscribes
  * where there is an intersection between two of the topics used in these
  * cases.
  *
@@ -611,6 +611,7 @@ module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
 
   var subscribeErrors = 0,
       unsubscribeErrors = 0,
+      subscribeUnsubscribeErrors = 0,
       subscribes = 0,
       unsubscribes = 0;
   client.on('error', function(err) {
@@ -622,8 +623,12 @@ module.exports.test_queued_via_error_unsubscribe_nop = function(test) {
       unsubscribeErrors++;
       return;
     }
+    if (/connect error/.test(err.message)) {
+      subscribeUnsubscribeErrors++;
+    }
 
-    if (subscribeErrors === 4 && unsubscribeErrors === 2) {
+    if ((subscribeErrors === 4 && unsubscribeErrors === 2) ||
+            subscribeUnsubscribeErrors == 6) {
       test.strictEqual(client._queuedSubscriptions.length, 4,
                        'expected to see 4 queued subscriptions, but saw ' +
           client._queuedSubscriptions.length);
