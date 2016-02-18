@@ -14,7 +14,9 @@ that goes to stderr when you run your application.
 ## Release notes
 
 ### 9.9.9999999999
+* Support for Node.js 5.x.x engine.
 
+### 1.0.2016010409
 * Bugfix to prevent connection aborted and/or SASL authentication failures
   if client was manually stopped and then started.
 
