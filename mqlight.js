@@ -1164,12 +1164,20 @@ var Client = function(service, id, securityOptions) {
     var serviceList;
     if (client._serviceFunction instanceof Function) {
       logger.entry('_serviceFunction', client.id);
-      client._serviceFunction(function(err, service) {
+      var serviceFunctionCallback = function(err, service) {
         if (err) {
           client._setState(STATE_STOPPED);
           client._invokeStartedCallbacks.call(client, err);
+          // The service 'lookup' function returned an error. Wait a few
+          // seconds and then try again (unless we're in a unit test)
+          if (process.env.NODE_ENV !== 'unittest') {
+            setTimeout(function() {
+              client._serviceFunction(serviceFunctionCallback);
+            }, 5000);
+          }
         } else {
           try {
+            client._setState(STATE_STARTING);
             serviceList =
                 client._generateServiceList.apply(client, [service]);
             client._connectToService(serviceList);
@@ -1179,7 +1187,8 @@ var Client = function(service, id, securityOptions) {
             client._invokeStartedCallbacks.call(client, err);
           }
         }
-      });
+      };
+      client._serviceFunction(serviceFunctionCallback);
       logger.exit('_serviceFunction', client.id, null);
     } else {
       try {
