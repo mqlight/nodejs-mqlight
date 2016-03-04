@@ -106,6 +106,10 @@ var header = function(lvl, clientId, options) {
       npmlog.log(lvl, clientId, '| potentialUnwinds  :-', potentialUnwinds);
     }
     npmlog.log(lvl, clientId, HEADER_BANNER);
+    if ('fnc' in options && options.fnc.indexOf('SIG') == 0) {
+      npmlog.log(lvl, clientId, '(Set MQLIGHT_NODE_NO_HANDLER to ' +
+                 'disable user requested FFDCs)');
+    }
     npmlog.log(lvl, clientId, '');
   }
 };
