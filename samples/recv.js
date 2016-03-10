@@ -216,11 +216,41 @@ if (checkService) {
 }
 var client = mqlight.createClient(opts);
 
+// create an event listener to handle any messages that arrive for us
+// and an event listener to handle any malformed messages
+var i = 0;
+var delayMs = 0;
+client.on('message', function(data, delivery) {
+  ++i;
+  if (parsed.verbose) console.log('# received message (%d)', i);
+  if (parsed.file) {
+    console.log('Writing message data to %s', parsed.file);
+    fs.writeFileSync(parsed.file, data);
+    delivery.message.confirmDelivery();
+    client.stop(function() {
+      console.error('Exiting.');
+      process.exit(0);
+    });
+  } else {
+    console.log(data);
+    if (parsed.verbose) console.log(delivery);
+    if (delayMs > 0) {
+      setTimeout(delivery.message.confirmDelivery, delayMs);
+    } else {
+      delivery.message.confirmDelivery();
+    }
+  }
+});
+client.on('malformed', function(data, delivery) {
+  console.error('*** received malformed message (%d)', (++i));
+  console.error(data);
+  console.error(delivery);
+});
+
 // once started, receive messages for the supplied pattern
 client.on('started', function() {
   console.log('Connected to %s using client-id %s', client.service, client.id);
   var options = { qos: mqlight.QOS_AT_LEAST_ONCE, autoConfirm: false };
-  var delayMs = 0;
   if (parsed['destination-ttl'] !== undefined) {
     options.ttl = Number(parsed['destination-ttl']) * 1000;
   }
@@ -245,35 +275,6 @@ client.on('started', function() {
         }
       }
     }
-  });
-
-  // listen to new message events and process them
-  var i = 0;
-  client.on('message', function(data, delivery) {
-    ++i;
-    if (parsed.verbose) console.log('# received message (%d)', i);
-    if (parsed.file) {
-      console.log('Writing message data to %s', parsed.file);
-      fs.writeFileSync(parsed.file, data);
-      delivery.message.confirmDelivery();
-      client.stop(function() {
-        console.error('Exiting.');
-        process.exit(0);
-      });
-    } else {
-      console.log(data);
-      if (parsed.verbose) console.log(delivery);
-      if (delayMs > 0) {
-        setTimeout(delivery.message.confirmDelivery, delayMs);
-      } else {
-        delivery.message.confirmDelivery();
-      }
-    }
-  });
-  client.on('malformed', function(data, delivery) {
-    console.error('*** received malformed message (%d)', (++i));
-    console.error(data);
-    console.error(delivery);
   });
 });
 

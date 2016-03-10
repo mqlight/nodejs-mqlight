@@ -2218,11 +2218,15 @@ Client.prototype.stop = function(callback) {
                 'stopProcessing.queuedSendCallback', client.id, null);
           });
         }
-        // clear the active subscriptions list as we were asked to disconnect
+        // Clear the active and queued subscriptions lists as we were
+        // asked to disconnect.
         logger.log('data', client.id, 'client._subscriptions:',
                    client._subscriptions);
         while (client._subscriptions.length > 0) {
           client._subscriptions.shift();
+        }
+        while (client._queuedSubscriptions.length > 0) {
+          client._queuedSubscriptions.shift();
         }
         // Close our end of the socket
         if (client._stream) {
