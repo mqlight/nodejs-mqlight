@@ -9,7 +9,14 @@
     "url": "https://ibm.biz/mqlight-forum",
     "email": "mqlight@uk.ibm.com"
   },
-  "keywords": ["simple", "robust", "messaging", "AMQP", "offload", "responsive"],
+  "keywords": [
+    "simple",
+    "robust",
+    "messaging",
+    "AMQP",
+    "offload",
+    "responsive"
+  ],
   "main": "mqlight.js",
   "gypfile": true,
   "binary": {
@@ -23,15 +30,17 @@
     "mqlight-debug": "./bin/mqlight-debug.js"
   },
   "dependencies": {
-    "hashmap": "~2.0.4",
-    "moment": "~2.10.6",
-    "nan": "^2.1.0",
-    "node-pre-gyp": "^0.6.17",
+    "hashmap": "~2.0.5",
+    "moment": "~2.13.0",
+    "nan": "^2.2.1",
+    "node-pre-gyp": "^0.6.26",
     "node-uuid": "~1.4.7",
     "nopt": "~3.0.6",
-    "npmlog": "~2.0.0"
+    "npmlog": "~2.0.3"
   },
-  "bundledDependencies": ["node-pre-gyp"],
+  "bundledDependencies": [
+    "node-pre-gyp"
+  ],
   "devDependencies": {
     "istanbul": "latest",
     "nodeunit": "~0.9.1"
