@@ -29,18 +29,18 @@
                     'PreprocessorDefinitions': [ '_WIN32_WINNT=0x0600', 'PN_NODEFINE_SSIZE_T' ]
                   }
                 },
-                "include_dirs+": [".", "<!(echo %BROOT%)/ship/mqm/include", "<!(echo %BROOT%)/appmsging/nodejs/node_modules/nan"],
+                "include_dirs+": [".", "<!(echo %BROOT%)/ship/mqm/include", "./node_modules/nan"],
                 "libraries": ["<!(echo %QPIDLIB%)"],
             }],
             ["OS=='linux'", {
                 "cflags_cc+": ["-Wall", "-Wno-comment", "-g"],
-                "include_dirs+": [".", "<!(echo $BROOT)/ship/opt/mqm/include", "<!(echo $BROOT)/appmsging/nodejs/node_modules/nan"],
-                "libraries": ["-lqpid-proton", "-L<!(echo $BROOT)/ship/opt/mqm/lib64", "-Wl,-rpath=\'$$ORIGIN\'"],
+                "include_dirs+": [".", "<!(echo $HOME)/.local/include", "./node_modules/nan"],
+                "libraries": ["-lqpid-proton", "-L<!(echo $HOME)/.local/lib", "-Wl,-rpath=\'$$ORIGIN\'"],
             }],
             ["OS=='mac'", {
                 "cflags_cc+": ["-Wall", "-Wno-comment", "-g"],
-                "include_dirs+": [".", "<!(echo $BROOT)/ship/opt/mqm/include", "<!(echo $BROOT)/appmsging/nodejs/node_modules/nan"],
-                "libraries": ["-lqpid-proton", "-L<!(echo $BROOT)/ship/opt/mqm/lib64", "-Wl,-install_name,@rpath/proton.node", "-Wl,-rpath,@loader_path/", "-Wl,-headerpad_max_install_names"],
+                "include_dirs+": [".", "<!(echo $HOME)/.local/include", "./node_modules/nan"],
+                "libraries": ["-lqpid-proton", "-L<!(echo $HOME)/.local/lib", "-Wl,-install_name,@rpath/proton.node", "-Wl,-rpath,@loader_path/", "-Wl,-headerpad_max_install_names"],
             }],
         ]
     },
@@ -50,7 +50,7 @@
       "dependencies": [ "<(module_name)" ],
       "copies": [
         {
-          "files": [ "<(PRODUCT_DIR)/<(module_name).node" ],
+          "files": [ "<(PRODUCT_DIR)/<(module_name).node", "<!(echo $HOME)/.local/lib/libqpid-proton.so.3" ],
           "destination": "<(module_path)"
         }
      ]
