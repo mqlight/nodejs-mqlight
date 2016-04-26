@@ -104,11 +104,7 @@ ProtonMessage::ProtonMessage() : ObjectWrap()
 
 ProtonMessage::~ProtonMessage()
 {
-  Proton::Entry("ProtonMessage::destructor", name);
-
   Free(this);
-
-  Proton::Exit("ProtonMessage::destructor", name, 0);
 }
 
 ProtonMessage::ProtonMessage(const ProtonMessage& that)
@@ -180,23 +176,16 @@ NAN_METHOD(ProtonMessage::New)
 
 void Free(ProtonMessage* msg)
 {
-  const char* name = msg ? msg->name : NULL;
-  Proton::Entry("ProtonMessage::Free", name);
-
   if (msg && msg->message) {
-    Proton::Entry("ProtonMessage::pn_message_free", name);
     pn_message_clear(msg->message);
     pn_message_free(msg->message);
     msg->message = NULL;
-    Proton::Exit("ProtonMessage::pn_message_free", name, 0);
   }
 
   if (msg && msg->linkAddr) {
     free(msg->linkAddr);
     msg->linkAddr = NULL;
   }
-
-  Proton::Exit("ProtonMessage::Free", NULL, 0);
 }
 
 NAN_METHOD(ProtonMessage::Destroy)

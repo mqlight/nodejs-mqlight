@@ -174,16 +174,9 @@ ProtonMessenger::ProtonMessenger(std::string name,
 
 ProtonMessenger::~ProtonMessenger()
 {
-  Proton::Entry("ProtonMessenger::destructor", NULL);
-
   if (messenger) {
-    const char* name = pn_messenger_name(messenger);
-    Proton::Entry("pn_messenger_free", name);
     pn_messenger_free(messenger);
-    Proton::Exit("pn_messenger_free", name, 0);
   }
-
-  Proton::Exit("ProtonMessenger::destructor", NULL, 0);
 }
 
 NAN_METHOD(ProtonMessenger::NewInstance)
