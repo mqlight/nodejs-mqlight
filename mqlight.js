@@ -1172,7 +1172,7 @@ var Client = function(service, id, securityOptions) {
             client._setState(STATE_STOPPED);
             client._invokeStartedCallbacks.call(client, err);
           } else {
-            setTimeout(function() {
+            client._serviceFunctionTimeout = setTimeout(function() {
               client._serviceFunction(serviceFunctionCallback);
             }, 5000);
           }
@@ -2205,6 +2205,13 @@ Client.prototype.stop = function(callback) {
     }
 
     client._setState(STATE_STOPPING);
+
+    if (client._serviceFunctionTimeout) {
+      // if we previously set a timeout to retry the serviceFunction, clear it.
+      clearTimeout(client._serviceFunctionTimeout);
+    }
+    client._serviceFunctionTimeout = null;
+
 
     // Only disconnect when all outstanding send operations are complete
     if (client._outstandingSends.length === 0) {
