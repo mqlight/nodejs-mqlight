@@ -1166,11 +1166,12 @@ var Client = function(service, id, securityOptions) {
       logger.entry('_serviceFunction', client.id);
       var serviceFunctionCallback = function(err, service) {
         if (err) {
-          client._setState(STATE_STOPPED);
-          client._invokeStartedCallbacks.call(client, err);
           // The service 'lookup' function returned an error. Wait a few
           // seconds and then try again (unless we're in a unit test)
-          if (process.env.NODE_ENV !== 'unittest') {
+          if (process.env.NODE_ENV === 'unittest') {
+            client._setState(STATE_STOPPED);
+            client._invokeStartedCallbacks.call(client, err);
+          } else {
             setTimeout(function() {
               client._serviceFunction(serviceFunctionCallback);
             }, 5000);
