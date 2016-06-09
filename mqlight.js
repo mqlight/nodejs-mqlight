@@ -1648,6 +1648,13 @@ var Client = function(service, id, securityOptions) {
         var connected = function() {
           logger.entry('Client._tryService.connected', _id);
 
+          if (!client._stream) {
+            logger.log('debug', _id,
+                       'client._stream is null');
+            logger.exit('Client._tryService.connected', _id, null);
+            return;
+          }
+
           if (connectUrl.protocol === 'amqps:') {
             // For secure connections, check that an authorization error didn't
             // occur.
