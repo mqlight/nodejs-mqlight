@@ -14,11 +14,24 @@ that goes to stderr when you run your application.
 ## Release notes
 
 ### 9.9.9999999999
+
+### 1.0.2016061711
+
+* Bugfix for issues around network retries of the http service lookup function
+
+### 1.0.2016051011
+
+* Bugfix ProtonMessage destructor causes fatal error during trace
+
+### 1.0.2016022416
+
 * Support for Node.js 5.x.x engine.
 * Bugfix client state not set to retrying after recoverable connection break
-* Bugfix re-subscribing to destination fails after calling client stop followed by client start
+* Bugfix re-subscribing to destination fails after calling client stop followed
+  by client start
 
 ### 1.0.2016010409
+
 * Bugfix to prevent connection aborted and/or SASL authentication failures
   if client was manually stopped and then started.
 
