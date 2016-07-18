@@ -47,7 +47,7 @@
   },
   "engineStrict": true,
   "engines": {
-    "node": "0.10.x || 0.12.x || 4.x.x || 5.x.x"
+    "node": "0.10.x || 0.12.x || 4.x.x || 5.x.x || 6.x.x"
   },
   "licenses": [
     {

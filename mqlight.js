@@ -26,7 +26,7 @@
  * configured by the value of the MQLIGHT_NODE_LOG environment
  * variable. The default is 'ffdc'.
  */
-GLOBAL.logger = require('./mqlight-log');
+global.logger = require('./mqlight-log');
 
 
 /**
@@ -35,8 +35,8 @@ GLOBAL.logger = require('./mqlight-log');
  * An ffdc can be generated programmatically by calling
  *   logger.ffdc()
  */
-exports.logger = GLOBAL.logger;
-var logger = GLOBAL.logger;
+exports.logger = global.logger;
+var logger = global.logger;
 
 var os = require('os');
 var util = require('util');
