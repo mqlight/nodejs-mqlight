@@ -17,7 +17,7 @@ before_install:
   - sudo apt-get install -qqy cmake g++-4.8 libssl-dev libsasl2-dev sasl2-bin
   - echo -e "machine github.ibm.com\n  login $CI_USER_TOKEN" >> ~/.netrc
   - git clone --depth=1 https://github.ibm.com/mqlight/qpid-proton.git ~/.local/src/qpid-proton
-  - cd ~/.local/src/qpid-proton && mkdir -p build && cd build && cmake -DNOBUILD_JAVA=TRUE -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=${HOME}/.local .. && cmake --build . --target install
+  - cd ~/.local/src/qpid-proton && mkdir -p build && cd build && cmake -DNOBUILD_JAVA=TRUE -DSSL_IMPL=none -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=${HOME}/.local .. && cmake --build . --target install
   - for F in $(find ~/.local/lib -maxdepth 1 -type l); do cp --remove-destination ~/.local/lib/$(readlink $F) $F; done
   - cd ${TRAVIS_BUILD_DIR}
   - echo "node-${TRAVIS_NODE_VERSION}-${TRAVIS_OS_NAME}"
