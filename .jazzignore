@@ -1,8 +1,0 @@
-### Jazz Ignore 0
-
-core.ignore= \
-             {.git} \
-             {build} \
-             {coverage} \
-             {node_modules} \
-             {proton}

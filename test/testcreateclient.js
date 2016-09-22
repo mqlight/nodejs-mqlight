@@ -501,15 +501,11 @@ module.exports.test_valid_ssl_options = function(test) {
     sslVerifyName: true
   },
   {
-    sslTrustCertificate: 'BadVerify',
-    sslVerifyName: false
-  },
-  {
     sslTrustCertificate: 'ValidCertificate',
     sslVerifyName: 2 > 1
   },
   {
-    sslTrustCertificate: 'BadVerify',
+    sslTrustCertificate: 'ValidCertificate',
     sslVerifyName: 1 > 2
   },
   {
@@ -524,7 +520,6 @@ module.exports.test_valid_ssl_options = function(test) {
   var validKeystoreFd = fs.openSync('ValidKeystore', 'w');
   var validKeyFd = fs.openSync('ValidKey', 'w');
   var validCertificateFd = fs.openSync('ValidCertificate', 'w');
-  var badVerifyFd = fs.openSync('BadVerify', 'w');
   var count = 0;
   var validSSLTest = function(options) {
     var opts = {
@@ -560,7 +555,6 @@ module.exports.test_valid_ssl_options = function(test) {
       fs.close(validKeystoreFd); fs.unlinkSync('ValidKeystore');
       fs.close(validKeyFd); fs.unlinkSync('ValidKey');
       fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
-      fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
     });
     client.start(function(err) {
       test.ok(!err);
@@ -571,7 +565,6 @@ module.exports.test_valid_ssl_options = function(test) {
         fs.close(validKeystoreFd); fs.unlinkSync('ValidKeystore');
         fs.close(validKeyFd); fs.unlinkSync('ValidKey');
         fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
-        fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
       } else {
         validSSLTest(testData[count]);
       }

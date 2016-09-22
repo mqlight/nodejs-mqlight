@@ -1,5 +1,2 @@
-build/*
-build64/*
-binding.gyp
-*.cpp
-*.hpp
+coverage
+.travis.yml

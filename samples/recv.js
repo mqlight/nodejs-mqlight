@@ -22,7 +22,7 @@
 
 var mqlight = require('mqlight');
 var nopt = require('nopt');
-var uuid = require('node-uuid');
+var uuid = require('uuid');
 var fs = require('fs');
 
 // parse the commandline arguments
@@ -243,7 +243,9 @@ client.on('message', function(data, delivery) {
 });
 client.on('malformed', function(data, delivery) {
   console.error('*** received malformed message (%d)', (++i));
-  console.error(data);
+  if (data) {
+    console.error(data);
+  }
   console.error(delivery);
 });
 
@@ -262,7 +264,7 @@ client.on('started', function() {
   // now subscribe to pattern for messages
   client.subscribe(pattern, share, options, function(err, pattern) {
     if (err) {
-      console.error('Problem with subscribe request: %s', err.message);
+      console.error('Problem with subscribe request: %s', err.toString());
       setImmediate(function() {
         process.exit(1);
       });

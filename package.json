@@ -1,6 +1,6 @@
 {
   "name": "mqlight",
-  "version": "1.0.2016071802",
+  "version": "2.0.2016092200",
   "description": "IBM MQ Light Client Module",
   "author": "IBM MQ Light <mqlight@uk.ibm.com>",
   "homepage": "https://developer.ibm.com/messaging/mq-light/",
@@ -18,36 +18,24 @@
     "responsive"
   ],
   "main": "mqlight.js",
-  "gypfile": true,
-  "binary": {
-    "module_name": "proton",
-    "module_path": "lib/{node_abi}-{platform}-{arch}",
-    "host": "https://developer.ibm.com/mqlight/",
-    "remote_path": "{name}/v{version}/{toolset}/",
-    "package_name": "{node_abi}-{platform}-{arch}.tar.gz"
-  },
   "bin": {
     "mqlight-debug": "./bin/mqlight-debug.js"
   },
+  "bundledDependencies": [ "amqp10", "amqp10-link-cache" ],
   "dependencies": {
-    "hashmap": "~2.0.5",
-    "moment": "~2.13.0",
-    "nan": "^2.2.1",
-    "node-pre-gyp": "^0.6.26",
-    "node-uuid": "~1.4.7",
+    "amqp10": "^3.2.5",
+    "amqp10-link-cache": "^1.0.1",
+    "moment": "~2.14.1",
     "nopt": "~3.0.6",
-    "npmlog": "~2.0.3"
+    "npmlog": "~2.0.4",
+    "uuid": "^2.0.2"
   },
-  "bundledDependencies": [
-    "node-pre-gyp"
-  ],
   "devDependencies": {
-    "istanbul": "latest",
-    "nodeunit": "~0.9.1"
-  },
-  "engineStrict": true,
-  "engines": {
-    "node": "0.10.x || 0.12.x || 4.x.x || 5.x.x || 6.x.x"
+    "bluebird": "^3.4.6",
+    "eslint": "^3.4.0",
+    "eslint-config-xo": "^0.15.4",
+    "istanbul": ">0.0.0",
+    "nodeunit": ">0.0.0"
   },
   "licenses": [
     {
@@ -56,7 +44,10 @@
     }
   ],
   "scripts": {
-    "install": "node-pre-gyp install --fallback-to-build",
-    "test": "node ./node_modules/istanbul/lib/cli.js cover ./node_modules/nodeunit/bin/nodeunit -- --config test/nodeunit.json test"
+    "lint": "node ./node_modules/.bin/eslint mqlight.js",
+    "test": "npm run lint && node ./node_modules/istanbul/lib/cli.js cover ./node_modules/nodeunit/bin/nodeunit -- --config test/nodeunit.json test"
+  },
+  "engines": {
+    "node": ">=4.0.0"
   }
 }

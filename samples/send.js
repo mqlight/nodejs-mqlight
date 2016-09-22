@@ -22,7 +22,7 @@
 
 var mqlight = require('mqlight');
 var nopt = require('nopt');
-var uuid = require('node-uuid');
+var uuid = require('uuid');
 var fs = require('fs');
 
 // parse the commandline arguments
@@ -252,7 +252,7 @@ client.on('started', function() {
       var options = { qos: mqlight.QOS_AT_LEAST_ONCE };
       var callback = function(err, topic, data, options) {
         if (err) {
-          console.error('**** Problem with send request: %s', err.message);
+          console.error('**** Problem with send request: %s', err.toString());
           setImmediate(function() {
             client.stop(function() {
               process.exit(1);
@@ -268,7 +268,7 @@ client.on('started', function() {
         if (messages.length == i) {
           client.stop(function(err) {
             if (err) {
-              console.error('Problem with stopping client: %s', err.message);
+              console.error('Problem with stopping client: %s', err.toString());
               process.exit(1);
             } else {
               console.log('stopping client');

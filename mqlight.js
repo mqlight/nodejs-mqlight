@@ -20,14 +20,12 @@
 /* jshint -W083,-W097 */
 'use strict';
 
-
 /**
  * Set up logging (to stderr by default). The level of output is
  * configured by the value of the MQLIGHT_NODE_LOG environment
  * variable. The default is 'ffdc'.
  */
 global.logger = require('./mqlight-log');
-
 
 /**
  * The logging level can be set programmatically by calling
@@ -40,53 +38,43 @@ var logger = global.logger;
 
 var os = require('os');
 var util = require('util');
-var _system = util.format('node-v%s-%s-%s',
-                          process.versions.modules,
-                          os.platform(),
-                          process.arch);
-if (process.env.NODE_ENV === 'unittest') {
-  var proton = require('./test/stubs/stubproton.js').createProtonStub();
-  Object.defineProperty(exports, 'proton', {
-    set: function(value) {
-      proton = value;
-    },
-    get: function() {
-      return proton;
-    }
-  });
-} else {
-  try {
-    var proton = require('./lib/' + _system + '/proton');
-  } catch (_) {
-    if ('MODULE_NOT_FOUND' === _.code) {
-      throw new Error('mqlight.js is not currently supported on ' + _system);
-    }
-    throw _;
-  }
-}
 
 var EventEmitter = require('events').EventEmitter;
-var uuid = require('node-uuid');
+var uuid = require('uuid');
 var url = require('url');
 var fs = require('fs');
 var http = require('http');
 var https = require('https');
-var net = require('net');
-var tls = require('tls');
+
+var AMQP = require('amqp10');
+// XXX: !!horrible monkey patching alert!!
+var frames = require('amqp10/lib/frames.js');
+var Link = require('amqp10/lib/link.js');
+Link.prototype._sendDetach = function() {
+  // no-op
+};
+Link.prototype._sendDetach2 = function(closed) {
+  var detachFrame = new frames.DetachFrame({
+    handle: this.handle,
+    channel: this.session.channel,
+    closed: Boolean(closed)
+  });
+
+  this.session.connection.sendFrame(detachFrame);
+};
+var linkCache = require('amqp10-link-cache');
+AMQP.use(linkCache({ttl: Infinity}));
 
 var invalidClientIdRegex = /[^A-Za-z0-9%\/\._]+/;
 var pemCertRegex = new RegExp('-----BEGIN CERTIFICATE-----(.|[\r\n])*?' +
                               '-----END CERTIFICATE-----', 'gm');
-
-var HashMap = require('hashmap').HashMap;
-
 
 /**
  * List of active clients to prevent duplicates, in the started state, with
  * the same id existing.
  */
 var activeClientList = {
-  clients: new HashMap(),
+  clients: new Map(),
   add: function(client) {
     logger.entry('activeClientList.add', client.id);
     this.clients.set(client.id, client);
@@ -94,7 +82,7 @@ var activeClientList = {
   },
   remove: function(id) {
     logger.entry('activeClientList.remove', id);
-    this.clients.remove(id);
+    this.clients.delete(id);
     logger.exit('activeClientList.remove', id, null);
   },
   get: function(id) {
@@ -111,78 +99,33 @@ var activeClientList = {
   }
 };
 
-
 /** @const {number} */
 exports.QOS_AT_MOST_ONCE = 0;
 
-
 /** @const {number} */
 exports.QOS_AT_LEAST_ONCE = 1;
-
-
-/** Proton Messenger status values (returned from ProtonMessenger.Status()) */
-
-
-/** The status unknown. */
-var PN_STATUS_UNKNOWN = 0;
-
-
-/** The message is in flight. */
-var PN_STATUS_PENDING = 1;
-
-
-/** The message was accepted. */
-var PN_STATUS_ACCEPTED = 2;
-
-
-/** The message was rejected. */
-var PN_STATUS_REJECTED = 3;
-
-
-/** The message was released. */
-var PN_STATUS_RELEASED = 4;
-
-
-/** The message was modified. */
-var PN_STATUS_MODIFIED = 5;
-
-
-/** The message was aborted. */
-var PN_STATUS_ABORTED = 6;
-
-
-/** The remote party has settled the message. */
-var PN_STATUS_SETTLED = 7;
-
 
 /** The connection retry interval in milliseconds. */
 var CONNECT_RETRY_INTERVAL = 1;
 if (process.env.NODE_ENV === 'unittest') CONNECT_RETRY_INTERVAL = 0;
 
-
 /** Client state: connectivity with the server re-established */
 var STATE_RESTARTED = 'restarted';
-
 
 /** Client state: trying to re-establish connectivity with the server */
 var STATE_RETRYING = 'retrying';
 
-
 /** Client state: ready to do messaging */
 var STATE_STARTED = 'started';
-
 
 /** Client state: becoming ready to do messaging */
 var STATE_STARTING = 'starting';
 
-
 /** Client state: client disconnected from server, not ready for messaging */
 var STATE_STOPPED = 'stopped';
 
-
 /** Client state: in the process of transitioning to STATE_STOPPED */
 var STATE_STOPPING = 'stopping';
-
 
 /**
  * Generic helper method to use for Error sub-typing
@@ -210,7 +153,6 @@ function setupError(obj, name, message) {
   }
 }
 
-
 /**
  * Generic helper method to map a named Error object into the correct
  * sub-type so that instanceof checking works as expected.
@@ -233,29 +175,6 @@ function getNamedError(obj) {
   return obj;
 }
 
-
-/**
- * Generic helper method to determine if we should automatically reconnect
- * for the given type of error.
- *
- * @param {Object}
- *          err - the Error object to check.
- * @return {Object} true if we should reconnect, false otherwise.
- */
-function shouldReconnect(err) {
-  // exclude all programming errors
-  return (!(err instanceof TypeError) &&
-          !(err instanceof InvalidArgumentError) &&
-          !(err instanceof NotPermittedError) &&
-          !(err instanceof ReplacedError) &&
-          !(err instanceof StoppedError) &&
-          !(err instanceof SubscribedError) &&
-          !(err instanceof UnsubscribedError)
-         );
-}
-
-
-
 /**
  * A subtype of Error defined by the MQ Light client. It is considered a
  * programming error. The underlying cause for this error are the parameter
@@ -272,8 +191,6 @@ exports.InvalidArgumentError = function(message) {
 };
 var InvalidArgumentError = exports.InvalidArgumentError;
 util.inherits(InvalidArgumentError, Error);
-
-
 
 /**
  * This is a subtype of Error defined by the MQ Light client. It is considered
@@ -293,8 +210,6 @@ exports.NetworkError = function(message) {
 var NetworkError = exports.NetworkError;
 util.inherits(NetworkError, Error);
 
-
-
 /**
  * This is a subtype of Error defined by the MQ Light client. It is considered
  * an operational error. NotPermittedError is thrown to indicate that a
@@ -312,8 +227,6 @@ exports.NotPermittedError = function(message) {
 };
 var NotPermittedError = exports.NotPermittedError;
 util.inherits(NotPermittedError, Error);
-
-
 
 /**
  * This is a subtype of Error defined by the MQ Light client. It is considered
@@ -333,8 +246,6 @@ exports.ReplacedError = function(message) {
 var ReplacedError = exports.ReplacedError;
 util.inherits(ReplacedError, Error);
 
-
-
 /**
  * Special type of ReplacedError thrown when an active Client instance is
  * replaced by the application starting another Client instance with the same
@@ -350,8 +261,6 @@ var LocalReplacedError = function(id) {
                              'second Client instance with id ' + id]);
 };
 util.inherits(LocalReplacedError, ReplacedError);
-
-
 
 /**
  * This is a subtype of Error defined by the MQ Light client. It is considered
@@ -369,8 +278,6 @@ exports.SecurityError = function(message) {
 };
 var SecurityError = exports.SecurityError;
 util.inherits(SecurityError, Error);
-
-
 
 /**
  * This is a subtype of Error defined by the MQ Light client.  It is
@@ -393,8 +300,6 @@ exports.StoppedError = function(message) {
 var StoppedError = exports.StoppedError;
 util.inherits(StoppedError, Error);
 
-
-
 /**
  * This is a subtype of Error defined by the MQ Light client.  It is considered
  * a programming error.  SubscribedError is thrown from the
@@ -412,8 +317,6 @@ exports.SubscribedError = function(message) {
 };
 var SubscribedError = exports.SubscribedError;
 util.inherits(SubscribedError, Error);
-
-
 
 /**
  * This is a subtype of Error defined by the MQ Light client.  It is considered
@@ -433,129 +336,25 @@ exports.UnsubscribedError = function(message) {
 var UnsubscribedError = exports.UnsubscribedError;
 util.inherits(UnsubscribedError, Error);
 
-
 /**
- * Creates and returns a new instance of the Client object.
- * <p>
- * See README.md for more details.
+ * Generic helper method to determine if we should automatically reconnect
+ * for the given type of error.
  *
- * @param {Object}   options - properties that define the
- *                             characteristics of the client.
- * @param {Function} callback - (optional) callback, invoked when the client has
- *                              attained 'started' or 'stopped' state.
- * @return {Object} A new Client object.
- * @this Client
+ * @param {Object}
+ *          err - the Error object to check.
+ * @return {Object} true if we should reconnect, false otherwise.
  */
-exports.createClient = function(options, callback) {
-  logger.entry('createClient', logger.NO_CLIENT_ID);
-
-  var err;
-
-  if (!options || (typeof options !== 'object')) {
-    err = new TypeError('options object missing');
-    logger.throw('createClient', logger.NO_CLIENT_ID, err);
-    throw err;
-  }
-
-  if (callback && (typeof callback !== 'function')) {
-    err = new TypeError('Callback argument must be a function');
-    logger.throw('createClient', logger.NO_CLIENT_ID, err);
-    throw err;
-  }
-
-  var securityOptions = {
-    propertyUser: options.user,
-    propertyPassword: options.password,
-    urlUser: undefined,
-    urlPassword: undefined,
-    sslKeystore: options.sslKeystore,
-    sslKeystorePassphrase: options.sslKeystorePassphrase,
-    sslClientCertificate: options.sslClientCertificate,
-    sslClientKey: options.sslClientKey,
-    sslClientKeyPassphrase: options.sslClientKeyPassphrase,
-    sslTrustCertificate: options.sslTrustCertificate,
-    sslVerifyName: (typeof options.sslVerifyName === 'undefined') ? true :
-        options.sslVerifyName,
-    toString: function() {
-      return '[\n' +
-          ' propertyUser: ' + this.propertyUser + '\n' +
-          ' propertyPassword: ' +
-          (this.propertyPassword ? '********' : undefined) + '\n' +
-          ' propertyUser: ' + this.urlUser + '\n' +
-          ' urlPassword: ' + (this.urlPassword ? '********' : undefined) +
-          '\n' +
-          ' sslKeystore: ' + this.sslKeystore + '\n' +
-          ' sslKeystorePassphrase: ' +
-          (this.sslKeystorePassphrase ? '********' : undefined) + '\n' +
-          ' sslClientCertificate: ' + this.sslClientCertificate + '\n' +
-          ' sslClientKey: ' + this.sslClientKey + '\n' +
-          ' sslClientKeyPassphrase: ' +
-          (this.sslClientKeyPassphrase ? '********' : undefined) + '\n' +
-          ' sslTrustCertificate: ' + this.sslTrustCertificate + '\n' +
-          ' sslVerifyName: ' + this.sslVerifyName + '\n' + ']';
-    }
-  };
-  var client = new Client(options.service, options.id, securityOptions);
-
-  process.setMaxListeners(0);
-  process.once('exit', function() {
-    logger.entry('createClient.on.exit', logger.NO_CLIENT_ID);
-
-    if (client && client.state === STATE_STARTED) {
-      try {
-        client._messenger.send(client._stream);
-        client.stop();
-      } catch (err) {
-        logger.caught('createClient.on.exit', client.id, err);
-      }
-    }
-
-    logger.exit('createClient.on.exit', logger.NO_CLIENT_ID, null);
-  });
-
-  // Check that the id for this instance is not already in use. If it is then
-  // we need to stop the active instance before starting
-  if (activeClientList.has(client.id)) {
-    logger.log('debug', client.id,
-        'stopping previously active client with same client id');
-    var previousActiveClient = activeClientList.get(client.id);
-    activeClientList.add(client);
-    previousActiveClient.stop(function() {
-      logger.log('debug', client.id,
-          'stopped previously active client with same client id');
-      var err = new LocalReplacedError(client.id);
-      var error = getNamedError(err);
-      logger.log('emit', previousActiveClient.id, 'error', error);
-      previousActiveClient.emit('error', error);
-      if (callback) {
-        client._queuedStartCallbacks.push({
-          callback: callback,
-          create: true
-        });
-        logger.log('debug', client.id, 'callback function queued');
-      }
-      process.nextTick(function() {
-        client._performConnect(true, false);
-      });
-    });
-  } else {
-    activeClientList.add(client);
-    if (callback) {
-      client._queuedStartCallbacks.push({
-        callback: callback,
-        create: true
-      });
-      logger.log('debug', client.id, 'callback function queued');
-    }
-    process.nextTick(function() {
-      client._performConnect(true, false);
-    });
-  }
-
-  logger.exit('createClient', client.id, client);
-  return client;
-};
-
+function shouldReconnect(err) {
+  // exclude all programming errors
+  return (!(err instanceof TypeError) &&
+          !(err instanceof InvalidArgumentError) &&
+          !(err instanceof NotPermittedError) &&
+          !(err instanceof ReplacedError) &&
+          !(err instanceof StoppedError) &&
+          !(err instanceof SubscribedError) &&
+          !(err instanceof UnsubscribedError)
+         );
+}
 
 /**
  * Function to take a single FILE URL and using the JSON retrieved from it to
@@ -584,7 +383,7 @@ var getFileServiceFunction = function(fileUrl) {
 
   var filePath = fileUrl;
   // special case for Windows drive letters in file URIs, trim the leading /
-  if (os.platform() === 'win32' && filePath.match('^\/[a-zA-Z]:\/')) {
+  if (os.platform() === 'win32' && filePath.match('^/[a-zA-Z]:/')) {
     filePath = filePath.substring(1);
   }
 
@@ -592,7 +391,7 @@ var getFileServiceFunction = function(fileUrl) {
     logger.entry('fileServiceFunction', logger.NO_CLIENT_ID);
     logger.log('parms', logger.NO_CLIENT_ID, 'filePath:', filePath);
 
-    fs.readFile(filePath, { encoding: 'utf8' }, function(err, data) {
+    fs.readFile(filePath, {encoding: 'utf8'}, function(err, data) {
       logger.entry('fileServiceFunction.readFile.callback',
                    logger.NO_CLIENT_ID);
       logger.log('parms', logger.NO_CLIENT_ID, 'err:', err);
@@ -640,7 +439,6 @@ var getFileServiceFunction = function(fileUrl) {
               fileServiceFunction);
   return fileServiceFunction;
 };
-
 
 /**
  * Function to take a single HTTP URL and using the JSON retrieved from it to
@@ -711,7 +509,7 @@ var getHttpServiceFunction = function(serviceUrl) {
           var message = 'http request to ' + serviceHref + ' failed with a ' +
                         'status code of ' + res.statusCode;
           if (data) message += ': ' + data;
-          err = new NetworkError(message);
+          var err = new NetworkError(message);
           logger.log('error', logger.NO_CLIENT_ID, err);
           logger.entry('httpServiceFunction.callback', logger.NO_CLIENT_ID);
           logger.log('parms', logger.NO_CLIENT_ID, 'err:', err);
@@ -755,7 +553,489 @@ var getHttpServiceFunction = function(serviceUrl) {
   return httpServiceFunction;
 };
 
+/**
+ * @param {function(object)}
+ *          stopProcessingCallback - callback to perform post stop processing.
+ * @param {client} client - the client object to stop the messenger for.
+ * @param {callback}
+ *          callback - passed an error object if something goes wrong.
+ */
 
+/**
+ * Stops the messenger.  The messenger stop function merely requests it to stop,
+ * so we need to keep checking until it is actually stopped. Then any post
+ * stop processing can be performed.
+ *
+ * @param {client} client - the client object to stop the messenger for.
+ * @param {stopProcessingCallback}
+ *          stopProcessingCallback - Function to perform the required post stop
+ *          processing.
+ * @param {callback}
+ *          callback - (optional) The application callback to be notified of
+ *          errors and completion (passed to the stopProcessingCallback).
+ */
+var stopMessenger = function(client, stopProcessingCallback, callback) {
+  logger.entry('stopMessenger', client.id);
+
+  // If messenger available then request it to stop
+  // (otherwise it must have already been stopped)
+  try {
+    if (client._messenger) {
+      client._messenger.disconnect().then(function() {
+        stopProcessingCallback(client, callback);
+      });
+    }
+  } catch (err) {
+    console.error(util.inspect(err, true));
+  }
+
+  logger.exit('stopMessenger', client.id);
+};
+
+/**
+* Called on reconnect or first connect to process any actions that may have
+* been queued.
+*
+* @param {Error} err if an error occurred in the performConnect function that
+* calls this callback.
+*/
+var processQueuedActions = function(err) {
+  // this set to the appropriate client via apply call in performConnect
+  var client = this;
+  if (typeof client === 'undefined'/* || client.constructor !== Client*/) {
+    logger.entry('processQueuedActions', 'client was not set');
+    logger.exit('processQueuedActions', 'client not set returning', null);
+    return;
+  }
+  logger.entry('processQueuedActions', client.id);
+  logger.log('parms', client.id, 'err:', err);
+  logger.log('data', client.id, 'client.state:', client.state);
+
+  if (!err) {
+    var performSend = function() {
+      logger.entry('performSend', client.id);
+      logger.log('data', client.id, 'client._queuedSends',
+                 client._queuedSends);
+      while (client._queuedSends.length > 0 &&
+              client.state === STATE_STARTED) {
+        var remaining = client._queuedSends.length;
+        var msg = client._queuedSends.shift();
+        client.send(msg.topic, msg.data, msg.options, msg.callback);
+        if (client._queuedSends.length >= remaining) {
+          // Calling client.send can cause messages to be added back into
+          // _queuedSends, if the network connection is broken.  Check that the
+          // size of the array is decreasing to avoid looping forever...
+          break;
+        }
+      }
+
+      logger.exit('performSend', client.id, null);
+    };
+
+    var performUnsub = function() {
+      logger.entry('performUnsub', client.id);
+
+      if (client._queuedUnsubscribes.length > 0 &&
+          client.state === STATE_STARTED) {
+        var rm = client._queuedUnsubscribes.shift();
+        logger.log('data', client.id, 'rm:', rm);
+        if (rm.noop) {
+          // no-op, so just trigger the callback without actually unsubscribing
+          if (rm.callback) {
+            logger.entry('performUnsub.callback', client.id);
+            rm.callback.apply(client, [null, rm.topicPattern, rm.share]);
+            logger.exit('performUnsub.callback', client.id, null);
+          }
+          setImmediate(function() {
+            performUnsub.apply(client);
+          });
+        } else {
+          client.unsubscribe(rm.topicPattern, rm.share, rm.options,
+              function(err, topicPattern, share) {
+                if (rm.callback) {
+                  logger.entry('performUnsub.callback', client.id);
+                  rm.callback.apply(client, [err, topicPattern, share]);
+                  logger.exit('performUnsub.callback', client.id, null);
+                }
+                setImmediate(function() {
+                  performUnsub.apply(client);
+                });
+              }
+          );
+        }
+      } else {
+        performSend.apply(client);
+      }
+
+      logger.exit('performUnsub', client.id, null);
+    };
+
+    var performSub = function() {
+      logger.entry('performSub', client.id);
+
+      if (client._queuedSubscriptions.length > 0 &&
+          client.state === STATE_STARTED) {
+        var sub = client._queuedSubscriptions.shift();
+        logger.log('data', client.id, 'sub:', sub);
+        if (sub.noop) {
+          // no-op, so just trigger the callback without actually subscribing
+          if (sub.callback) {
+            process.nextTick(function() {
+              logger.entry('performSub.callback', client.id);
+              logger.log('parms', client.id, 'err:', err, ', topicPattern:',
+                         sub.topicPattern, ', originalShareValue:', sub.share);
+              sub.callback.apply(client,
+                  [err, sub.topicPattern, sub.originalShareValue]);
+              logger.exit('performSub.callback', client.id, null);
+            });
+          }
+          setImmediate(function() {
+            performSub.apply(client);
+          });
+        } else {
+          client.subscribe(sub.topicPattern, sub.share, sub.options,
+              function(err, topicPattern, share) {
+                if (sub.callback) {
+                  process.nextTick(function() {
+                    logger.entry('performSub.callback',
+                                 client.id);
+                    logger.log('parms', client.id, 'err:', err,
+                               ', topicPattern:', topicPattern,
+                               ', share:', share);
+                    sub.callback.apply(client,
+                        [err, topicPattern, share]);
+                    logger.exit('performSub.callback',
+                                client.id, null);
+                  });
+                }
+                setImmediate(function() {
+                  performSub.apply(client);
+                });
+              }
+          );
+        }
+      } else {
+        performUnsub.apply(client);
+      }
+
+      logger.exit('performSub', client.id, null);
+    };
+
+    performSub();
+  }
+  logger.exit('processQueuedActions', client.id, null);
+};
+
+/**
+ * Reconnects the client to the MQ Light service, implicitly closing any
+ * subscriptions that the client has open. The 'restarted' event will be
+ * emitted once the client has reconnected.
+ *
+ * @param {client} client - the client object to reconnect
+ * @return {Object} The instance of client that it is invoked on - allowing
+ *          for chaining of other method calls on the client object.
+ */
+var reconnect = function(client) {
+  if (typeof client === 'undefined'/* || client.constructor !== Client*/) {
+    logger.entry('Client.reconnect', logger.NO_CLIENT_ID);
+    logger.log('parms', logger.NO_CLIENT_ID, 'client:', client);
+    logger.exit('Client.reconnect', logger.NO_CLIENT_ID, undefined);
+    return;
+  }
+  logger.entry('Client.reconnect', client.id);
+  if (client.state !== STATE_STARTED) {
+    if (client.isStopped()) {
+      logger.exit('Client.reconnect', client.id, null);
+      return;
+    } else if (client.state === STATE_RETRYING) {
+      logger.exit('Client.reconnect', client.id, client);
+      return client;
+    }
+  }
+  client._setState(STATE_RETRYING);
+
+  setImmediate(function() {
+    // stop the messenger to free the object then attempt a reconnect
+    stopMessenger(client, function(client) {
+      logger.entry('Client.reconnect.stopProcessing', client.id);
+
+      // clear the subscriptions list, if the cause of the reconnect happens
+      // during check for messages we need a 0 length so it will check once
+      // reconnected.
+      logger.log('data', client.id, 'client._subscriptions:',
+              client._subscriptions);
+      while (client._subscriptions.length > 0) {
+        client._queuedSubscriptions.push(client._subscriptions.shift());
+      }
+      // also clear any left over outstanding sends
+      while (client._outstandingSends.length > 0) {
+        client._outstandingSends.shift();
+      }
+      client._queuedStartCallbacks.push({
+        callback: processQueuedActions,
+        create: false
+      });
+      client._performConnect(false, true);
+
+      logger.exit('Client.reconnect.stopProcessing', client.id, null);
+    });
+  });
+
+  logger.exit('Client.reconnect', client.id, client);
+  return client;
+};
+
+var processMessage = function(client, receiver, protonMsg) {
+  logger.entryLevel('entry_often', 'processMessage', client.id);
+  Object.defineProperty(protonMsg, 'connectionId', {
+    value: client._connectionId
+  });
+
+  // if body is a JSON'ified object, try to parse it back to a js obj
+  var data;
+  var err;
+  if (protonMsg.properties.contentType === 'application/json') {
+    try {
+      data = JSON.parse(protonMsg.body);
+    } catch (_) {
+      logger.caughtLevel('entry_often', 'processMessage', client.id, _);
+      console.warn(_);
+    }
+  } else {
+    data = protonMsg.body;
+  }
+
+  var topic = protonMsg.properties.to;
+  var prefixMatch = topic.match('^amqp[s]?://');
+  if (prefixMatch) {
+    topic = topic.slice(prefixMatch[0].length);
+    topic = topic.slice(topic.indexOf('/') + 1);
+  }
+  var autoConfirm = true;
+  var qos = exports.QOS_AT_MOST_ONCE;
+  var matchedSubs = client._subscriptions.filter(function(el) {
+    // 1 added to length to account for the / we add
+    var addressNoService = el.address.slice(client._getService().length + 1);
+    // possible to have 2 matches work out whether this is
+    // for a share or private topic
+    var linkAddress;
+    if (receiver.name.indexOf('private:') === 0 && !el.share) {
+      // slice off 'private:' prefix
+      linkAddress = receiver.name.slice(8);
+    } else if (receiver.name.indexOf('share:') === 0 && el.share) {
+      // starting after the share: look for the next : denoting the end
+      // of the share name and get everything past that
+      linkAddress = receiver.name.slice(receiver.name.indexOf(':', 7) + 1);
+    }
+    return (addressNoService === linkAddress);
+  });
+  // should only ever be one entry in matchedSubs
+  if (matchedSubs.length > 1) {
+    err = new Error('received message matched more than one ' +
+        'subscription');
+    logger.ffdc('processMessage', 'ffdc003', client, err);
+  }
+  var subscription = matchedSubs[0];
+  if (typeof subscription === 'undefined') {
+    // ideally we shouldn't get here, but it can happen in a timing
+    // window if we had received a message from a subscription we've
+    // subsequently unsubscribed from
+    logger.log('debug', client.id, 'No subscription matched message: ' +
+        data + ' going to address: ' + protonMsg.properties.to);
+    protonMsg = null;
+    return;
+  }
+
+  qos = subscription.qos;
+  if (qos === exports.QOS_AT_LEAST_ONCE) {
+    autoConfirm = subscription.autoConfirm;
+  }
+  ++subscription.unconfirmed;
+
+  var delivery = {
+    message: {
+      topic: topic
+    }
+  };
+
+  if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
+    var deliveryConfirmed = false;
+    delivery.message.confirmDelivery = function(callback) {
+      logger.entry('message.confirmDelivery', client.id);
+      logger.log('data', client.id, 'delivery:', delivery);
+
+      var err;
+      if (client.isStopped()) {
+        err = new NetworkError('not started');
+        logger.throw('message.confirmDelivery', client.id, err);
+        throw err;
+      }
+
+      if (callback && (typeof callback !== 'function')) {
+        err = new TypeError('Callback must be a function');
+        logger.throw('message.confirmDelivery', client.id, err);
+        throw err;
+      }
+
+      logger.log('data', client.id, 'deliveryConfirmed:', deliveryConfirmed);
+
+      if (!deliveryConfirmed && protonMsg) {
+        // also throw NetworkError if the client has disconnected at some point
+        // since this particular message was received
+        if (protonMsg.connectionId !== client._connectionId) {
+          err = new NetworkError('client has reconnected since this ' +
+                                 'message was received');
+          logger.throw('message.confirmDelivery', client.id, err);
+          throw err;
+        }
+        deliveryConfirmed = true;
+        receiver.accept(protonMsg);
+        if (callback) {
+          // FIXME: we shouldn't really have a callback at all here...
+          //        and if we do, it should at least track the 'sending' of the
+          //        settlement
+          process.nextTick(function() {
+            logger.entry('message.confirmDelivery.callback', client.id);
+            callback.apply(client);
+            logger.exit('message.confirmDelivery.callback', client.id,
+                        null);
+          });
+        }
+      }
+      logger.exit('message.confirmDelivery', client.id, null);
+    };
+  }
+
+  var linkAddress = receiver.name;
+  if (linkAddress) {
+    delivery.destination = {};
+    var link = linkAddress;
+    if (link.indexOf('share:') === 0) {
+      // remove 'share:' prefix from link name
+      link = link.substring(6, linkAddress.length);
+      // extract share name and add to delivery information
+      delivery.destination.share = link.substring(0, link.indexOf(':'));
+    }
+    // extract topicPattern and add to delivery information
+    delivery.destination.topicPattern =
+        link.substring(link.indexOf(':') + 1, link.length);
+  }
+  if (protonMsg.header.ttl > 0) {
+    delivery.message.ttl = protonMsg.ttl;
+  }
+
+  if (protonMsg.properties.applicationProperties) {
+    delivery.message.properties = protonMsg.properties;
+  }
+
+  var da = protonMsg.deliveryAnnotations;
+  var malformed = {};
+  if (da && 'x-opt-message-malformed-condition' in da) {
+    malformed = {
+      condition: da['x-opt-message-malformed-condition'],
+      description: da['x-opt-message-malformed-description'],
+      MQMD: {
+        CodedCharSetId:
+            Number(da['x-opt-message-malformed-MQMD.CodedCharSetId']),
+        Format: da['x-opt-message-malformed-MQMD.Format']
+      }
+    };
+  }
+  if (malformed.condition) {
+    if (client.listeners('malformed').length > 0) {
+      delivery.malformed = malformed;
+      logger.log('emit', client.id,
+          'malformed', protonMsg.body, delivery);
+      client.emit('malformed', protonMsg.body, delivery);
+    } else {
+      err = new Error('No listener for "malformed" event.');
+      logger.throwLevel('exit_often', 'processMessage', client.id, err);
+      throw err;
+    }
+  } else {
+    logger.log('emit', client.id, 'message', delivery);
+    try {
+      client.emit('message', data, delivery);
+    } catch (err) {
+      logger.caughtLevel('entry_often', 'processMessage',
+                               client.id, err);
+      logger.log('emit', client.id, 'error', err);
+      client.emit('error', err);
+    }
+  }
+
+  if (client.isStopped()) {
+    logger.log('debug', client.id,
+        'client is stopped so not accepting or settling message');
+  } else {
+    if (qos === exports.QOS_AT_MOST_ONCE) {
+      // XXX: is this needed/correct any more?
+      receiver.accept(protonMsg);
+    }
+    if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
+      receiver.accept(protonMsg);
+    }
+  }
+  logger.exitLevel('exit_often', 'processMessage', client.id, null);
+};
+
+var lookupError = function(err) {
+  if (/ECONNREFUSED/.test(err.code) ||
+      err instanceof AMQP.Errors.DisconnectedError) {
+    var msg = 'CONNECTION ERROR: The remote computer refused ' +
+      'the network connection. ';
+    if (err && err.message) {
+      msg += err.message;
+    }
+    err = new NetworkError(msg);
+  } else if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(err.code) ||
+             /SELF_SIGNED_CERT_IN_CHAIN/.test(err.code)) {
+    // Convert DEPTH_ZERO_SELF_SIGNED_CERT or SELF_SIGNED_CERT_IN_CHAIN
+    // into a clearer error message.
+    err = new SecurityError('SSL Failure: certificate verify failed');
+  } else if (/CERT_HAS_EXPIRED/.test(err.code)) {
+    // Convert CERT_HAS_EXPIRED into a clearer error message.
+    err = new SecurityError('SSL Failure: certificate verify failed ' +
+                            '- certificate has expired');
+  } else if (/Hostname\/IP doesn't match certificate's altnames/.test(
+                 err)) {
+    err = new SecurityError(err);
+  } else if (/mac verify failure/.test(err)) {
+    err = new SecurityError('SSL Failure: ' + err +
+        ' (likely due to a keystore access failure)');
+  } else if (/wrong tag/.test(err)) {
+    err = new SecurityError('SSL Failure: ' + err +
+        ' (likely due to the specified keystore being invalid)');
+  } else if (/bad decrypt/.test(err)) {
+    err = new SecurityError('SSL Failure: ' + err +
+        ' (likely due to the specified passphrase being wrong)');
+  } else if (/no start line/.test(err)) {
+    err = new SecurityError('SSL Failure: ' + err +
+        ' (likely due to an invalid certificate PEM file being ' +
+        'specified)');
+  } else if (err instanceof AMQP.Errors.AuthenticationError) {
+    err = new SecurityError('sasl authentication failed');
+  } else if (err.condition === 'amqp:precondition-failed' ||
+             err.condition === 'amqp:not-allowed' ||
+             err.condition === 'amqp:link:detach-forced' ||
+             err.condition === 'amqp:link:message-size-exceeded' ||
+             err.condition === 'amqp:not-implemented') {
+    err = new NotPermittedError(err.description);
+  } else if (err.condition === 'amqp:unauthorized-access') {
+    err = new SecurityError(err.description);
+  } else if (err.condition === 'amqp:link:stolen') {
+    err = new ReplacedError(err.description);
+  }
+  return err;
+};
+
+if (process.env.NODE_ENV === 'unittest') {
+  /**
+   * Export for unittest purposes.
+   */
+  exports.processMessage = processMessage;
+  exports.reconnect = reconnect;
+}
 
 /**
  * Represents an MQ Light client instance.
@@ -828,7 +1108,6 @@ var Client = function(service, id, securityOptions) {
     }
   });
 
-
   /**
    * @return {String} The identifier associated with the client. This will
    *         either be: a) the identifier supplied as the id property of the
@@ -842,7 +1121,6 @@ var Client = function(service, id, securityOptions) {
     }
   });
 
-
   /**
    * @return {String} The current state of the client - can will be one of the
    *         following string values: 'started', 'starting', 'stopped',
@@ -855,7 +1133,6 @@ var Client = function(service, id, securityOptions) {
     }
   });
 
-
   logger.entry('Client.constructor', logger.NO_CLIENT_ID);
   logger.log('parms', logger.NO_CLIENT_ID, 'service:',
              String(service).replace(/:[^\/:]+@/g, ':********@'));
@@ -865,10 +1142,11 @@ var Client = function(service, id, securityOptions) {
 
   EventEmitter.call(this);
 
-  var err, msg;
+  var msg;
+  var err;
 
   // Ensure the service is an Array or Function
-  var serviceList, serviceFunction;
+  var serviceFunction;
   if (service instanceof Function) {
     serviceFunction = service;
   } else if (typeof service === 'string') {
@@ -878,7 +1156,7 @@ var Client = function(service, id, securityOptions) {
     } else if (serviceUrl.protocol === 'file:') {
       if (serviceUrl.host.length > 0 && serviceUrl.host !== 'localhost') {
         msg = 'service contains unsupported file URI of ' + service +
-            ', only file:///path or file://localhost/path are supported.';
+              ', only file:///path or file://localhost/path are supported.';
         err = new InvalidArgumentError(msg);
         logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
         throw err;
@@ -929,12 +1207,13 @@ var Client = function(service, id, securityOptions) {
      * appropriate)
     */
     var serviceList = [];
-    var authUser, authPassword;
+    var authUser;
+    var authPassword;
+    var msg;
 
     for (var i = 0; i < inputServiceList.length; i++) {
       var serviceUrl = url.parse(inputServiceList[i]);
       var protocol = serviceUrl.protocol;
-      var msg;
 
       // check for auth details
       var auth = serviceUrl.auth;
@@ -945,17 +1224,17 @@ var Client = function(service, id, securityOptions) {
           authUser = String(auth).slice(0, auth.indexOf(':'));
           authPassword = String(auth).slice(auth.indexOf(':') + 1);
         } else {
-          msg = "URLs supplied via the 'service' property must specify both a" +
-                ' user name and a password value, or omit both values';
+          msg = 'URLs supplied via the \'service\' property must specify ' +
+                'both a user name and a password value, or omit both values';
           err = new InvalidArgumentError(msg);
           logger.throw('_generateServiceList', _id, err);
           throw err;
         }
         if (securityOptions.propertyUser && authUser &&
             (securityOptions.propertyUser !== authUser)) {
-          msg = "User name supplied as 'user' property (" +
+          msg = 'User name supplied as \'user\' property (' +
                 securityOptions.propertyUser + ') does not match user name ' +
-                "supplied via a URL passed via the 'service' property (" +
+                'supplied via a URL passed via the \'service\' property (' +
                 authUser + ')';
           err = new InvalidArgumentError(msg);
           logger.throw('_generateServiceList', _id, err);
@@ -963,8 +1242,9 @@ var Client = function(service, id, securityOptions) {
         }
         if (securityOptions.propertyPassword && authPassword &&
             (securityOptions.propertyPassword !== authPassword)) {
-          msg = "Password supplied as 'password' property does not match a " +
-                "password supplied via a URL passed via the 'service' property";
+          msg = 'Password supplied as \'password\' property does not match a ' +
+                'password supplied via a URL passed via the \'service\' ' +
+                'property';
           err = new InvalidArgumentError(msg);
           logger.throw('_generateServiceList', _id, err);
           throw err;
@@ -980,13 +1260,13 @@ var Client = function(service, id, securityOptions) {
       // pass through the loop.
       if (i > 0) {
         if (securityOptions.urlUser !== authUser) {
-          msg = "URLs supplied via the 'service' property contain " +
+          msg = 'URLs supplied via the \'service\' property contain ' +
                 'inconsistent user names';
           err = new InvalidArgumentError(msg);
           logger.throw('_generateServiceList', _id, err);
           throw err;
         } else if (securityOptions.urlPassword !== authPassword) {
-          msg = "URLs supplied via the 'service' property contain " +
+          msg = 'URLs supplied via the \'service\' property contain ' +
                 'inconsistent password values';
           err = new InvalidArgumentError(msg);
           logger.throw('_generateServiceList', _id, err);
@@ -995,9 +1275,9 @@ var Client = function(service, id, securityOptions) {
       }
 
       // Check we are trying to use the amqp protocol
-      if (!protocol || protocol !== 'amqp:' && protocol !== 'amqps:') {
-        msg = "Unsupported URL '" + inputServiceList[i] +
-              "' specified for service. Only the amqp or amqps protocol are " +
+      if (!protocol || (protocol !== 'amqp:' && protocol !== 'amqps:')) {
+        msg = 'Unsupported URL \'' + inputServiceList[i] +
+              '\' specified for service. Only the amqp or amqps protocol are ' +
               'supported.';
         err = new InvalidArgumentError(msg);
         logger.throw('_generateServiceList', _id, err);
@@ -1006,8 +1286,8 @@ var Client = function(service, id, securityOptions) {
       // Check we have a hostname
       var host = serviceUrl.host;
       if (!host || !serviceUrl.hostname) {
-        msg = "Unsupported URL ' " + inputServiceList[i] + "' specified for " +
-              'service. Must supply a hostname.';
+        msg = 'Unsupported URL \' ' + inputServiceList[i] + '\' specified ' +
+              'for service. Must supply a hostname.';
         err = new InvalidArgumentError(msg);
         logger.throw('_generateServiceList', _id, err);
         throw err;
@@ -1020,8 +1300,8 @@ var Client = function(service, id, securityOptions) {
       // Check for no path
       var path = serviceUrl.path;
       if (path && path !== '/') {
-        msg = "Unsupported URL '" + inputServiceList[i] + "' paths (" + path +
-              " ) can't be part of a service URL.";
+        msg = 'Unsupported URL \'' + inputServiceList[i] + '\' paths (' + path +
+              ' ) can\'t be part of a service URL.';
         err = new InvalidArgumentError(msg);
         logger.throw('_generateServiceList', _id, err);
         throw err;
@@ -1034,18 +1314,17 @@ var Client = function(service, id, securityOptions) {
     }
 
     logger.exit('_generateServiceList', _id,
-                [
-                  'serviceList:',
-                  String(serviceList).replace(/:[^\/:]+@/g, ':********@'),
-                  'securityOptions:', securityOptions.toString()
-                ]);
+      [
+        'serviceList:',
+        String(serviceList).replace(/:[^\/:]+@/g, ':********@'),
+        'securityOptions:', securityOptions.toString()
+      ]);
     return serviceList;
   };
 
   /**
   * Function to invoke all callbacks waiting on a started event.
   *
-  * @this should be set to the client object.
   * @param {Error} err Set if an error occurred while starting.
   */
   this._invokeStartedCallbacks = function(err) {
@@ -1097,12 +1376,14 @@ var Client = function(service, id, securityOptions) {
         logger.ffdc('Client._performConnect', 'ffdc005', client,
                     'Replaced client not in stopped state');
       }
-      client._invokeStartedCallbacks.call(client, new LocalReplacedError(_id));
+      client._invokeStartedCallbacks(new LocalReplacedError(_id));
       logger.exit('Client._performConnect', _id, null);
       return;
     }
 
-    if (!newClient) {
+    if (newClient) {
+      client._setState(STATE_STARTING);
+    } else {
       var currentState = _state;
       logger.log('debug', _id, 'currentState:', currentState);
       logger.log('debug', _id, 'retrying:', retrying);
@@ -1131,17 +1412,16 @@ var Client = function(service, id, securityOptions) {
           });
           logger.exit('Client._performConnect', _id, null);
           return;
-        } else {
-          if (currentState === STATE_STARTED) {
-            // if the client is already started, then drive any callbacks
-            // waiting to be notified
-            process.nextTick(function() {
-              client._invokeStartedCallbacks.call(client, null);
-            });
-          }
-          logger.exit('Client._performConnect', _id, client);
-          return client;
         }
+        if (currentState === STATE_STARTED) {
+          // if the client is already started, then drive any callbacks
+          // waiting to be notified
+          process.nextTick(function() {
+            client._invokeStartedCallbacks(null);
+          });
+        }
+        logger.exit('Client._performConnect', _id, client);
+        return client;
       }
 
       if (_state === STATE_STOPPED) {
@@ -1149,14 +1429,12 @@ var Client = function(service, id, securityOptions) {
       }
 
       // If the messenger is not already stopped then something has gone wrong
-      if (client._messenger && !client._messenger.stopped) {
-        err = new Error('messenger is not stopped');
-        logger.ffdc('Client._performConnect', 'ffdc001', client, err);
-        logger.throw('Client._performConnect', _id, err);
-        throw err;
-      }
-    } else {
-      client._setState(STATE_STARTING);
+      // if (client._messenger && client._messenger._connection) {
+      //   err = new Error('messenger is not stopped');
+      //   logger.ffdc('Client._performConnect', 'ffdc001', client, err);
+      //   logger.throw('Client._performConnect', _id, err);
+      //   throw err;
+      // }
     }
 
     // Obtain the list of services for connect and connect to one of the
@@ -1170,7 +1448,7 @@ var Client = function(service, id, securityOptions) {
           // seconds and then try again (unless we're in a unit test)
           if (process.env.NODE_ENV === 'unittest') {
             client._setState(STATE_STOPPED);
-            client._invokeStartedCallbacks.call(client, err);
+            client._invokeStartedCallbacks(err);
           } else {
             client._serviceFunctionTimeout = setTimeout(function() {
               client._serviceFunction(serviceFunctionCallback);
@@ -1180,12 +1458,12 @@ var Client = function(service, id, securityOptions) {
           try {
             client._setState(STATE_STARTING);
             serviceList =
-                client._generateServiceList.apply(client, [service]);
+                client._generateServiceList(service);
             client._connectToService(serviceList);
           } catch (err) {
             logger.caught('_serviceFunction', client.id, err);
             client._setState(STATE_STOPPED);
-            client._invokeStartedCallbacks.call(client, err);
+            client._invokeStartedCallbacks(err);
           }
         }
       };
@@ -1193,12 +1471,12 @@ var Client = function(service, id, securityOptions) {
       logger.exit('_serviceFunction', client.id, null);
     } else {
       try {
-        serviceList = client._generateServiceList.apply(client, [service]);
+        serviceList = client._generateServiceList(service);
         client._connectToService(serviceList);
       } catch (err) {
         logger.caught('Client._performConnect', client.id, err);
         client._setState(STATE_STOPPED);
-        client._invokeStartedCallbacks.call(client, err);
+        client._invokeStartedCallbacks(err);
       }
     }
 
@@ -1207,113 +1485,13 @@ var Client = function(service, id, securityOptions) {
   };
 
   /**
-  * Function to log socket errors.
-  *
-  * @this should be set to the client object.
-  * @param {Error} err The error that occurred on the socket.
-  */
-  this._socketError = function(err) {
-    logger.entry('Client._socketError', _id);
-    logger.log('error', _id, 'err:', err);
-    logger.exit('Client._socketError', _id, null);
-  };
-
-  // Push the queue of chunks into proton.
-  this._pushChunks = function() {
-    var client = this;
-    var pushed = 0;
-    logger.entry('Client._pushChunks', _id);
-
-    // Allow further calls to be scheduled.
-    if (client.pushTimeout) {
-      // If we previously set a timeout to process the chunks, clear it.
-      clearTimeout(client.pushTimeout);
-    }
-    client.pushTimeout = null;
-
-    // Build up a merged buffer of all the chunks
-    logger.log('data', _id, '_queuedChunks.length:',
-               client._queuedChunks.length, '_queuedChunksSize:',
-               client._queuedChunksSize);
-    if (client._queuedChunks.length > 0) {
-      var chunk = Buffer.concat(client._queuedChunks,
-                                client._queuedChunksSize);
-      client._queuedChunks = [];
-      client._queuedChunksSize = 0;
-
-      // Keep pushing data into proton until the whole chunk is pushed.
-      while (chunk.length > 0) {
-        // Attempt to push the whole chunk into proton.
-        logger.log('data', _id, 'chunk length:', chunk.length);
-        var n = client._messenger.push(chunk.length, chunk);
-
-        if (n < chunk.length) {
-          if (n <= 0) {
-            // If we failed to push anything in, then quit pushing now and
-            // schedule work to happen again shortly.
-            logger.log('debug', _id, 'retrying later');
-            client._queuedChunks.push(chunk);
-            client._queuedChunksSize = chunk.length;
-            client._messenger.pop(client._stream, true);
-            setImmediate(function() {
-              client._pushChunks.call(client);
-            });
-            logger.exit('Client._pushChunks', _id, pushed);
-            return;
-          } else {
-            // A push into proton may mean data also needs to be written.
-            pushed += n;
-            client._messenger.pop(client._stream, false);
-          }
-
-          // Remove the pushed part of the chunk.
-          chunk = chunk.slice(n);
-        } else {
-          // This chunk has been fully dealt with.
-          pushed += n;
-          break;
-        }
-      }
-
-      // Check to see if there's a SASL result
-      try {
-        client._messenger.sasl();
-      }
-      catch (err) {
-        logger.caughtLevel('entry_often', 'processMessage', client.id, err);
-        logger.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      }
-
-      // A push into proton may mean data also needs to be written. Force
-      // a messenger tick.
-      client._messenger.pop(client._stream, true);
-    }
-
-    // If data has been read, messages may have arrived, so perform
-    // a check.
-    if (client._subscriptions.length > 0) {
-      setImmediate(function() {
-        if (client.state === STATE_STARTED) {
-          client.checkForMessages.apply(client);
-        }
-      });
-    }
-
-    logger.exit('Client._pushChunks', _id, pushed);
-  };
-
-  /**
   * Function to connect to a service. Callback happens once a successful
   * connect/reconnect occurs.
   *
-  * @this should be set to the client object.
   * @param {Array} serviceList list of services to connect to.
   */
   this._tryService = function(serviceList) {
     var client = this;
-    var error;
-
     logger.entry('Client._tryService', _id);
 
     if (serviceList.length === 0) {
@@ -1375,7 +1553,7 @@ var Client = function(service, id, securityOptions) {
               logger.entryLevel('entry_often', 'Client._tryService.retry', _id);
               if (!client.isStopped()) {
                 process.nextTick(function() {
-                  client._performConnect.apply(client, [false, true]);
+                  client._performConnect(false, true);
                 });
               }
               logger.exitLevel('exit_often', 'Client._tryService.retry',
@@ -1394,23 +1572,18 @@ var Client = function(service, id, securityOptions) {
             // times by CONNECT_RETRY_INTERVAL for unittest purposes
             interval = Math.round(interval) * CONNECT_RETRY_INTERVAL;
             logger.log('data', _id, 'trying to connect again ' +
-                       'after ' + interval / 1000 + ' seconds');
+                       'after ' + (interval / 1000) + ' seconds');
             setTimeout(retry, interval);
             if (error) {
-              logger.log('emit', _id, 'error', error);
-              try {
-                process.nextTick(function() {
-                  client.emit('error', error);
-                });
-              } catch (err) {
-                logger.log('debug', _id, 'client.emit threw error ' + error +
-                    '\n (ignoring as only seems to occur when logging errors)');
-              }
+              setImmediate(function() {
+                logger.log('emit', _id, 'error', error);
+                client.emit('error', error);
+              });
             }
           } else {
             // Try the next service in the list
             logger.log('data', _id, 'Trying next service');
-            client._tryService.apply(client, [serviceList.slice(1)]);
+            client._tryService(serviceList.slice(1));
           }
 
           logger.exit('Client._tryService.tryNextService', _id, null);
@@ -1420,58 +1593,18 @@ var Client = function(service, id, securityOptions) {
         // then try the next service.
         var connError = function(err) {
           logger.entry('Client._tryService.connError', _id);
+
+          err = lookupError(err);
           logger.log('data', _id, 'failed to connect to: ' + logUrl +
-                     ' due to error: ' + err);
-
-          if (client._stream) {
-            // Deregister the connection error handler since we've failed to
-            // connect.
-            client._stream.removeListener('error', connError);
-            client._stream.on('error', client._socketError);
-          }
-
-          if (/ECONNREFUSED/.test(err)) {
-            // Convert ECONNREFUSED into a clearer error message.
-            err = new NetworkError('CONNECTION ERROR (' + serviceUrl.host +
-                '): Connect failure: The remote computer refused the network ' +
-                'connection.');
-          } else if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(err) ||
-                     /SELF_SIGNED_CERT_IN_CHAIN/.test(err)) {
-            // Convert DEPTH_ZERO_SELF_SIGNED_CERT or SELF_SIGNED_CERT_IN_CHAIN
-            // into a clearer error message.
-            err = new SecurityError('SSL Failure: certificate verify failed');
-          } else if (/CERT_HAS_EXPIRED/.test(err)) {
-            // Convert CERT_HAS_EXPIRED into a clearer error message.
-            err = new SecurityError('SSL Failure: certificate verify failed ' +
-                                    '- certificate has expired');
-          } else if (/mac verify failure/.test(err)) {
-            err = new SecurityError('SSL Failure: ' + err +
-                ' (likely due to a keystore access failure)');
-          } else if (/wrong tag/.test(err)) {
-            err = new SecurityError('SSL Failure: ' + err +
-                ' (likely due to the specified keystore being invalid)');
-          } else if (/bad decrypt/.test(err)) {
-            err = new SecurityError('SSL Failure: ' + err +
-                ' (likely due to the specified passphrase being wrong)');
-          } else if (/no start line/.test(err)) {
-            err = new SecurityError('SSL Failure: ' + err +
-                ' (likely due to an invalid certificate PEM file being ' +
-                'specified)');
-          }
+                     ' due to error: ' + util.inspect(err));
 
           // Don't leave an invalid messenger object lying around.
           stopMessenger(client, function(client) {
             logger.entry('Client._tryService.connError.stopProcessing',
                          client.id);
 
-            // Close our end of the socket.
-            if (client._stream) {
-              client._stream.removeAllListeners('close');
-              client._stream.end();
-              client._stream = null;
-            }
-
             // This service failed to connect. Try the next one.
+            // XXX: wrap in shouldReconnect ?
             tryNextService(err);
 
             logger.exit('Client._tryService.connError.stopProcessing',
@@ -1481,115 +1614,8 @@ var Client = function(service, id, securityOptions) {
           logger.exit('Client._tryService.connError', _id, null);
         };
 
-        // Define an on stream readable handler. Queue up the chunk for pushing
-        // into proton at the next best opportunity.
-        var dataAvailable = function(chunk) {
-          logger.entryLevel('entry_often', 'Client.dataAvailable', _id);
-
-          if (chunk instanceof String) {
-            // The chunk could be a string or a buffer. If it's a string
-            // convert it into a buffer that we can pass into proton.
-            var buffer = new Buffer(chunk);
-            logger.log('data_often', _id, 'string chunk length:', chunk.length);
-            chunk = buffer;
-          }
-          logger.log('data_often', _id, 'chunk length:', chunk.length);
-
-          // Queue up the chunk
-          client._queuedChunks.push(chunk);
-          client._queuedChunksSize += chunk.length;
-
-          // Small chunks usually indicate something needing immediate attention
-          // so push them immediately, whereas larger chunks may simply be part
-          // of a larger message.
-          if ((chunk.length < 1024)) {
-            client._pushChunks.call(client);
-          } else {
-            // Allow more time for chunks to arrive before we process them.
-            if (!client.pushTimeout) {
-              client.pushTimeout = setTimeout(function() {
-                client._pushChunks.call(client);
-              }, 50);
-            }
-          }
-
-          logger.exitLevel('exit_often', 'Client.dataAvailable', _id, null);
-        };
-
-        // Define an on stream drain handler. Check if proton has further data
-        // to be written to the stream.
-        var dataDrained = function() {
-          setImmediate(function() {
-            logger.entry('Client.dataDrained', _id);
-            var drained = client._messenger.pop(client._stream, false);
-            logger.exit('Client.dataDrained', _id, drained);
-          });
-        };
-
-        // Define an on stream close handler. Notify proton of the close.
-        var streamClosed = function(had_error) {
-          setImmediate(function() {
-            logger.entry('Client.streamClosed', _id);
-            logger.log('parms', _id, 'had_error:', had_error);
-
-            client._pushChunks.call(client);
-
-            try {
-              client._messenger.closed();
-            } catch (err) {
-              error = getNamedError(err);
-              logger.caught('Client.streamClosed', _id, error);
-              process.nextTick(function() {
-                if (shouldReconnect(error)) {
-                  reconnect(client);
-                }
-                logger.log('emit', _id, 'error', error);
-                client.emit('error', error);
-              });
-            }
-
-            // Force any final data from the messenger, which may give it the
-            // chance to close any connections.
-            try {
-              client._messenger.pop(client._stream, true);
-            } catch (err) {
-              // ignore
-            }
-
-            logger.exit('Client.streamClosed', _id, had_error);
-          });
-        };
-
-        // Define a function that we can keep calling until the messenger has
-        // actually started.
-        var waitForStart = function() {
-          logger.entry('Client._tryService.waitForStart', _id);
-
-          if (client.state !== STATE_RETRYING &&
-              client.state !== STATE_STARTING) {
-            // Don't keep waiting if we're no longer in a starting state
-            logger.log('debug', _id, 'client no longer starting');
-            logger.exit('Client._tryService.waitForStart', _id, false);
-            return;
-          }
-
-          try {
-            if (!client._messenger.started()) {
-              setImmediate(function() {
-                waitForStart.call(client);
-              });
-              logger.exit('Client._tryService.waitForStart', _id, false);
-              return;
-            }
-          } catch (err) {
-            error = getNamedError(err);
-            logger.caught('Client._tryService.waitForStart', _id, error);
-            connError(error);
-            logger.exit('Client._tryService.waitForStart', _id, false);
-            return;
-          }
-
-          logger.log('data', _id, 'successfully started:', logUrl);
+        var connected = function() {
+          logger.log('data', _id, 'successfully connected to:', logUrl);
           _service = serviceList[0];
 
           // Indicate that we're started
@@ -1613,176 +1639,40 @@ var Client = function(service, id, securityOptions) {
           process.nextTick(function() {
             logger.log('emit', _id, eventToEmit);
             client.emit(eventToEmit);
-            client._invokeStartedCallbacks.call(client, null);
+            client._invokeStartedCallbacks(null);
           });
-
-          // Setup heartbeat timer to ensure that while connected we send
-          // heartbeat frames to keep the connection alive, when required.
-          var remoteIdleTimeout =
-              client._messenger.getRemoteIdleTimeout(_service);
-          var heartbeatInterval = remoteIdleTimeout > 0 ?
-              remoteIdleTimeout / 2 : remoteIdleTimeout;
-          logger.log('data', _id, 'set heartbeatInterval to: ',
-                     heartbeatInterval);
-          if (heartbeatInterval > 0) {
-            var performHeartbeat = function(client, heartbeatInterval) {
-              logger.entry('Client._tryService.waitForStart.performHeartbeat',
-                           _id);
-              if (client._messenger) {
-                client._messenger.heartbeat(client._stream);
-                client.heartbeatTimeout = setTimeout(performHeartbeat,
-                    heartbeatInterval, client, heartbeatInterval);
-              }
-              logger.exit('Client._tryService.waitForStart.performHeartbeat',
-                          _id, null);
-            };
-            client.heartbeatTimeout = setTimeout(performHeartbeat,
-                                                 heartbeatInterval,
-                                                 client, heartbeatInterval);
-          }
-
-          logger.exit('Client._tryService.waitForStart', _id, true);
         };
 
-        // Define a callback function that will be called once the stream has
-        // actually been connected.
-        var connected = function() {
-          logger.entry('Client._tryService.connected', _id);
-
-          if (!client._stream) {
-            logger.log('debug', _id,
-                       'client._stream is null');
-            logger.exit('Client._tryService.connected', _id, null);
-            return;
-          }
-
-          if (connectUrl.protocol === 'amqps:') {
-            // For secure connections, check that an authorization error didn't
-            // occur.
-            if (!client._stream.authorized) {
-              var authError =
-                  new SecurityError(client._stream.authorizationError);
-              logger.log('data', _id, 'authorization error occurred:',
-                         authError);
-
-              if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(authError) ||
-                  /SELF_SIGNED_CERT_IN_CHAIN/.test(authError)) {
-                connError(authError);
-                logger.exit('Client._tryService.connected', _id, null);
-                return;
-              }
-              // Hostname mismatches will produce an authorization failure. We
-              // allow them if sslVerifyName is false.
-              else if (
-                  /Hostname\/IP doesn't match certificate's altnames/.test(
-                  authError.message)) {
-                if (securityOptions.sslVerifyName) {
-                  connError(authError);
-                  logger.exit('Client._tryService.connected', _id, null);
-                  return;
-                } else {
-                  logger.log('data', _id,
-                             'permitting certificate with hostname mismatch');
-                }
-              } else {
-                connError(authError);
-                logger.exit('Client._tryService.connected', _id, null);
-                return;
-              }
-            }
-          }
-
-          // Deregister the connection error handler since we're connected.
-          client._stream.removeListener('error', connError);
-          client._stream.on('error', client._socketError);
-
-          try {
-            // Get messenger to connect if it hasn't already.
-            if (!client._messenger.connected()) {
-              client._messenger.connect(connectUrl);
-            }
-          } catch (err) {
-            error = getNamedError(err);
-            logger.caught('Client._tryService.connected', _id, error);
-            connError(error);
-            logger.exit('Client._tryService.connected', _id, null);
-            return;
-          }
-
-          logger.log('data', _id, 'successfully connected to:', logUrl);
-
-          // Pass any data to proton.
-          client._messenger.pop(client._stream, false);
-
-          // Wait for the messenger to have started.
-          waitForStart.call(client);
-
-          logger.exit('Client._tryService.connected', _id, null);
-        };
-
-        // Set up the connect options.
-        var connOpts = {
-          host: serviceUrl.hostname,
-          port: serviceUrl.port,
-          rejectUnauthorized: false,
-          sslTrustCertificate: securityOptions.sslTrustCertificate,
-          sslVerifyName: securityOptions.sslVerifyName
-        };
-
-        // Read the client keystore or pem files as appropriate, setting the
-        // required security related connection options
-        if (typeof securityOptions.sslKeystore !== 'undefined') {
-          connOpts.pfx = fs.readFileSync(securityOptions.sslKeystore);
-          connOpts.passphrase = securityOptions.sslKeystorePassphrase;
-        } else {
-          if (typeof securityOptions.sslClientCertificate !== 'undefined') {
-            connOpts.cert =
-                fs.readFileSync(securityOptions.sslClientCertificate, 'utf-8');
-          }
-          if (typeof securityOptions.sslClientKey !== 'undefined') {
-            connOpts.key = fs.readFileSync(securityOptions.sslClientKey,
-                                           'utf-8');
-            connOpts.passphrase = securityOptions.sslClientKeyPassphrase;
-          }
-          // Read the pem file and load multiple certs up into a separate entry
-          if (typeof securityOptions.sslTrustCertificate !== 'undefined') {
-            connOpts.ca = fs.readFileSync(securityOptions.sslTrustCertificate,
-                                          'utf-8').match(pemCertRegex);
-          }
-        }
-
+        // Otherwise do a standard net connect.
+        // Get messenger to connect if it hasn't already.
+        var promise;
         if (process.env.NODE_ENV === 'unittest') {
-          // If the unit tests are being run, then don't really connect.
           logger.log('debug', _id, 'connecting via stub');
-          client._stream = proton.connect(connOpts, connected);
-        } else if (serviceUrl.protocol === 'amqps:') {
-          // If the amqps protocol is being used, then do a tls connect.
-          logger.log('debug', _id, 'connecting via tls');
-          try {
-            client._stream = tls.connect(connOpts, connected);
-          } catch (err) {
-            logger.log('data', _id, 'authorization error occurred:', err);
-            connError(err);
-            logger.exit('Client._tryService', _id, null);
-            return;
-          }
+          // XXX: hack for unittesting purposes
+          var connOpts = {
+            host: serviceUrl.hostname,
+            port: serviceUrl.port,
+            rejectUnauthorized: false,
+            sslTrustCertificate: securityOptions.sslTrustCertificate,
+            sslVerifyName: securityOptions.sslVerifyName
+          };
+          promise = client._messenger.connect(connectUrl, connOpts);
         } else {
-          // Otherwise do a standard net connect.
-          // In all cases we register a connected callback, and an error
-          // handler.
           logger.log('debug', _id, 'connecting via net');
-          client._stream = net.connect(connOpts, connected);
+          promise = client._messenger.connect(connectUrl);
         }
-        client._stream.on('error', connError);
-        client._stream.on('drain', dataDrained);
-        client._stream.on('close', function(had_error) {
-          process.nextTick(streamClosed, had_error);
-        });
-        client._stream.on('data', dataAvailable);
+        promise.then(connected)
+          .catch(function(err) {
+            logger.caught('Client._tryService', _id, err);
+            connError(err);
+          })
+          .error(function(err) {
+            logger.caught('Client._tryService', _id, err);
+            connError(err);
+          });
       } catch (err) {
         // should never get here, as it means that messenger.connect has been
         // called in an invalid way, so FFDC
-        error = err;
         logger.caught('Client._tryService', _id, err);
         logger.ffdc('Client._tryService', 'ffdc002', client, err);
         client._setState(STATE_STOPPED);
@@ -1800,7 +1690,6 @@ var Client = function(service, id, securityOptions) {
   * attempts to connect again. Callback happens once a successful
   * connect/reconnect occurs.
   *
-  * @this should be set to the client object.
   * @param {Array} serviceList list of services to connect to.
   */
   this._connectToService = function(serviceList) {
@@ -1808,9 +1697,8 @@ var Client = function(service, id, securityOptions) {
     logger.entry('Client._connectToService', _id);
 
     if (client.isStopped()) {
-      client._invokeStartedCallbacks.call(client,
-          new StoppedError('connect aborted due to stop')
-      );
+      client._invokeStartedCallbacks(
+          new StoppedError('connect aborted due to stop'));
       logger.exit('Client._connectToService', _id, null);
       return;
     }
@@ -1826,8 +1714,8 @@ var Client = function(service, id, securityOptions) {
 
   // If the client id is too long then throw an error
   if (id.length > 256) {
-    msg = "Client identifier '" + id + "' is longer than the maximum ID " +
-          'length of 256.';
+    msg = 'Client identifier \'' + id + '\' is longer than the maximum ' +
+          'ID length of 256.';
     err = new InvalidArgumentError(msg);
     logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
     throw err;
@@ -1838,7 +1726,8 @@ var Client = function(service, id, securityOptions) {
   // currently client ids are restricted, reject any invalid ones
   var matches = invalidClientIdRegex.exec(id);
   if (matches) {
-    msg = "Client Identifier '" + id + "' contains invalid char: " + matches[0];
+    msg =
+        'Client Identifier \'' + id + '\' contains invalid char: ' + matches[0];
     err = new InvalidArgumentError(msg);
     logger.throw('Client.constructor', logger.NO_CLIENT_ID, err);
     throw err;
@@ -1861,8 +1750,8 @@ var Client = function(service, id, securityOptions) {
     keystoreOptionCount++;
   }
   if (typeof securityOptions.sslKeystore !== 'undefined') {
-    if (keystoreOptionCount > 0) keystoreOption = keystoreOption + ', ';
-    keystoreOption = keystoreOption + 'sslKeystore';
+    if (keystoreOptionCount > 0) keystoreOption += ', ';
+    keystoreOption += 'sslKeystore';
     keystoreOptionCount++;
   }
 
@@ -1873,22 +1762,22 @@ var Client = function(service, id, securityOptions) {
     clientCertOptionCount++;
   }
   if (typeof securityOptions.sslClientKey !== 'undefined') {
-    if (clientCertOptionCount > 0) clientCertOption = clientCertOption + ', ';
-    clientCertOption = clientCertOption + 'sslClientKey';
+    if (clientCertOptionCount > 0) clientCertOption += ', ';
+    clientCertOption += 'sslClientKey';
     clientCertOptionCount++;
   }
   if (typeof securityOptions.sslClientKeyPassphrase !== 'undefined') {
-    if (clientCertOptionCount > 0) clientCertOption = clientCertOption + ', ';
-    clientCertOption = clientCertOption + 'sslClientKeyPassphrase';
+    if (clientCertOptionCount > 0) clientCertOption += ', ';
+    clientCertOption += 'sslClientKeyPassphrase';
     clientCertOptionCount++;
   }
 
   var certificateOption = '';
-  if (typeof securityOptions.sslTrustCertificate !== 'undefined') {
-    if (clientCertOptionCount > 0) certificateOption = clientCertOption + ', ';
-    certificateOption = certificateOption + 'sslTrustCertificate';
-  } else {
+  if (typeof securityOptions.sslTrustCertificate === 'undefined') {
     certificateOption = clientCertOption;
+  } else {
+    if (clientCertOptionCount > 0) certificateOption += ', ';
+    certificateOption += 'sslTrustCertificate';
   }
 
   if ((keystoreOption.length > 0) && (certificateOption.length > 0)) {
@@ -1912,33 +1801,33 @@ var Client = function(service, id, securityOptions) {
   }
 
   var sslOptions = [
-    { name: 'sslKeystore', value: securityOptions.sslKeystore },
-    { name: 'sslTrustCertificate', value: securityOptions.sslTrustCertificate },
-    { name: 'sslClientCertificate',
-      value: securityOptions.sslClientCertificate },
-    { name: 'sslClientKey', value: securityOptions.sslClientKey }
+    {name: 'sslKeystore', value: securityOptions.sslKeystore},
+    {name: 'sslTrustCertificate', value: securityOptions.sslTrustCertificate},
+    {name: 'sslClientCertificate',
+      value: securityOptions.sslClientCertificate},
+    {name: 'sslClientKey', value: securityOptions.sslClientKey}
   ];
   for (var i = 0; i < sslOptions.length; i++) {
     var sslOption = sslOptions[i];
     if (typeof sslOption.value !== 'undefined') {
       if (typeof sslOption.value !== 'string') {
-        err = new TypeError(sslOption.name + " value '" +
+        err = new TypeError(sslOption.name + ' value \'' +
                             sslOption.value +
-                            "' is invalid. Must be of type String");
+                            '\' is invalid. Must be of type String');
         logger.throw('Client.constructor', _id, err);
         throw err;
       }
       if (!fs.existsSync(sslOption.value)) {
-        err = new TypeError('The file specified for ' + sslOption.name + " '" +
+        err = new TypeError('The file specified for ' + sslOption.name + ' \'' +
                             sslOption.value +
-                            "' does not exist");
+                            '\' does not exist');
         logger.throw('Client.constructor', _id, err);
         throw err;
       }
       if (!fs.statSync(sslOption.value).isFile()) {
-        err = new TypeError('The file specified for ' + sslOption.name + " '" +
+        err = new TypeError('The file specified for ' + sslOption.name + ' \'' +
                             sslOption.value +
-                            "' is not a regular file");
+                            '\' is not a regular file');
         logger.throw('Client.constructor', _id, err);
         throw err;
       }
@@ -1946,36 +1835,118 @@ var Client = function(service, id, securityOptions) {
   }
   if ((typeof securityOptions.sslKeystorePassphrase !== 'undefined') &&
       (typeof securityOptions.sslKeystorePassphrase !== 'string')) {
-    err = new TypeError("sslKeystorePassphrase value '" +
+    err = new TypeError('sslKeystorePassphrase value \'' +
                         securityOptions.sslKeystorePassphrase +
-                        "' is invalid. Must be of type String");
+                        '\' is invalid. Must be of type String');
     logger.throw('Client.constructor', _id, err);
     throw err;
   }
   if ((typeof securityOptions.sslClientKeyPassphrase !== 'undefined') &&
       (typeof securityOptions.sslClientKeyPassphrase !== 'string')) {
-    err = new TypeError("sslClientKeyPassphrase value '" +
+    err = new TypeError('sslClientKeyPassphrase value \'' +
                         securityOptions.sslClientKeyPassphrase +
-                        "' is invalid. Must be of type String");
+                        '\' is invalid. Must be of type String');
     logger.throw('Client.constructor', _id, err);
     throw err;
   }
   if (typeof securityOptions.sslVerifyName !== 'boolean') {
-    err = new TypeError("sslVerifyName value '" +
+    err = new TypeError('sslVerifyName value \'' +
         securityOptions.sslVerifyName +
-        "' is invalid. Must be of type Boolean");
+        '\' is invalid. Must be of type Boolean');
     logger.throw('Client.constructor', _id, err);
     throw err;
   }
 
   // Save the required data as client fields
   this._serviceFunction = serviceFunction;
-  this._serviceList = serviceList;
   _id = id;
 
   logger.entry('proton.createMessenger', _id);
-  this._messenger = proton.createMessenger(_id);
+  if (process.env.NODE_ENV === 'unittest') {
+    this._messenger =
+        require('./test/stubs/stubproton.js').createProtonStub().messenger;
+  } else {
+    var policy = {
+      defaultSubjects: false,
+      reconnect: {
+        retries: 0,
+        strategy: 'exponential',
+        forever: false
+      },
+      connect: {
+        options: {
+          containerId: _id
+        }
+      }
+    };
+    sslOptions = {
+      keyFile: null,
+      certFile: null,
+      caFile: null,
+      rejectUnauthorized: true,
+      sslTrustCertificate: securityOptions.sslTrustCertificate,
+      sslVerifyName: securityOptions.sslVerifyName
+    };
+
+    // Read the client keystore or pem files as appropriate, setting the
+    // required security related connection options
+    if (typeof securityOptions.sslKeystore === 'undefined') {
+      if (typeof securityOptions.sslClientCertificate !== 'undefined') {
+        sslOptions.cert =
+          fs.readFileSync(securityOptions.sslClientCertificate, 'utf-8');
+      }
+      if (typeof securityOptions.sslClientKey !== 'undefined') {
+        sslOptions.key = fs.readFileSync(securityOptions.sslClientKey,
+          'utf-8');
+        sslOptions.passphrase = securityOptions.sslClientKeyPassphrase;
+      }
+      // Read the pem file and load multiple certs up into a separate entry
+      if (typeof securityOptions.sslTrustCertificate !== 'undefined') {
+        sslOptions.ca = fs.readFileSync(securityOptions.sslTrustCertificate,
+          'utf-8').match(pemCertRegex);
+      }
+    } else {
+      sslOptions.pfx = fs.readFileSync(securityOptions.sslKeystore);
+      sslOptions.passphrase = securityOptions.sslKeystorePassphrase;
+    }
+
+    policy.connect.options.sslOptions = sslOptions;
+
+    this._messenger = new AMQP.Client(AMQP.Policy.merge(policy));
+  }
   logger.exit('proton.createMessenger', _id, null);
+
+  var client = this;
+  this._messenger.on(AMQP.Client.ErrorReceived, function(err) {
+    logger.entry('Client._messenger.on.ErrorReceived', _id);
+    if (err) {
+      err = lookupError(err);
+      logger.log('parms', _id, 'err:', err);
+      if (_state === STATE_STARTED || err instanceof SecurityError) {
+        if (!(err instanceof NotPermittedError)) {
+          logger.log('debug', _id, '_state', _state);
+          logger.log('emit', _id, 'error', err);
+          client.emit('error', err);
+        }
+        if (shouldReconnect(err)) {
+          setImmediate(function() {
+            logger.log('data', _id, 'calling reconnect');
+            reconnect(client);
+          });
+        }
+      }
+    }
+    logger.exit('Client._messenger.on.ErrorReceived', _id, null);
+  });
+
+  this._messenger.on(AMQP.Client.ConnectionClosed, function() {
+    if (_state === STATE_STARTED) {
+      logger.log('data', client.id, 'calling reconnect');
+      reconnect(client);
+    } else if (_state === STATE_RETRYING || _state === STATE_STARTING) {
+      //
+    }
+  });
 
   // Set the initial state to starting
   _state = STATE_STARTING;
@@ -2016,12 +1987,117 @@ var Client = function(service, id, securityOptions) {
   this._queuedChunksSize = 0;
 
   if (!serviceFunction) {
-    serviceList = this._generateServiceList.apply(this, [service]);
+    this._serviceList = this._generateServiceList(service);
   }
   logger.exit('Client.constructor', _id, this);
 };
 util.inherits(Client, EventEmitter);
 
+/**
+ * Creates and returns a new instance of the Client object.
+ * <p>
+ * See README.md for more details.
+ *
+ * @param {Object}   options - properties that define the
+ *                             characteristics of the client.
+ * @param {Function} callback - (optional) callback, invoked when the client has
+ *                              attained 'started' or 'stopped' state.
+ * @return {Object} A new Client object.
+ * @this Client
+ */
+exports.createClient = function(options, callback) {
+  logger.entry('createClient', logger.NO_CLIENT_ID);
+
+  var err;
+
+  if (!options || (typeof options !== 'object')) {
+    err = new TypeError('options object missing');
+    logger.throw('createClient', logger.NO_CLIENT_ID, err);
+    throw err;
+  }
+
+  if (callback && (typeof callback !== 'function')) {
+    err = new TypeError('Callback argument must be a function');
+    logger.throw('createClient', logger.NO_CLIENT_ID, err);
+    throw err;
+  }
+
+  var securityOptions = {
+    propertyUser: options.user,
+    propertyPassword: options.password,
+    urlUser: undefined,
+    urlPassword: undefined,
+    sslKeystore: options.sslKeystore,
+    sslKeystorePassphrase: options.sslKeystorePassphrase,
+    sslClientCertificate: options.sslClientCertificate,
+    sslClientKey: options.sslClientKey,
+    sslClientKeyPassphrase: options.sslClientKeyPassphrase,
+    sslTrustCertificate: options.sslTrustCertificate,
+    sslVerifyName: (typeof options.sslVerifyName === 'undefined') ? true :
+        options.sslVerifyName,
+    toString: function() {
+      return '[\n' +
+          ' propertyUser: ' + this.propertyUser + '\n' +
+          ' propertyPassword: ' +
+          (this.propertyPassword ? '********' : undefined) + '\n' +
+          ' propertyUser: ' + this.urlUser + '\n' +
+          ' urlPassword: ' + (this.urlPassword ? '********' : undefined) +
+          '\n' +
+          ' sslKeystore: ' + this.sslKeystore + '\n' +
+          ' sslKeystorePassphrase: ' +
+          (this.sslKeystorePassphrase ? '********' : undefined) + '\n' +
+          ' sslClientCertificate: ' + this.sslClientCertificate + '\n' +
+          ' sslClientKey: ' + this.sslClientKey + '\n' +
+          ' sslClientKeyPassphrase: ' +
+          (this.sslClientKeyPassphrase ? '********' : undefined) + '\n' +
+          ' sslTrustCertificate: ' + this.sslTrustCertificate + '\n' +
+          ' sslVerifyName: ' + this.sslVerifyName + '\n]';
+    }
+  };
+  var client = new Client(options.service, options.id, securityOptions);
+
+  // Check that the id for this instance is not already in use. If it is then
+  // we need to stop the active instance before starting
+  if (activeClientList.has(client.id)) {
+    logger.log('debug', client.id,
+        'stopping previously active client with same client id');
+    var previousActiveClient = activeClientList.get(client.id);
+    activeClientList.add(client);
+    previousActiveClient.stop(function() {
+      logger.log('debug', client.id,
+          'stopped previously active client with same client id');
+      var err = new LocalReplacedError(client.id);
+      var error = getNamedError(err);
+      logger.log('emit', previousActiveClient.id, 'error', error);
+      previousActiveClient.emit('error', error);
+      if (callback) {
+        client._queuedStartCallbacks.push({
+          callback: callback,
+          create: true
+        });
+        logger.log('debug', client.id, 'callback function queued');
+      }
+      process.nextTick(function() {
+        client._performConnect(true, false);
+      });
+    });
+  } else {
+    activeClientList.add(client);
+    if (callback) {
+      client._queuedStartCallbacks.push({
+        callback: callback,
+        create: true
+      });
+      logger.log('debug', client.id, 'callback function queued');
+    }
+    process.nextTick(function() {
+      client._performConnect(true, false);
+    });
+  }
+
+  logger.exit('createClient', client.id, client);
+  return client;
+};
 
 /**
  * @param {function(object)}
@@ -2029,7 +2105,6 @@ util.inherits(Client, EventEmitter);
  * @param {String}
  *          err - an error message if a problem occurred.
  */
-
 
 /**
  * Prepares the client to send and/or receive messages from the server.
@@ -2096,57 +2171,6 @@ Client.prototype.start = function(callback) {
   return client;
 };
 
-
-/**
- * @param {function(object)}
- *          stopProcessingCallback - callback to perform post stop processing.
- * @param {client} client - the client object to stop the messenger for.
- * @param {callback}
- *          callback - passed an error object if something goes wrong.
- */
-
-
-/**
- * Stops the messenger.  The messenger stop function merely requests it to stop,
- * so we need to keep checking until it is actually stopped. Then any post
- * stop processing can be performed.
- *
- * @param {client} client - the client object to stop the messenger for.
- * @param {stopProcessingCallback}
- *          stopProcessingCallback - Function to perform the required post stop
- *          processing.
- * @param {callback}
- *          callback - (optional) The application callback to be notified of
- *          errors and completion (passed to the stopProcessingCallback).
- */
-var stopMessenger = function(client, stopProcessingCallback, callback) {
-  logger.entry('stopMessenger', client.id);
-
-  var stopped = true;
-
-  // Ensure any received data has been pushed into messenger
-  // before we request it to stop
-  client._pushChunks.call(client);
-
-  // If messenger available then request it to stop
-  // (otherwise it must have already been stopped)
-  if (client._messenger) {
-    stopped = client._messenger.stop(client._stream);
-  }
-
-  // If stopped then perform the required stop processing
-  if (stopped) {
-    stopProcessingCallback(client, callback);
-
-  // Otherwise check for the messenger being stopped again
-  } else {
-    setImmediate(stopMessenger, client, stopProcessingCallback, callback);
-  }
-
-  logger.exit('stopMessenger', client.id, stopped);
-};
-
-
 /**
  * @param {function(object)}
  *          disconnectCallback - callback, passed an error object if something
@@ -2154,7 +2178,6 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
  * @param {String}
  *          err - an error message if a problem occurred.
  */
-
 
 /**
  * Stops the client from sending and/or receiving messages from the server.
@@ -2212,27 +2235,29 @@ Client.prototype.stop = function(callback) {
     }
     client._serviceFunctionTimeout = null;
 
-
     // Only disconnect when all outstanding send operations are complete
     if (client._outstandingSends.length === 0) {
       stopMessenger(client, function(client, callback) {
         logger.entry('Client.stop.performDisconnect.stopProcessing',
             client.id);
-        if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
         // clear queuedSends as we are disconnecting
+        var messages = [];
         while (client._queuedSends.length > 0) {
-          var msg = client._queuedSends.shift();
-          // call the callback in error as we have disconnected
-          process.nextTick(function() {
-            logger.entry('Client.stop.performDisconnect.' +
-                'stopProcessing.queuedSendCallback', client.id);
+          messages.push(client._queuedSends.shift());
+        }
+        // call the msg callbacks in error as we have disconnected
+        process.nextTick(function() {
+          logger.entry('Client.stop.performDisconnect.' +
+              'stopProcessing.queuedSendCallback', client.id);
+          while (messages.length > 0) {
+            var msg = messages.shift();
             if (msg.callback) {
               msg.callback(new StoppedError('send aborted due to client stop'));
             }
-            logger.exit('Client.stop.performDisconnect.' +
-                'stopProcessing.queuedSendCallback', client.id, null);
-          });
-        }
+          }
+          logger.exit('Client.stop.performDisconnect.' +
+              'stopProcessing.queuedSendCallback', client.id, null);
+        });
         // Clear the active and queued subscriptions lists as we were
         // asked to disconnect.
         logger.log('data', client.id, 'client._subscriptions:',
@@ -2316,220 +2341,6 @@ Client.prototype.stop = function(callback) {
   return client;
 };
 
-
-/**
- * Reconnects the client to the MQ Light service, implicitly closing any
- * subscriptions that the client has open. The 'restarted' event will be
- * emitted once the client has reconnected.
- *
- * @param {client} client - the client object to reconnect
- * @return {Object} The instance of client that it is invoked on - allowing
- *          for chaining of other method calls on the client object.
- */
-var reconnect = function(client) {
-  if (typeof client === 'undefined' || client.constructor !== Client) {
-    logger.entry('Client.reconnect', logger.NO_CLIENT_ID);
-    logger.log('parms', logger.NO_CLIENT_ID, 'client:', client);
-    logger.exit('Client.reconnect', logger.NO_CLIENT_ID, undefined);
-    return;
-  }
-  logger.entry('Client.reconnect', client.id);
-  if (client.state !== STATE_STARTED) {
-    if (client.isStopped()) {
-      logger.exit('Client.reconnect', client.id, null);
-      return;
-    } else if (client.state === STATE_RETRYING) {
-      logger.exit('Client.reconnect', client.id, client);
-      return client;
-    }
-  }
-  client._setState(STATE_RETRYING);
-
-  setImmediate(function() {
-
-    // stop the messenger to free the object then attempt a reconnect
-    stopMessenger(client, function(client) {
-      logger.entry('Client.reconnect.stopProcessing', client.id);
-
-      if (client.heartbeatTimeout) clearTimeout(client.heartbeatTimeout);
-
-      // clear the subscriptions list, if the cause of the reconnect happens
-      // during check for messages we need a 0 length so it will check once
-      // reconnected.
-      logger.log('data', client.id, 'client._subscriptions:',
-              client._subscriptions);
-      while (client._subscriptions.length > 0) {
-        client._queuedSubscriptions.push(client._subscriptions.shift());
-      }
-      // also clear any left over outstanding sends
-      while (client._outstandingSends.length > 0) {
-        client._outstandingSends.shift();
-      }
-      client._queuedStartCallbacks.push({
-        callback: processQueuedActions,
-        create: false
-      });
-      // Close our end of the socket
-      if (client._stream) {
-        client._stream.removeAllListeners('close');
-        client._stream.end();
-        client._stream = null;
-      }
-      client._queuedChunks = [];
-      client._queuedChunksSize = 0;
-      client._performConnect.apply(client, [false, true]);
-
-      logger.exit('Client.reconnect.stopProcessing', client.id, null);
-    });
-  });
-
-  logger.exit('Client.reconnect', client.id, client);
-  return client;
-};
-if (process.env.NODE_ENV === 'unittest') {
-  /**
-   * Export for unittest purposes.
-   */
-  exports.reconnect = reconnect;
-}
-
-
-/**
-* Called on reconnect or first connect to process any actions that may have
-* been queued.
-*
-* @this should be set to the client object that has connected or reconnected
-* @param {Error} err if an error occurred in the performConnect function that
-* calls this callback.
-*/
-var processQueuedActions = function(err) {
-  // this set to the appropriate client via apply call in performConnect
-  var client = this;
-  if (typeof client === 'undefined' || client.constructor !== Client) {
-    logger.entry('processQueuedActions', 'client was not set');
-    logger.exit('processQueuedActions', 'client not set returning', null);
-    return;
-  }
-  logger.entry('processQueuedActions', client.id);
-  logger.log('parms', client.id, 'err:', err);
-  logger.log('data', client.id, 'client.state:', client.state);
-
-  if (!err) {
-    var performSend = function() {
-      logger.entry('performSend', client.id);
-      logger.log('data', client.id, 'client._queuedSends',
-                 client._queuedSends);
-      while (client._queuedSends.length > 0 &&
-              client.state === STATE_STARTED) {
-        var remaining = client._queuedSends.length;
-        var msg = client._queuedSends.shift();
-        client.send(msg.topic, msg.data, msg.options, msg.callback);
-        if (client._queuedSends.length >= remaining) {
-          // Calling client.send can cause messages to be added back into
-          // _queuedSends, if the network connection is broken.  Check that the
-          // size of the array is decreasing to avoid looping forever...
-          break;
-        }
-      }
-
-      logger.exit('performSend', client.id, null);
-    };
-
-    var performUnsub = function() {
-      logger.entry('performUnsub', client.id);
-
-      if (client._queuedUnsubscribes.length > 0 &&
-          client.state === STATE_STARTED) {
-        var rm = client._queuedUnsubscribes.shift();
-        logger.log('data', client.id, 'rm:', rm);
-        if (rm.noop) {
-          // no-op, so just trigger the callback without actually unsubscribing
-          if (rm.callback) {
-            logger.entry('performUnsub.callback', client.id);
-            rm.callback.apply(client, [null, rm.topicPattern, rm.share]);
-            logger.exit('performUnsub.callback', client.id, null);
-          }
-          setImmediate(function() {
-            performUnsub.apply(client);
-          });
-        } else {
-          client.unsubscribe(rm.topicPattern, rm.share, rm.options,
-              function(err, topicPattern, share) {
-                if (rm.callback) {
-                  logger.entry('performUnsub.callback', client.id);
-                  rm.callback.apply(client, [err, rm.topicPattern, rm.share]);
-                  logger.exit('performUnsub.callback', client.id, null);
-                }
-                setImmediate(function() {
-                  performUnsub.apply(client);
-                });
-              }
-          );
-        }
-      } else {
-        performSend.apply(client);
-      }
-
-      logger.exit('performUnsub', client.id, null);
-    };
-
-    var performSub = function() {
-      logger.entry('performSub', client.id);
-
-      if (client._queuedSubscriptions.length > 0 &&
-          client.state === STATE_STARTED) {
-        var sub = client._queuedSubscriptions.shift();
-        logger.log('data', client.id, 'sub:', sub);
-        if (sub.noop) {
-          // no-op, so just trigger the callback without actually subscribing
-          if (sub.callback) {
-            process.nextTick(function() {
-              logger.entry('performSub.callback', client.id);
-              logger.log('parms', client.id, 'err:', err, ', topicPattern:',
-                         sub.topicPattern, ', originalShareValue:', sub.share);
-              sub.callback.apply(client,
-                  [err, sub.topicPattern, sub.originalShareValue]);
-              logger.exit('performSub.callback', client.id, null);
-            });
-          }
-          setImmediate(function() {
-            performSub.apply(client);
-          });
-        } else {
-          client.subscribe(sub.topicPattern, sub.share, sub.options,
-              function(err, topicPattern, share) {
-                if (sub.callback) {
-                  process.nextTick(function() {
-                    logger.entry('performSub.callback',
-                                 client.id);
-                    logger.log('parms', client.id, 'err:', err,
-                               ', topicPattern:', sub.topicPattern,
-                               ', originalShareValue:', sub.share);
-                    sub.callback.apply(client,
-                        [err, sub.topicPattern, sub.originalShareValue]);
-                    logger.exit('performSub.callback',
-                                client.id, null);
-                  });
-                }
-                setImmediate(function() {
-                  performSub.apply(client);
-                });
-              }
-          );
-        }
-      } else {
-        performUnsub.apply(client);
-      }
-
-      logger.exit('performSub', client.id, null);
-    };
-
-    performSub();
-  }
-  logger.exit('processQueuedActions', client.id, null);
-};
-
-
 /**
  * @return {Boolean} <code>true</code> true if in 'stopping' or 'stopped' state,
  * <code>false</code> otherwise.
@@ -2550,7 +2361,6 @@ Client.prototype.isStopped = function() {
  * @param {Object}
  *          delivery - the message delivery information
  */
-
 
 /**
  * Sends a message to the MQ Light server.
@@ -2573,12 +2383,12 @@ Client.prototype.send = function(topic, data, options, callback) {
   var nextMessage = false;
 
   // Validate the passed parameters
-  if (!topic) {
+  if (topic) {
+    topic = String(topic);
+  } else {
     err = new TypeError('Cannot send to undefined topic');
     logger.throw('Client.send', this.id, err);
     throw err;
-  } else {
-    topic = String(topic);
   }
   logger.log('parms', this.id, 'topic:', topic);
   logger.log('parms', this.id, 'data: typeof', typeof data);
@@ -2622,8 +2432,8 @@ Client.prototype.send = function(topic, data, options, callback) {
       } else if (options.qos === exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
-        err = new RangeError("options:qos value '" + options.qos +
-                             "' is invalid must evaluate to 0 or 1");
+        err = new RangeError('options:qos value \'' + options.qos +
+                             '\' is invalid must evaluate to 0 or 1');
         logger.throw('Client.send', this.id, err);
         throw err;
       }
@@ -2632,9 +2442,9 @@ Client.prototype.send = function(topic, data, options, callback) {
     if ('ttl' in options) {
       ttl = Number(options.ttl);
       if (Number.isNaN(ttl) || !Number.isFinite(ttl) || ttl <= 0) {
-        err = new RangeError("options:ttl value '" +
+        err = new RangeError('options:ttl value \'' +
             options.ttl +
-            "' is invalid, must be an unsigned non-zero integer number");
+            '\' is invalid, must be an unsigned non-zero integer number');
         logger.throw('Client.send', this.id, err);
         throw err;
       } else if (ttl > 4294967295) {
@@ -2686,39 +2496,44 @@ Client.prototype.send = function(topic, data, options, callback) {
   var inOutstandingSends = false;
   try {
     logger.entry('proton.createMessage', client.id);
-    protonMsg = proton.createMessage();
+    protonMsg = {
+      header: {},
+      properties: {}
+    };
     logger.exit('proton.createMessage', client.id, protonMsg);
-    protonMsg.address = client._getService() + '/' + topic;
+    protonMsg.properties.to = client._getService() + '/' + topic;
     if (ttl) {
-      protonMsg.ttl = ttl;
+      protonMsg.header.ttl = ttl;
     }
     if (options && 'properties' in options) {
       var properties = {};
       for (var property in options.properties) {
-        var key = String(property);
-        var val = options.properties[property];
-        var type = typeof(val);
-        if (val !== null && type !== 'boolean' && type !== 'number' &&
-            type !== 'string' && !(val instanceof Buffer)) {
-          var msg = "Property key '" + key + "' specifies a value which is " +
-                    'not of a supported type';
-          err = new InvalidArgumentError(msg);
-          logger.throw('Client.send', this.id, err);
-          throw err;
+        if ({}.hasOwnProperty.call(options.properties, property)) {
+          var key = String(property);
+          var val = options.properties[property];
+          var type = typeof (val);
+          if (val !== null && type !== 'boolean' && type !== 'number' &&
+              type !== 'string' && !(val instanceof Buffer)) {
+            var msg = 'Property key \'' + key + '\' specifies a value which ' +
+                      'is not of a supported type';
+            err = new InvalidArgumentError(msg);
+            logger.throw('Client.send', this.id, err);
+            throw err;
+          }
+          properties[key] = val;
         }
-        properties[key] = val;
       }
-      protonMsg.properties = properties;
+      protonMsg.applicationProperties = properties;
     }
     if (typeof data === 'string') {
       protonMsg.body = data;
-      protonMsg.contentType = 'text/plain';
+      protonMsg.properties.contentType = 'text/plain';
     } else if (data instanceof Buffer) {
       protonMsg.body = data;
-      protonMsg.contentType = 'application/octet-stream';
+      protonMsg.properties.contentType = 'application/octet-stream';
     } else {
       protonMsg.body = JSON.stringify(data);
-      protonMsg.contentType = 'application/json';
+      protonMsg.properties.contentType = 'application/json';
     }
 
     // Record that a send operation is in progress
@@ -2730,187 +2545,6 @@ Client.prototype.send = function(topic, data, options, callback) {
       options: options
     });
     inOutstandingSends = true;
-
-    messenger.put(protonMsg, qos);
-    messenger.send(client._stream);
-
-    if (client._outstandingSends.length === 1) {
-      var sendOutboundMessages = function() {
-        logger.entry('Client.send.sendOutboundMessages', client.id);
-        logger.log('debug', client.id,
-                   'outstandingSends:', client._outstandingSends.length);
-        try {
-          var inFlight;
-          if (!messenger.stopped) {
-            // Write any data buffered within messenger
-            messenger.pop(client._stream, false);
-            if (messenger.pendingOutbound(client._getService())) {
-              logger.log('debug', client.id, 'output still pending!');
-            }
-
-            // See if any of the outstanding send operations have now completed
-            while (client._outstandingSends.length > 0) {
-              inFlight = client._outstandingSends.slice(0, 1)[0];
-              var status = messenger.status(inFlight.msg);
-              var complete = false;
-              var err = null;
-              if (inFlight.qos == exports.QOS_AT_MOST_ONCE) {
-                if (messenger.sending(inFlight.msg.address)) {
-                  complete = (status === PN_STATUS_UNKNOWN);
-                }
-              } else {
-                switch (status) {
-                  case PN_STATUS_ACCEPTED:
-                  case PN_STATUS_SETTLED:
-                    messenger.settle(inFlight.msg, client._stream);
-                    complete = true;
-                    break;
-                  case PN_STATUS_REJECTED:
-                    complete = true;
-                    var rejectMsg = messenger.statusError(inFlight.msg);
-                    if (!rejectMsg || rejectMsg === '') {
-                      rejectMsg = 'send failed - message was rejected';
-                    }
-                    err = new RangeError(rejectMsg);
-                    break;
-                  case PN_STATUS_RELEASED:
-                    complete = true;
-                    err = new Error('send failed - message was released');
-                    break;
-                  case PN_STATUS_MODIFIED:
-                    complete = true;
-                    err = new Error('send failed - message was modified');
-                    break;
-                  case PN_STATUS_ABORTED:
-                    complete = true;
-                    err = new Error('send failed - message was aborted');
-                    break;
-                  case PN_STATUS_PENDING:
-                    messenger.send(client._stream);
-                    break;
-                }
-              }
-
-              if (complete) {
-                // Remove send operation from list of outstanding send ops.
-                client._outstandingSends.shift();
-
-                // Generate drain event, if required.
-                if (client._drainEventRequired &&
-                    (client._outstandingSends.length <= 1)) {
-                  client._drainEventRequired = false;
-                  process.nextTick(function() {
-                    logger.log('emit', client.id, 'drain');
-                    client.emit('drain');
-                  });
-                }
-
-                // invoke the callback, if specified
-                if (inFlight.callback) {
-                  setImmediate(
-                      function(client, cbFunc, err, topic, body, options) {
-                        logger.entry(
-                            'Client.send.sendOutboundMessages.callback',
-                            client.id);
-                        cbFunc.apply(client, [err,
-                                              topic,
-                                              body,
-                                              options]);
-                        logger.exit('Client.send.sendOutboundMessages.callback',
-                            client.id, null);
-                      }, client, inFlight.callback, err, inFlight.topic,
-                      inFlight.msg.body, inFlight.options);
-                }
-
-                // Free resources used by the message
-                inFlight.msg.destroy();
-              } else {
-                // Can't make any more progress for now - schedule remaining
-                // work for processing in the future.
-                setImmediate(sendOutboundMessages);
-                logger.exit('Client.send.sendOutboundMessages', client.id,
-                            null);
-                return;
-              }
-            }
-          } else {
-            // messenger has been stopped.
-            while (client._outstandingSends.length > 0) {
-              inFlight = client._outstandingSends.shift();
-              client._queuedSends.push({
-                topic: inFlight.topic,
-                data: inFlight.msg.body,
-                options: inFlight.options,
-                callback: callback
-              });
-              inFlight.msg.destroy();
-            }
-          }
-        } catch (e) {
-          var error = getNamedError(e);
-          var callbackError = null;
-          logger.caught('Client.send.sendOutboundMessages', client.id, error);
-
-          // Error - so empty the outstandingSends array:
-          while (client._outstandingSends.length > 0) {
-            inFlight = client._outstandingSends.shift();
-            if (inFlight.qos === exports.QOS_AT_LEAST_ONCE) {
-              // Retry at-least-once qos messages
-              client._queuedSends.push({
-                topic: inFlight.topic,
-                data: inFlight.msg.body,
-                options: inFlight.options,
-                callback: callback
-              });
-            } else {
-              // we don't know if an at-most-once message made it across.
-              // Call the callback with an err of null to indicate success
-              // otherwise the application could decide to resend (duplicate)
-              // the message
-              if (inFlight.callback) {
-                setImmediate(function(client, error, topic, body, options) {
-                  logger.entry('Client.send.sendOutboundMessages.callback',
-                      client.id);
-                  try {
-                    inFlight.callback.apply(client,
-                        [null, topic, body, options]);
-                  } catch (cberr) {
-                    logger.caught('Client.send.sendOutboundMessages.callback',
-                                  client.id, cberr);
-                    if (callbackError === null) callbackError = cberr;
-                  }
-                  logger.exit('Client.send.sendOutboundMessages.callback',
-                              client.id, null);
-
-                }, client, error, inFlight.topic, inFlight.msg.body,
-                inFlight.options);
-              }
-            }
-          }
-
-          inFlight.msg.destroy();
-
-          if (shouldReconnect(error)) {
-            reconnect(client);
-          }
-
-          if (error) {
-            process.nextTick(function() {
-              logger.log('emit', client.id, 'error', error);
-              client.emit('error', error);
-            });
-          }
-
-          if (callbackError !== null) {
-            logger.throw('Client.send.sendOutboundMessages',
-                         client.id, callbackError);
-            throw callbackError;
-          }
-        }
-        logger.exit('Client.send.sendOutboundMessages', client.id, null);
-      };
-      setImmediate(sendOutboundMessages);
-    }
 
     // If we have a backlog of messages, then record the need to emit a drain
     // event later to indicate the backlog has been cleared.
@@ -2967,11 +2601,6 @@ Client.prototype.send = function(topic, data, options, callback) {
         if (doReconnect) {
           reconnect(client);
         }
-
-        process.nextTick(function() {
-          logger.log('emit', client.id, 'error', invocation.error);
-          client.emit('error', invocation.error);
-        });
       });
     }
 
@@ -2984,307 +2613,53 @@ Client.prototype.send = function(topic, data, options, callback) {
       topic: topic
     });
   }
+  messenger.createSender(topic, {
+    attach: {
+      senderSettleMode:
+        (qos === exports.QOS_AT_MOST_ONCE) ?
+        AMQP.Constants.senderSettleMode.settled :
+        AMQP.Constants.senderSettleMode.unsettled
+    }
+  }).then(function(sender) {
+    sender.send(protonMsg).then(function(state) {
+      client._outstandingSends.shift();
+      // generate drain event, if required.
+      if (client._drainEventRequired &&
+        (client._outstandingSends.length <= 1)) {
+        client._drainEventRequired = false;
+        process.nextTick(function() {
+          logger.log('emit', client.id, 'drain');
+          client.emit('drain');
+        });
+      }
+      if (state && callback) {
+        // TODO: check if we need to handle different values of state
+        callback.apply(client, [null, topic, data, options]);
+      }
+    }).catch(function(err) {
+      logger.caught('Client.send', client.id, err);
+      client._outstandingSends.shift();
+      if (callback) {
+        err = lookupError(err);
+        callback.apply(client, [err, topic, data, options]);
+      }
+    }).error(function(err) {
+      logger.caught('Client.send', client.id, err);
+      client._outstandingSends.shift();
+      if (callback) {
+        err = lookupError(err);
+        callback.apply(client, [err, topic, data, options]);
+      }
+    });
+  }).catch(function(err) {
+    console.error(err);
+    logger.caught('Client.send', client.id, err);
+  });
 
   logger.exit('Client.send', this.id, nextMessage);
   return nextMessage;
 };
 
-
-/**
- * Function to force the client to check for messages, outputting the contents
- * of any that have arrived to the client event emitter.
- *
- * @throws {Error}
- *           If a listener hasn't been reqistered for the 'malformed' event and
- *           one needs to be emitted.
- */
-Client.prototype.checkForMessages = function() {
-  var client = this;
-  logger.entryLevel('entry_often', 'checkForMessages', client.id);
-  var messenger = client._messenger;
-  if (client.state !== STATE_STARTED || client._subscriptions.length === 0 ||
-      client.listeners('message').length === 0) {
-    logger.exitLevel('exit_often', 'checkForMessages', client.id, null);
-    return;
-  }
-
-  var err;
-
-  try {
-    var messages = messenger.receive(client._stream);
-    if (messages.length > 0) {
-      logger.log('debug', client.id, 'received %d messages', messages.length);
-
-      for (var msg = 0, tot = messages.length; msg < tot; msg++) {
-        logger.log('debug', client.id, 'processing message %d', msg);
-        var protonMsg = messages[msg];
-        processMessage(client, protonMsg);
-        if (msg < (tot - 1)) {
-          // Unless this is the last pass around the loop, call pop() so that
-          // Messenger has a chance to respond to any heartbeat requests
-          // that may have arrived from the server.
-          client._messenger.pop(client._stream, true);
-        }
-      }
-    }
-  } catch (e) {
-    err = getNamedError(e);
-    logger.caughtLevel('entry_often', 'checkForMessages', client.id, err);
-    process.nextTick(function() {
-      if (shouldReconnect(err)) {
-        reconnect(client);
-      }
-      logger.log('emit', client.id, 'error', err);
-      client.emit('error', err);
-    });
-  }
-
-  logger.exitLevel('exit_often', 'checkForMessages', client.id, null);
-};
-
-var processMessage = function(client, protonMsg) {
-  logger.entryLevel('entry_often', 'processMessage', client.id);
-  var messenger = client._messenger;
-  Object.defineProperty(protonMsg, 'connectionId', {
-    value: client._connectionId
-  });
-
-  // if body is a JSON'ified object, try to parse it back to a js obj
-  var data;
-  var err;
-  if (protonMsg.contentType === 'application/json') {
-    try {
-      data = JSON.parse(protonMsg.body);
-    } catch (_) {
-      logger.caughtLevel('entry_often', 'processMessage', client.id, _);
-      console.warn(_);
-    }
-  } else {
-    data = protonMsg.body;
-  }
-
-  var topic = protonMsg.address;
-  var prefixMatch = topic.match('^amqp[s]?:\/\/');
-  if (prefixMatch) {
-    topic = topic.slice(prefixMatch[0].length);
-    topic = topic.slice(topic.indexOf('/') + 1);
-  }
-  var autoConfirm = true;
-  var qos = exports.QOS_AT_MOST_ONCE;
-  var matchedSubs = client._subscriptions.filter(function(el) {
-    // 1 added to length to account for the / we add
-    var addressNoService = el.address.slice(client._getService().length + 1);
-    // possible to have 2 matches work out whether this is
-    // for a share or private topic
-    var linkAddress;
-    if (protonMsg.linkAddress.indexOf('private:') === 0 && !el.share) {
-      // slice off 'private:' prefix
-      linkAddress = protonMsg.linkAddress.slice(8);
-    } else if (protonMsg.linkAddress.indexOf('share:') === 0 && el.share) {
-      // starting after the share: look for the next : denoting the end
-      // of the share name and get everything past that
-      linkAddress = protonMsg.linkAddress.slice(
-          protonMsg.linkAddress.indexOf(':', 7) + 1);
-    }
-    if (addressNoService === linkAddress) {
-      return el;
-    }
-  });
-  // should only ever be one entry in matchedSubs
-  if (matchedSubs.length > 1) {
-    err = new Error('received message matched more than one ' +
-        'subscription');
-    logger.ffdc('processMessage', 'ffdc003', client, err);
-  }
-  var subscription = matchedSubs[0];
-  if (typeof subscription !== 'undefined') {
-    qos = subscription.qos;
-    if (qos === exports.QOS_AT_LEAST_ONCE) {
-      autoConfirm = subscription.autoConfirm;
-    }
-    ++subscription.unconfirmed;
-  } else {
-    // ideally we shouldn't get here, but it can happen in a timing
-    // window if we had received a message from a subscription we've
-    // subsequently unsubscribed from
-    logger.log('debug', client.id, 'No subscription matched message: ' +
-        data + ' going to address: ' + protonMsg.address);
-    protonMsg.destroy();
-    protonMsg = null;
-    return;
-  }
-
-  var delivery = {
-    message: {
-      topic: topic
-    }
-  };
-
-
-  var stillSettling = function(subscription, protonMsg, callback) {
-    var client = this;
-    logger.entryLevel('entry_often', 'processMessage.stillSettling', client.id);
-
-    var settled = messenger.settled(protonMsg);
-    if (settled) {
-      --subscription.unconfirmed;
-      ++subscription.confirmed;
-      logger.log('data', client.id, '[credit,unconfirmed,confirmed]:',
-          '[' + subscription.credit + ',' +
-          subscription.unconfirmed + ',' +
-          subscription.confirmed + ']');
-      // Ask to flow more messages if >= 80% of available credit
-      // (e.g. not including unconfirmed messages) has been used.
-      // Or if we have just confirmed everything.
-      var available = subscription.credit - subscription.unconfirmed;
-      if ((available / subscription.confirmed) <= 1.25 ||
-          (subscription.unconfirmed === 0 &&
-          subscription.confirmed > 0)) {
-        messenger.flow(client._getService() + '/' + protonMsg.linkAddress,
-                             subscription.confirmed, client._stream);
-        subscription.confirmed = 0;
-      }
-      protonMsg.destroy();
-      protonMsg = null;
-      if (callback) {
-        process.nextTick(function() {
-          logger.entry('processMessage.stillSettling.callback', client.id);
-          callback.apply(client);
-          logger.exit('processMessage.stillSettling.callback', client.id, null);
-        });
-      }
-    } else {
-      setImmediate(function() {
-        stillSettling.call(client, subscription, protonMsg, callback);
-      });
-    }
-
-    logger.exitLevel('exit_often', 'processMessage.stillSettling',
-                     client.id, !settled);
-  };
-
-  if (qos >= exports.QOS_AT_LEAST_ONCE && !autoConfirm) {
-    var deliveryConfirmed = false;
-    delivery.message.confirmDelivery = function(callback) {
-      logger.entry('message.confirmDelivery', client.id);
-      logger.log('data', client.id, 'delivery:', delivery);
-
-      var err;
-      if (client.isStopped()) {
-        err = new NetworkError('not started');
-        logger.throw('message.confirmDelivery', client.id, err);
-        throw err;
-      }
-
-      if (callback && (typeof callback !== 'function')) {
-        err = new TypeError('Callback must be a function');
-        logger.throw('message.confirmDelivery', client.id, err);
-        throw err;
-      }
-
-      logger.log('data', client.id, 'deliveryConfirmed:', deliveryConfirmed);
-
-      if (!deliveryConfirmed && protonMsg) {
-        // also throw NetworkError if the client has disconnected at some point
-        // since this particular message was received
-        if (protonMsg.connectionId !== client._connectionId) {
-          err = new NetworkError('client has reconnected since this ' +
-                                 'message was received');
-          logger.throw('message.confirmDelivery', client.id, err);
-          throw err;
-        }
-        deliveryConfirmed = true;
-        messenger.settle(protonMsg, client._stream);
-        stillSettling.call(client, subscription, protonMsg, callback);
-      }
-      logger.exit('message.confirmDelivery', client.id, null);
-    };
-  }
-
-  var linkAddress = protonMsg.linkAddress;
-  if (linkAddress) {
-    delivery.destination = {};
-    var link = linkAddress;
-    if (link.indexOf('share:') === 0) {
-      // remove 'share:' prefix from link name
-      link = link.substring(6, linkAddress.length);
-      // extract share name and add to delivery information
-      delivery.destination.share = link.substring(0, link.indexOf(':'));
-    }
-    // extract topicPattern and add to delivery information
-    delivery.destination.topicPattern =
-        link.substring(link.indexOf(':') + 1, link.length);
-  }
-  if (protonMsg.ttl > 0) {
-    delivery.message.ttl = protonMsg.ttl;
-  }
-
-  if (protonMsg.properties) {
-    delivery.message.properties = protonMsg.properties;
-  }
-
-  var da = protonMsg.deliveryAnnotations;
-  var malformed = {};
-  malformed.MQMD = {};
-  for (var an = 0; da && (an < da.length); ++an) {
-    if (da[an] && da[an].key) {
-      switch (da[an].key) {
-        case 'x-opt-message-malformed-condition':
-          malformed.condition = da[an].value;
-          break;
-        case 'x-opt-message-malformed-description':
-          malformed.description = da[an].value;
-          break;
-        case 'x-opt-message-malformed-MQMD.CodedCharSetId':
-          malformed.MQMD.CodedCharSetId = Number(da[an].value);
-          break;
-        case 'x-opt-message-malformed-MQMD.Format':
-          malformed.MQMD.Format = da[an].value;
-          break;
-        default:
-          break;
-      }
-    }
-  }
-  if (malformed.condition) {
-    if (client.listeners('malformed').length > 0) {
-      delivery.malformed = malformed;
-      logger.log('emit', client.id,
-          'malformed', protonMsg.body, delivery);
-      client.emit('malformed', protonMsg.body, delivery);
-    } else {
-      protonMsg.destroy();
-      err = new Error('No listener for "malformed" event.');
-      logger.throwLevel('exit_often', 'processMessage', client.id, err);
-      throw err;
-    }
-  } else {
-    logger.log('emit', client.id, 'message', delivery);
-    try {
-      client.emit('message', data, delivery);
-    } catch (err) {
-      logger.caughtLevel('entry_often', 'processMessage',
-                               client.id, err);
-      logger.log('emit', client.id, 'error', err);
-      client.emit('error', err);
-    }
-  }
-
-  if (client.isStopped()) {
-    logger.log('debug', client.id,
-        'client is stopped so not accepting or settling message');
-    protonMsg.destroy();
-  } else {
-    if (qos === exports.QOS_AT_MOST_ONCE) {
-      messenger.accept(protonMsg);
-    }
-    if (qos === exports.QOS_AT_MOST_ONCE || autoConfirm) {
-      messenger.settle(protonMsg, client._stream);
-      stillSettling.call(client, subscription, protonMsg);
-    }
-  }
-  logger.exitLevel('exit_often', 'processMessage', client.id, null);
-};
 /**
  * @param {function(object)}
  *          destCallback - callback, invoked with an Error object if
@@ -3295,7 +2670,6 @@ var processMessage = function(client, protonMsg) {
  * @param {String}
  *          topicPattern - the topic pattern that was subscribed to
  */
-
 
 /**
  * Subscribes to a destination. The client will be eligible to receive messages
@@ -3321,13 +2695,14 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
 
   // Must accept at least one option - and first option is always a
   // topicPattern.
+  var err;
   if (arguments.length === 0) {
-    err = new TypeError("You must specify a 'topicPattern' argument");
+    err = new TypeError('You must specify a \'topicPattern\' argument');
     logger.throw('Client.subscribe', this.id, err);
     throw err;
   }
   if (!topicPattern) {
-    err = new TypeError("You must specify a 'topicPattern' argument");
+    err = new TypeError('You must specify a \'topicPattern\' argument');
     logger.throw('Client.subscribe', this.id, err);
     throw err;
   }
@@ -3367,9 +2742,9 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   if (share) {
     share = String(share);
     if (share.indexOf(':') >= 0) {
-      err = new InvalidArgumentError("share argument value '" + share +
-                                     "' is invalid because it contains a " +
-                                     "colon (\':\') character");
+      err = new InvalidArgumentError('share argument value \'' + share +
+                                     '\' is invalid because it contains a ' +
+                                     'colon (\':\') character');
       logger.throw('Client.subscribe', this.id, err);
       throw err;
     }
@@ -3402,8 +2777,8 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       } else if (options.qos === exports.QOS_AT_LEAST_ONCE) {
         qos = exports.QOS_AT_LEAST_ONCE;
       } else {
-        err = new RangeError("options:qos value '" + options.qos +
-                             "' is invalid must evaluate to 0 or 1");
+        err = new RangeError('options:qos value \'' + options.qos +
+                             '\' is invalid must evaluate to 0 or 1');
         logger.throw('Client.subscribe', this.id, err);
         throw err;
       }
@@ -3414,9 +2789,9 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       } else if (options.autoConfirm === false) {
         autoConfirm = false;
       } else {
-        err = new TypeError("options:autoConfirm value '" +
+        err = new TypeError('options:autoConfirm value \'' +
                             options.autoConfirm +
-                            "' is invalid must evaluate to true or false");
+                            '\' is invalid must evaluate to true or false');
         logger.throw('Client.subscribe', this.id, err);
         throw err;
       }
@@ -3424,9 +2799,9 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     if ('ttl' in options) {
       ttl = Number(options.ttl);
       if (Number.isNaN(ttl) || !Number.isFinite(ttl) || ttl < 0) {
-        err = new RangeError("options:ttl value '" +
+        err = new RangeError('options:ttl value \'' +
                              options.ttl +
-                             "' is invalid, must be an unsigned integer " +
+                             '\' is invalid, must be an unsigned integer ' +
                              'number');
         logger.throw('Client.subscribe', this.id, err);
         throw err;
@@ -3437,9 +2812,9 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
       credit = Number(options.credit);
       if (Number.isNaN(credit) || !Number.isFinite(credit) || credit < 0 ||
           credit > 4294967295) {
-        err = new RangeError("options:credit value '" +
+        err = new RangeError('options:credit value \'' +
                              options.credit +
-                             "' is invalid, must be an unsigned integer " +
+                             '\' is invalid, must be an unsigned integer ' +
                              'number');
         logger.throw('Client.subscribe', this.id, err);
         throw err;
@@ -3463,7 +2838,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   // Subscribe using the specified topic pattern and share options
   var client = this;
   var messenger = client._messenger;
-  var address = client._getService() + '/' + share + topicPattern;
+  var address = share + topicPattern;
   var subscriptionAddress = client._getService() + '/' + topicPattern;
 
   var i = 0;
@@ -3494,8 +2869,6 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     logger.exit('Client.subscribe', client.id, client);
     return client;
   }
-
-  var err;
 
   // if we already believe this subscription exists, we should reject the
   // request to subscribe by throwing a SubscribedError
@@ -3543,13 +2916,16 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
         reconnect(client);
       }
 
-      process.nextTick(function() {
-        logger.log('emit', client.id, 'error', err);
-        client.emit('error', err);
-      });
+      if (!callback) {
+        process.nextTick(function() {
+          logger.log('emit', client.id, 'error', err);
+          client.emit('error', err);
+        });
+      }
     } else {
-      // if no errors, add this to the stored list of subscriptions
+      // if no errors, add to the stored list of subscriptions
       client._subscriptions.push({
+        receiver: this,
         address: subscriptionAddress,
         qos: qos,
         autoConfirm: autoConfirm,
@@ -3566,49 +2942,97 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
     logger.exit('Client.subscribe.finishedSubscribing', client.id, null);
   };
 
-  if (!err) {
-    try {
-      messenger.subscribe(address, qos, ttl, client._stream);
-
-      var stillSubscribing = function(client, callback) {
-        logger.entry('Client.subscribe.stillSubscribing', client.id);
-
-        try {
-          if (!messenger.subscribed(address)) {
-            setImmediate(function() {
-              stillSubscribing(client, callback);
-            });
-          } else {
-            if (credit > 0) {
-              messenger.flow(address, credit, client._stream);
-            }
-            finishedSubscribing(null, callback);
+  if (err) {
+    finishedSubscribing(err, callback);
+  } else {
+    var link = {
+      name: address,
+      credit:
+        (qos === exports.QOS_AT_MOST_ONCE) ?
+        // XXX: previously we renewed credit at 80% rather than 50%...
+        AMQP.Policy.Utils.CreditPolicies.RefreshAtHalf :
+        AMQP.Policy.Utils.CreditPolicies.RefreshSettled(
+          Math.max(1, credit / 2)),
+      creditQuantum: credit,
+      attach: {
+        source: {
+          address: address
+        },
+        target: {
+          address: address
+        },
+        receiverSettleMode:
+          (qos === exports.QOS_AT_MOST_ONCE) ?
+          AMQP.Constants.receiverSettleMode.autoSettle :
+          AMQP.Constants.receiverSettleMode.settleOnDisposition
+      }
+    };
+    // if (ttl) {
+    link.attach.source.expiryPolicy = link.attach.target.expiryPolicy =
+        'link-detach';
+    link.attach.source.timeout = link.attach.target.timeout = ttl;
+    // }
+    var handleLinkError = function(receiver, err) {
+      if (err.description && err.description !== 'detach-forced') {
+        var matchedSubs = client._subscriptions.filter(function(el) {
+          var addressNoService =
+              el.address.slice(client._getService().length + 1);
+          var linkAddress;
+          if (receiver.name.indexOf('private:') === 0 && !el.share) {
+            linkAddress = receiver.name.slice(8);
+          } else if (receiver.name.indexOf('share:') === 0 && el.share) {
+            linkAddress =
+                receiver.name.slice(receiver.name.indexOf(':', 7) + 1);
           }
-        } catch (e) {
-          logger.caught('Client.subscribe.stillSubscribing', client.id, e);
-          err = getNamedError(e);
+          return (addressNoService === linkAddress);
+        });
+        err = lookupError(err);
+        if (matchedSubs.length > 0) {
+          logger.log('debug', client.id, 'matchedSubs', matchedSubs);
+          logger.log('emit', client.id, 'error', err);
+          client.emit('error', err);
+        } else {
           finishedSubscribing(err, callback);
         }
-
-        logger.exit('Client.subscribe.stillSubscribing', client.id, null);
-      };
-
-      setImmediate(function() {
-        stillSubscribing(client, callback);
+      }
+    };
+    messenger.createReceiver(address, link).then(function(receiver) {
+      logger.log('debug', client.id, 'createReceiver', receiver);
+      receiver.on('message', function(message) {
+        processMessage(client, receiver, message);
       });
-    } catch (e) {
-      logger.caught('Client.subscribe', client.id, e);
-      err = getNamedError(e);
+      receiver.on('detached', function(info) {
+        logger.log('debug', client.id, 'detached', info);
+        if (info.error) {
+          var err = info.error;
+          handleLinkError(receiver, err);
+        }
+      });
+      receiver.on('errorReceived', function(err) {
+        logger.log('debug', client.id, 'errorReceived', err);
+        handleLinkError(receiver, err);
+      });
+      if (receiver.remote.handle === undefined) {
+        if (receiver.remote.detach === undefined) {
+          // ignore for now as we should receive a 'detached' event shortly
+        } else {
+          handleLinkError(receiver, receiver.remote.detach.error);
+        }
+      } else {
+        finishedSubscribing.apply(receiver, [null, callback]);
+      }
+    }).catch(function(err) {
+      logger.caught('Client.subscribe', client.id, err);
       finishedSubscribing(err, callback);
-    }
-  } else {
-    finishedSubscribing(err, callback);
+    }).error(function(err) {
+      logger.caught('Client.subscribe', client.id, err);
+      finishedSubscribing(err, callback);
+    });
   }
 
   logger.exit('Client.subscribe', client.id, client);
   return client;
 };
-
 
 /**
  * Stops the flow of messages from a destination to this client.  The client's
@@ -3630,20 +3054,21 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
  * @throws {TypeError} one of the  parameters is of the wrong type.
  * @throws {Error} if the topic pattern parameter is undefined.
  */
-Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
-                               {
+Client.prototype.unsubscribe = function(topicPattern, share, options,
+                                        callback) {
   logger.entry('Client.unsubscribe', this.id);
   logger.log('parms', this.id, 'topicPattern:', topicPattern);
 
   // Must accept at least one option - and first option is always a
   // topicPattern.
+  var err;
   if (arguments.length === 0) {
-    err = new TypeError("You must specify a 'topicPattern' argument");
+    err = new TypeError('You must specify a \'topicPattern\' argument');
     logger.throw('Client.unsubscribe', this.id, err);
     throw err;
   }
   if (!topicPattern) {
-    err = new TypeError("You must specify a 'topicPattern' argument");
+    err = new TypeError('You must specify a \'topicPattern\' argument');
     logger.throw('Client.unsubscribe', this.id, err);
     throw err;
   }
@@ -3683,9 +3108,9 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   if (share) {
     share = String(share);
     if (share.indexOf(':') >= 0) {
-      err = new InvalidArgumentError("share argument value '" + share +
-                                     "' is invalid because it contains a " +
-                                     "colon (\':\') character");
+      err = new InvalidArgumentError('share argument value \'' + share +
+                                     '\' is invalid because it contains a ' +
+                                     'colon (\':\') character');
       logger.throw('Client.unsubscribe', this.id, err);
       throw err;
     }
@@ -3712,9 +3137,9 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     if ('ttl' in options) {
       ttl = Number(options.ttl);
       if (Number.isNaN(ttl) || ttl !== 0) {
-        err = new RangeError("options:ttl value '" +
+        err = new RangeError('options:ttl value \'' +
                              options.ttl +
-                             "' is invalid, only 0 is a supported value for " +
+                             '\' is invalid, only 0 is a supported value for ' +
                              ' an unsubscribe request');
         logger.throw('Client.unsubscribe', this.id, err);
         throw err;
@@ -3736,17 +3161,17 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
   }
 
   var client = this;
-  var messenger = client._messenger;
-  var address = client._getService() + '/' + share + topicPattern;
   var subscriptionAddress = client._getService() + '/' + topicPattern;
 
   // Check that there is actually a subscription for the pattern and share
   var subscribed = false;
+  var receiver;
   var i = 0;
   for (i = 0; i < client._subscriptions.length; i++) {
     if (client._subscriptions[i].address === subscriptionAddress &&
         client._subscriptions[i].share === originalShareValue) {
       subscribed = true;
+      receiver = client._subscriptions[i].receiver;
       break;
     }
   }
@@ -3802,8 +3227,6 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
     return client;
   }
 
-  var err;
-
   if (!subscribed) {
     err = new UnsubscribedError('client is not subscribed to this address');
     logger.throw('Client.unsubscribe', this.id, err);
@@ -3856,34 +3279,22 @@ Client.prototype.unsubscribe = function(topicPattern, share, options, callback)
 
   // unsubscribe using the specified topic pattern and share options
   try {
-    messenger.unsubscribe(address, ttl, client._stream);
-
-    var stillUnsubscribing = function(client, callback) {
-      logger.entry('Client.unsubscribe.stillUnsubscribing', client.id);
-
-      try {
-        if (!messenger.unsubscribed(address)) {
-          setImmediate(function() {
-            stillUnsubscribing(client, callback);
-          });
-        } else {
-          finishedUnsubscribing(null, callback);
-        }
-      } catch (e) {
-        logger.caught('Client.unsubscribe.stillUnsubscribing', client.id, e);
-        err = getNamedError(e);
+    var closed = (ttl === 0);
+    receiver.detach().then(function() {
+      finishedUnsubscribing(null, callback);
+    }).catch(function(err) {
+      if (closed || err !== 'link not closed') {
+        logger.caught('Client.unsubscribe', client.id, err);
         finishedUnsubscribing(err, callback);
+      } else {
+        finishedUnsubscribing(null, callback);
       }
-
-      logger.exit('Client.unsubscribe.stillUnsubscribing', client.id, null);
-    };
-
-    setImmediate(function() {
-      stillUnsubscribing(client, callback);
     });
-  } catch (e) {
-    logger.caught('Client.unsubscribe', client.id, e);
-    err = getNamedError(e);
+    // FIXME: currently no way of specifying closed=false on detach, so we use
+    // our monkey patch
+    receiver._sendDetach2(closed);
+  } catch (err) {
+    logger.caught('Client.unsubscribe', client.id, err);
     finishedUnsubscribing(err, callback);
   }
 

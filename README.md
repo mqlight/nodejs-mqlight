@@ -15,10 +15,9 @@ See https://developer.ibm.com/messaging/mq-light/ for more details.
 
 ### Prerequisites
 
-You will need a Node.js 0.10, 0.12, 4.x, 5.x or 6.x runtime environment to use
-the MQ Light API module. This can be installed from
-http://nodejs.org/download/, or by using your operating system's package
-manager.
+You will need a Node.js 4.x or newer runtime environment to use the MQ Light
+API module. This can be installed from http://nodejs.org/download/, or by using
+your operating system's package manager.
 
 The following are the currently supported platform architectures:
 
@@ -27,13 +26,6 @@ The following are the currently supported platform architectures:
 * 64-bit runtime on Mac OS X (x64)
 
 You will receive an error if you attempt to use any other combination.
-
-Before using MQ Light on Linux, you will also need to make sure you have the
-libuuid package installed. For example:
-
-* To check whether you have the package on Ubuntu, run: ``dpkg -l libuuid1``
-* To check whether you have the package on RedHat, run: ``rpm -qa | grep
-  libuuid``
 
 ### Usage
 
@@ -615,6 +607,13 @@ environment variable `MQLIGHT_NODE_LOG` to `debug` and by collecting the output
 that goes to stderr when you run your application.
 
 ## Release notes
+
+### 2.0.2016092200
+
+* Complete rewrite of the client to use a pure JavaScript implementation of the
+  AMQP 1.0 protocol. Hence we no longer require compilation of a native addon
+  and can more easily support newer releases of the Node.js runtime.
+* This is considered a major semver bump.
 
 ### 1.0.2016071802
 

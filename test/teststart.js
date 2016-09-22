@@ -756,7 +756,7 @@ module.exports.test_start_file_multiple_endpoints = function(test) {
     id: 'test_start_file_multiple_endpoints'
   });
   // error will be emitted for the last service in the returned endpoint list
-  client.on('error', function(err) {
+  client.once('error', function(err) {
     test.ok(err.message.indexOf('bad4') != -1);
   });
   client.start(function(err) {
@@ -870,60 +870,6 @@ module.exports.test_start_file_bad_json = function(test) {
     fs.readFile = originalReadFileMethod;
   });
 };
-
-
-/**
- * Tests that after successfully connecting to the server, a heartheat is
- * setup to call pn_messenger_work at the rate required by
- * the server.
- *
- * @param {object} test the unittest interface
- */
-module.exports.test_start_heartbeat = function(test) {
-  var heartbeatCount = 0;
-  var remoteIdleTimeout = 20;
-  stubproton.setRemoteIdleTimeout(remoteIdleTimeout, function() {
-    heartbeatCount++;
-  });
-  var client = mqlight.createClient({
-    service: 'amqp://host:1234',
-    id: 'test_start_heartbeat'
-  });
-  client.start(function() {
-    // Function to check for heartbeats. Invoked at half the rate of heartbeats
-    // This is a little crude as it is not possible to get exact timings
-    var waitForHeartbeats = function(count) {
-      count++;
-      // If out of time then there have not been enough heartbeats
-      if (count === 100) {
-        client.stop();
-        stubproton.setRemoteIdleTimeout(-1);
-        test.fail('insufficient heartbeats, only saw ' + heartbeatCount +
-                  'heartbeats');
-        test.done();
-      // If too many heartbeats then fail (more a test to see if the heartbeat
-      // is thrashing rather than an accurate attempt to count the expected
-      // heartbeats)
-      } else if (heartbeatCount / count > 10) {
-        client.stop();
-        stubproton.setRemoteIdleTimeout(-1);
-        test.fail('too many heartbeats (heartbeat count: ' +
-                  heartbeatCount + ' loop count: ' + count + ')');
-        test.done();
-      // We've had enough heartbeats within half the time, so pass
-      } else if (heartbeatCount >= 100) {
-        client.stop();
-        stubproton.setRemoteIdleTimeout(-1);
-        test.ok(heartbeatCount >= 100);
-        test.done();
-      } else {
-        setTimeout(waitForHeartbeats, remoteIdleTimeout, count);
-      }
-    };
-    setTimeout(waitForHeartbeats, remoteIdleTimeout, 0);
-  });
-};
-
 
 /**
  * Test that passing various combinations of user and password into the
@@ -1117,35 +1063,14 @@ module.exports.test_start_user_password_options = function(test) {
     }
   ];
 
-  var originalConnect = mqlight.proton.messenger.connect;
-  var lastUsr, lastPw;
-  mqlight.proton.messenger.connect = function(service) {
-    var auth;
-    try {
-      auth = url.parse(service).auth;
-    } catch (_) {
-      auth = undefined;
-    }
-    if (auth) {
-      lastUsr = String(auth).slice(0, auth.indexOf(':'));
-      lastPw = String(auth).slice(auth.indexOf(':') + 1);
-    } else {
-      lastUsr = undefined;
-      lastPw = undefined;
-    }
-
-    var messenger = stubproton.createProtonStub().createMessenger();
-    var result = messenger.connect.apply(messenger, [service]);
-    return result;
-  };
-
   var runtest = function(i) {
-    if (i == data.length) {
+    if (i === data.length) {
       test.done();
-      mqlight.proton.messenger.connect = originalConnect;
     } else {
       try {
-        mqlight.createClient(data[i], function(err) {
+        var lastUsr;
+        var lastPw;
+        var client = mqlight.createClient(data[i], function(err) {
           if (err) {
             test.ok(!data[i].valid,
                     'index #' + i + ' should have been accepted\n' +
@@ -1163,10 +1088,23 @@ module.exports.test_start_user_password_options = function(test) {
                          'underlying proton messenger');
             }
           }
-          this.stop(function() {
+          client.stop(function() {
             runtest(++i);
           });
         });
+        var originalConnect = client._messenger.connect;
+        client._messenger.connect = function(connectUrl, connOpts) {
+          var auth = connectUrl.auth;
+          if (auth) {
+            lastUsr = String(auth).slice(0, auth.indexOf(':'));
+            lastPw = String(auth).slice(auth.indexOf(':') + 1);
+          } else {
+            lastUsr = undefined;
+            lastPw = undefined;
+          }
+
+          return originalConnect.apply(this, [connectUrl, connOpts]);
+        };
       } catch (e) {
         test.ok(!data[i].valid,
                 'index #' + i + ' should have been accepted\n' +

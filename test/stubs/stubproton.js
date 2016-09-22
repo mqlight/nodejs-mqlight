@@ -21,7 +21,7 @@
 'use strict';
 
 var util = require('util');
-var Duplex = require('stream').Duplex;
+var Promise = require('bluebird');
 
 var DEBUG = process.env.MQLIGHT_NODE_STUB_DEBUG || false;
 var log = process.env.MQLIGHT_NODE_STUB_LOG_ERROR ? console.error : console.log;
@@ -78,6 +78,31 @@ exports.setRemoteIdleTimeout = function(interval, callback) {
   workCallback = callback;
 };
 
+exports.receiver = {
+  remote: {
+    handle: 0
+  },
+  on: function() {},
+  detach: function() {
+    return new Promise(function(resolve, reject) {
+      if (connectStatus === 0) {
+        resolve(true);
+      } else {
+        var err = new Error('error on unsubscribe: ' + connectStatus);
+        err.name = 'NetworkError';
+        reject(err);
+      }
+    });
+  },
+  _sendDetach2: function() {}
+};
+exports.sender = {
+  send: function() {
+    return new Promise(function(resolve) {
+      resolve(true);
+    });
+  }
+};
 
 /**
  * A no-function stub for the native Proton code.
@@ -85,9 +110,11 @@ exports.setRemoteIdleTimeout = function(interval, callback) {
  * @return {object} a stub for the proton module.
  */
 module.exports.createProtonStub = function() {
-
   return {
     messenger: {
+      on: function(event) {
+        if (DEBUG) log('stub event handler added for event', event);
+      },
       send: function() {
         if (DEBUG) log('stub send function called');
       },
@@ -128,24 +155,58 @@ module.exports.createProtonStub = function() {
           }
         }
       },
-      connect: function(service) {
-        if (DEBUG) log('stub connect function called for service:', service);
-        if (!this.stopped) throw new Error('already connected');
-        var href = service.href;
-        var err = null;
-        if (href.indexOf('fail') != -1) {
-          err = new TypeError('bad service ' + href);
-        } else {
-          if (connectStatus !== 0) {
+      connect: function(service, options) {
+        var self = this;
+        return new Promise(function(resolve, reject) {
+          if (DEBUG) log('stub connect function called for service:', service);
+          if (!self.stopped) throw new Error('already connected');
+          var href = service.href;
+          var err = null;
+          if (href.indexOf('fail') !== -1) {
+            if (DEBUG) log('connect received bad service');
+            err = new TypeError('bad service ' + href);
+          } else if (options.host.indexOf('bad') !== -1) {
+            if (DEBUG) log('connect received bad connection');
+            err = new Error('ECONNREFUSED bad service ' + options.host);
+            err.code = 'ECONNREFUSED';
+          } else if (options.sslTrustCertificate === 'BadCertificate') {
+            if (DEBUG) log('connect received bad certificate');
+            err = new Error('Bad Certificate wrong tag');
+          } else if (options.sslTrustCertificate === 'BadVerify') {
+            if (DEBUG) log('connect received bad verify');
+            err =
+              new Error('Hostname/IP doesn\'t match certificate\'s altnames');
+          } else if (options.sslTrustCertificate === 'SelfSignedCertificate') {
+            if (DEBUG) log('connect received self-signed certificate');
+            err =
+              new Error('DEPTH_ZERO_SELF_SIGNED_CERT');
+            err.code = err.message;
+          } else if (options.sslTrustCertificate === 'ExpiredCertificate') {
+            if (DEBUG) log('connect received expired certificate');
+            err = new Error('CERT_HAS_EXPIRED');
+            err.code = err.message;
+          } else if (options.sslClientCertificate === 'BadCertificate') {
+            if (DEBUG) log('connect received bad client certificate');
+            err = new Error('Bad Certificate');
+          } else if (options.sslClientKey === 'BadKey') {
+            if (DEBUG) log('connect received bad client key');
+            err = new Error('Bad Key');
+          } else if (options.sslKeystore === 'BadKeystore') {
+            if (DEBUG) log('connect received bad keystore');
+            err = new Error('Bad Keystore');
+          } else if (connectStatus !== 0) {
+            if (DEBUG) log('connect received connect error');
             err = new Error('connect error: ' + connectStatus);
             err.name = 'NetworkError';
-          } else {
-            err = null;
-            this.stopped = false;
-            if (DEBUG) log('successfully connected');
           }
-        }
-        if (err) throw err;
+          if (err) {
+            reject(err);
+          } else {
+            self.stopped = false;
+            if (DEBUG) log('successfully connected');
+            resolve();
+          }
+        });
       },
       connected: function() {
         if (DEBUG) log('stub connected function called');
@@ -156,18 +217,13 @@ module.exports.createProtonStub = function() {
         // if (DEBUG) log('stub receive function called');
         return [];
       },
-      stopCount: 2,
-      stop: function() {
-        if (DEBUG) log('stub stop function called');
-        if (!this.stopped) {
-          this.stopCount--;
-          if (this.stopCount === 0) {
-            this.stopped = true;
-            this.stopCount = 2;
-          }
-        }
-        if (DEBUG) log('stub stop function returning:', this.stopped);
-        return this.stopped;
+      disconnect: function() {
+        var self = this;
+        return new Promise(function(resolve, reject) {
+          if (DEBUG) log('stub disconnect function called');
+          self.stopped = true;
+          resolve();
+        });
       },
       put: function(msg, qos) {
         if (DEBUG) log('stub put function called');
@@ -182,226 +238,24 @@ module.exports.createProtonStub = function() {
       },
       stopped: true,
       subscribe: function() {
-        if (DEBUG) log('stub subscribe function called');
       },
-      subscribedCount: 0,
-      subscribed: function(address) {
-        if (DEBUG) log('stub subscribed function called with address', address);
-        if (connectStatus !== 0) {
-          var err = new Error('error on subscribe: ' + connectStatus);
-          err.name = 'NetworkError';
-          throw err;
-        } else {
-          if (++this.subscribedCount >= 2) {
-            this.subscribedCount = 0;
-            return true;
+      createSender: function() {
+        return new Promise(function(resolve) {
+          resolve(exports.sender);
+        });
+      },
+      createReceiver: function() {
+        return new Promise(function(resolve, reject) {
+          if (DEBUG) log('stub subscribe function called');
+          if (connectStatus === 0) {
+            resolve(exports.receiver);
           } else {
-            return false;
+            var err = new Error('error on subscribe: ' + connectStatus);
+            err.name = 'NetworkError';
+            reject(err);
           }
-        }
+        });
       },
-      unsubscribe: function() {
-        if (DEBUG) log('stub unsubscribe function called');
-      },
-      unsubscribedCount: 0,
-      unsubscribed: function(address) {
-        if (DEBUG) log('stub unsubscribed function called with ' +
-                       'address', address);
-        if (connectStatus !== 0) {
-          var err = new Error('error on unsubscribe: ' + connectStatus);
-          err.name = 'NetworkError';
-          throw err;
-        } else {
-          if (++this.unsubscribedCount >= 2) {
-            this.unsubscribedCount = 0;
-            return true;
-          } else {
-            return false;
-          }
-        }
-      },
-      getRemoteIdleTimeout: function(address) {
-        if (DEBUG) log('stub getRemoteIdleTimeout function called, ' +
-                       'returning:', remoteIdleTimeout);
-        return remoteIdleTimeout;
-      },
-      flow: function(linkAddress, credit) {
-        if (DEBUG) log('stub flow function called with link address:',
-                       linkAddress, ' and credit:', credit);
-      },
-      pendingOutbound: function(address) {
-        if (DEBUG) log('pendingOutbound function called with address', address);
-        return false;
-      },
-      pushCount: 0,
-      push: function(length, chunk) {
-        var result = length;
-        if (++this.pushCount === 5) {
-          result--;
-        } else if (this.pushCount === 6) {
-          this.pushCount = 0;
-          result = 0;
-        }
-        if (DEBUG) log('stub push function called, returning:', result);
-        return result;
-      },
-      popCount: 0,
-      pop: function(stream, force) {
-        if (DEBUG) log('stub pop function called with force:', force);
-        if (stream) {
-          if (++this.popCount === 20) {
-            this.popCount = 0;
-            process.nextTick(function() {
-              stream.emit('error', new Error('stub fake socket error'));
-            });
-          }
-        }
-        return 0;
-      },
-      closed: function() {
-        if (DEBUG) log('stub closed function called');
-        return 0;
-      },
-      heartbeat: function() {
-        if (DEBUG) log('stub heartbeat function called');
-        if (workCallback) workCallback.apply();
-      },
-      sasl: function() {
-        if (DEBUG) log('stub sasl function called');
-      }
     },
-
-    createMessenger: function() {
-      if (DEBUG) log('stub createMessenger function called');
-      connectStatus = 0;
-      this.messenger.stopped = true;
-      return this.messenger;
-    },
-
-    createMessage: function() {
-      if (DEBUG) log('stub createMessage function called');
-      return {
-        destroy: function() {
-          if (DEBUG) log('stub destroy function called');
-        }
-      };
-    },
-
-    connect: function(options, callback) {
-      if (DEBUG) log('stub proton connect function called with options',
-                     options);
-      return new StubStream(options, callback);
-    }
   };
 };
-
-/**
- * A stub connection to the Server implemented as a Duplex
- * Stream.
- *
- * @constructor
- * @param {object} options stream options.
- * @param {Function} callback connect callback.
- * @return {object} a stub connection.
- */
-
-var StubStream = function(options, callback) {
-  if (DEBUG) log('StubStream constructor called');
-
-  var stream = this;
-
-  if (!(stream instanceof StubStream))
-    return new StubStream(options);
-
-  Duplex.call(stream, options);
-
-  stream.ended = false;
-  stream.connError = false;
-  stream.authorized = true;
-  stream.authorizationError = null;
-
-  var err = null;
-  if (options.host.indexOf('bad') != -1) {
-    if (DEBUG) log('StubStream received bad connection');
-    err = new TypeError('ECONNREFUSED bad service ' + options.host);
-  } else if (options.sslTrustCertificate === 'BadCertificate') {
-    if (DEBUG) log('StubStream received bad certificate');
-    stream.authorized = false;
-    stream.authorizationError = new Error('Bad Certificate').message;
-  } else if (options.sslTrustCertificate === 'BadVerify') {
-    if (DEBUG) log('StubStream received bad verify');
-    stream.authorized = false;
-    stream.authorizationError =
-        new Error('Hostname/IP doesn\'t match certificate\'s altnames').message;
-  } else if (options.sslTrustCertificate === 'SelfSignedCertificate') {
-    if (DEBUG) log('StubStream received self-signed certificate');
-    stream.authorized = false;
-    stream.authorizationError =
-        new Error('DEPTH_ZERO_SELF_SIGNED_CERT').message;
-  } else if (options.sslTrustCertificate === 'ExpiredCertificate') {
-    if (DEBUG) log('StubStream received expired certificate');
-    stream.authorized = false;
-    stream.authorizationError = new Error('CERT_HAS_EXPIRED').message;
-  } else if (options.sslClientCertificate === 'BadCertificate') {
-    if (DEBUG) log('StubStream received bad client certificate');
-    stream.authorized = false;
-    stream.authorizationError = new Error('Bad Certificate').message;
-  } else if (options.sslClientKey === 'BadKey') {
-    if (DEBUG) log('StubStream received bad client key');
-    stream.authorized = false;
-    stream.authorizationError = new Error('Bad Key').message;  
-  } else if (options.sslKeystore === 'BadKeystore') {
-    if (DEBUG) log('StubStream received bad keystore');
-    stream.authorized = false;
-    stream.authorizationError = new Error('Bad Keystore').message;    
-  } else if (connectStatus !== 0) {
-    if (DEBUG) log('StubStream received connect error');
-    err = new Error('connect error: ' + connectStatus);
-    err.name = 'NetworkError';
-  }
-  if (err) {
-    stream.connError = true;
-    if (DEBUG) log('emitting error event');
-    process.nextTick(function() {
-      stream.emit('error', err);
-    });
-  } else {
-    if (DEBUG) log('connection made');
-    process.nextTick(function() {
-      callback.apply(stream, []);
-    });
-  }
-
-  stream._read = function(size) {
-    if (DEBUG) log('stream _read function called for size:', size);
-  };
-
-  stream._write = function(chunk, encoding, callback) {
-    if (DEBUG) log('stream _write function called for chunk size:',
-                   chunk.length);
-  };
-
-  stream.end = function() {
-    if (DEBUG) log('stream end function called');
-    stream.ended = true;
-    stream.push(null);
-    process.nextTick(function() {
-      stream.emit('close', false);
-    });
-  };
-
-  var pushData = function(stream) {
-    if (!stream.ended) {
-      stream.push('chunk');
-      setImmediate(function() {
-        stream.emit('drain');
-        pushData(stream);
-      });
-    }
-  };
-
-  setImmediate(function(stream) {
-    pushData(stream)
-  }, stream);
-};
-util.inherits(StubStream, Duplex);

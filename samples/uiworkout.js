@@ -21,7 +21,7 @@
 'use strict';
 
 var mqlight = require('mqlight');
-var uuid = require('node-uuid');
+var uuid = require('uuid');
 var nopt = require('nopt');
 
 // The URL to use when connecting to the MQ Light server
@@ -274,7 +274,7 @@ function startClient(topic, share) {
 
   var client = mqlight.createClient(opts, function(err) {
     if (err) {
-      console.error('Problem with connect: ', err.message);
+      console.error('Problem with connect: ', err.toString());
       process.exit(1);
     }
   });
@@ -283,7 +283,7 @@ function startClient(topic, share) {
     console.log('Connected to ' + client.service + ' using id ' + client.id);
     client.subscribe(topic, share, function(err, topicPattern, share) {
       if (err) {
-        console.error('Problem with subscribe request: ', err.message);
+        console.error('Problem with subscribe request: ', err.toString());
         process.exit(1);
       }
       console.log("Receiving messages from topic pattern '" + topicPattern +
@@ -297,7 +297,7 @@ function startClient(topic, share) {
       var sendTopic = allTopics[Math.floor(Math.random() * allTopics.length)];
       var sendCallback = function(err, msg) {
         if (err) {
-          console.error('Problem with send request: ' + err.message);
+          console.error('Problem with send request: ' + err.toString());
           process.exit(0);
         } else {
           if (messageCount === 0) {
