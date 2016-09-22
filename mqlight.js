@@ -1887,6 +1887,11 @@ var Client = function(service, id, securityOptions) {
       sslTrustCertificate: securityOptions.sslTrustCertificate,
       sslVerifyName: securityOptions.sslVerifyName
     };
+    if (securityOptions.sslVerifyName === false) {
+      sslOptions.checkServerIdentity = function() {
+        return null;
+      };
+    }
 
     // Read the client keystore or pem files as appropriate, setting the
     // required security related connection options
