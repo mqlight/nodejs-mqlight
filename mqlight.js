@@ -1359,8 +1359,6 @@ var Client = function(service, id, securityOptions) {
     var client = this;
     logger.entry('Client._performConnect', _id, newClient);
 
-    var err = null;
-
     // If there is no active client (i.e. we've been stopped) then add
     // ourselves back to the active list. Otherwise if there is another
     // active client (that's replaced us) then exit function now
@@ -1427,14 +1425,6 @@ var Client = function(service, id, securityOptions) {
       if (_state === STATE_STOPPED) {
         client._setState(STATE_STARTING);
       }
-
-      // If the messenger is not already stopped then something has gone wrong
-      // if (client._messenger && client._messenger._connection) {
-      //   err = new Error('messenger is not stopped');
-      //   logger.ffdc('Client._performConnect', 'ffdc001', client, err);
-      //   logger.throw('Client._performConnect', _id, err);
-      //   throw err;
-      // }
     }
 
     // Obtain the list of services for connect and connect to one of the
