@@ -1,0 +1,17 @@
+language: node_js
+node_js:
+  - '0.10'
+  - '0.12'
+  - '4'
+
+before_install:
+  - sudo add-apt-repository ppa:qpid/testing -y
+  - sudo apt-get update -q
+  - sudo apt-get install qpidd qpid-tools
+  - sudo sh -c 'echo "auth=no" >> /etc/qpid/qpidd.conf'
+
+before_script:
+  - sudo /etc/init.d/qpidd restart
+
+script:
+  - make test
