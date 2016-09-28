@@ -2617,7 +2617,7 @@ Client.prototype.send = function(topic, data, options, callback) {
     },
     callback: (qos === exports.QOS_AT_MOST_ONCE) ? 'sent' : 'settled'
   }).then(function(sender) {
-    sender.send(protonMsg).then(function(state) {
+    sender.send(protonMsg).then(function() {
       client._outstandingSends.shift();
       // generate drain event, if required.
       if (client._drainEventRequired &&
@@ -2628,7 +2628,7 @@ Client.prototype.send = function(topic, data, options, callback) {
           client.emit('drain');
         });
       }
-      if (state && callback) {
+      if (callback) {
         // TODO: check if we need to handle different values of state
         callback.apply(client, [null, topic, data, options]);
       }
