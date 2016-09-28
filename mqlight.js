@@ -992,7 +992,9 @@ var lookupError = function(err) {
     }
     err = new NetworkError(msg);
   } else if (/DEPTH_ZERO_SELF_SIGNED_CERT/.test(err.code) ||
-             /SELF_SIGNED_CERT_IN_CHAIN/.test(err.code)) {
+             /SELF_SIGNED_CERT_IN_CHAIN/.test(err.code) ||
+             /UNABLE_TO_GET_ISSUER_CERT_LOCALLY/.test(err.code)
+  ) {
     // Convert DEPTH_ZERO_SELF_SIGNED_CERT or SELF_SIGNED_CERT_IN_CHAIN
     // into a clearer error message.
     err = new SecurityError('SSL Failure: certificate verify failed');
@@ -1876,10 +1878,9 @@ var Client = function(service, id, securityOptions) {
       keyFile: null,
       certFile: null,
       caFile: null,
-      rejectUnauthorized: true,
-      sslTrustCertificate: securityOptions.sslTrustCertificate,
-      sslVerifyName: securityOptions.sslVerifyName
+      rejectUnauthorized: true
     };
+
     if (securityOptions.sslVerifyName === false) {
       sslOptions.checkServerIdentity = function() {
         return null;
@@ -1909,6 +1910,7 @@ var Client = function(service, id, securityOptions) {
     }
 
     policy.connect.options.sslOptions = sslOptions;
+    logger.log('debug', _id, 'sslOptions', sslOptions);
 
     this._messenger = new AMQP.Client(AMQP.Policy.merge(policy));
   }
