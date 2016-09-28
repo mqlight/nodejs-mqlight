@@ -2614,7 +2614,8 @@ Client.prototype.send = function(topic, data, options, callback) {
         (qos === exports.QOS_AT_MOST_ONCE) ?
         AMQP.Constants.senderSettleMode.settled :
         AMQP.Constants.senderSettleMode.unsettled
-    }
+    },
+    callback: (qos === exports.QOS_AT_MOST_ONCE) ? 'sent' : 'settled'
   }).then(function(sender) {
     sender.send(protonMsg).then(function(state) {
       client._outstandingSends.shift();
