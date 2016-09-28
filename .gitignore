@@ -38,4 +38,3 @@ lib/*
 
 # Include bundled node_modules in git
 !node_modules/amqp10
-!node_modules/amqp10-link-cache
