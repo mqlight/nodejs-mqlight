@@ -4,6 +4,10 @@
   "description": "IBM MQ Light Client Module",
   "author": "IBM MQ Light <mqlight@uk.ibm.com>",
   "homepage": "https://developer.ibm.com/messaging/mq-light/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mqlight/nodejs-mqlight.git"
+  },
   "tonicExampleFilename": "samples/tonic-example.js",
   "bugs": {
     "url": "https://ibm.biz/mqlight-forum",
@@ -38,12 +42,7 @@
     "istanbul": ">0.0.0",
     "nodeunit": ">0.0.0"
   },
-  "licenses": [
-    {
-      "type": "proprietary",
-      "url": "http://www14.software.ibm.com/cgi-bin/weblap/lap.pl?popup=Y&li_formnum=L-ACRR-9MKEUW"
-    }
-  ],
+  "license": "Apache-2.0",
   "scripts": {
     "lint": "node ./node_modules/.bin/eslint mqlight.js",
     "test": "npm run lint && node ./node_modules/istanbul/lib/cli.js cover ./node_modules/nodeunit/bin/nodeunit -- --config test/nodeunit.json test"
