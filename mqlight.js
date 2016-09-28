@@ -583,7 +583,9 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
   try {
     if (client._messenger) {
       client._messenger.disconnect().then(function() {
-        stopProcessingCallback(client, callback);
+        if (stopProcessingCallback) {
+          stopProcessingCallback(client, callback);
+        }
       });
     }
   } catch (err) {
@@ -1926,9 +1928,11 @@ var Client = function(service, id, securityOptions) {
         }
         if (shouldReconnect(err)) {
           setImmediate(function() {
-            logger.log('data', _id, 'calling reconnect');
+            logger.log('data', _id, 'calling reconnect', err);
             reconnect(client);
           });
+        } else {
+          stopMessenger(client);
         }
       }
     }
@@ -1936,12 +1940,14 @@ var Client = function(service, id, securityOptions) {
   });
 
   this._messenger.on(AMQP.Client.ConnectionClosed, function() {
+    logger.entry('Client._messenger.on.ConnectionClosed', _id);
     if (_state === STATE_STARTED) {
       logger.log('data', client.id, 'calling reconnect');
       reconnect(client);
     } else if (_state === STATE_RETRYING || _state === STATE_STARTING) {
       //
     }
+    logger.exit('Client._messenger.on.ConnectionClosed', _id, null);
   });
 
   // Set the initial state to starting
