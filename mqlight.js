@@ -577,16 +577,34 @@ var getHttpServiceFunction = function(serviceUrl) {
  */
 var stopMessenger = function(client, stopProcessingCallback, callback) {
   logger.entry('stopMessenger', client.id);
+  logger.log('parms', client.id, 'stopProcessingCallback:',
+             stopProcessingCallback);
+  logger.log('parms', client.id, 'callback:', callback);
+
+  var cb = function() {
+    if (stopProcessingCallback) {
+      stopProcessingCallback(client, callback);
+    }
+  };
 
   // If messenger available then request it to stop
   // (otherwise it must have already been stopped)
   try {
     if (client._messenger) {
+      logger.log('debug', client.id, 'disconnecting messenger');
       client._messenger.disconnect().then(function() {
-        if (stopProcessingCallback) {
-          stopProcessingCallback(client, callback);
-        }
+        logger.log('debug', client.id, 'messenger disconnected');
+        cb();
+      }).catch(function(err) {
+        logger.caught('stopMessenger', client.id, err);
+        callback(err);
+      }).error(function(err) {
+        logger.caught('stopMessenger', client.id, err);
+        callback(err);
       });
+    } else {
+      logger.log('debug', client.id, 'no active messenger to stop');
+      cb();
     }
   } catch (err) {
     console.error(util.inspect(err, true));
@@ -1593,18 +1611,9 @@ var Client = function(service, id, securityOptions) {
           logger.log('data', _id, 'failed to connect to: ' + logUrl +
                      ' due to error: ' + util.inspect(err));
 
-          // Don't leave an invalid messenger object lying around.
-          stopMessenger(client, function(client) {
-            logger.entry('Client._tryService.connError.stopProcessing',
-                         client.id);
-
-            // This service failed to connect. Try the next one.
-            // XXX: wrap in shouldReconnect ?
-            tryNextService(err);
-
-            logger.exit('Client._tryService.connError.stopProcessing',
-                        client.id, null);
-          });
+          // This service failed to connect. Try the next one.
+          // XXX: wrap in shouldReconnect ?
+          tryNextService(err);
 
           logger.exit('Client._tryService.connError', _id, null);
         };
@@ -1861,7 +1870,7 @@ var Client = function(service, id, securityOptions) {
     this._messenger =
         require('./test/stubs/stubproton.js').createProtonStub().messenger;
   } else {
-    var policy = {
+    var policy = AMQP.Policy.merge({
       defaultSubjects: false,
       reconnect: {
         retries: 0,
@@ -1873,7 +1882,8 @@ var Client = function(service, id, securityOptions) {
           containerId: _id
         }
       }
-    };
+    });
+
     sslOptions = {
       keyFile: null,
       certFile: null,
@@ -1912,7 +1922,7 @@ var Client = function(service, id, securityOptions) {
     policy.connect.options.sslOptions = sslOptions;
     logger.log('debug', _id, 'sslOptions', sslOptions);
 
-    this._messenger = new AMQP.Client(AMQP.Policy.merge(policy));
+    this._messenger = new AMQP.Client(policy);
   }
   logger.exit('proton.createMessenger', _id, null);
 
