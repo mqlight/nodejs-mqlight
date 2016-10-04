@@ -1663,7 +1663,9 @@ var Client = function(service, id, securityOptions) {
           promise = client._messenger.connect(connectUrl, connOpts);
         } else {
           logger.log('debug', _id, 'connecting via net');
-          promise = client._messenger.connect(connectUrl);
+          promise = client._messenger.connect(connectUrl, {
+            saslMechanism: (auth) ? 'PLAIN' : 'ANONYMOUS'
+          });
         }
         promise.then(connected)
           .catch(function(err) {
