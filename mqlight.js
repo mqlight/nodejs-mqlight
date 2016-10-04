@@ -3297,7 +3297,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options,
   // unsubscribe using the specified topic pattern and share options
   try {
     var closed = (ttl === 0);
-    receiver.detach().then(function() {
+    receiver.detach(closed).then(function() {
       finishedUnsubscribing(null, callback);
     }).catch(function(err) {
       if (closed || err !== 'link not closed') {
@@ -3307,9 +3307,6 @@ Client.prototype.unsubscribe = function(topicPattern, share, options,
         finishedUnsubscribing(null, callback);
       }
     });
-    // FIXME: currently no way of specifying closed=false on detach, so we use
-    // our monkey patch
-    receiver._sendDetach2(closed);
   } catch (err) {
     logger.caught('Client.unsubscribe', client.id, err);
     finishedUnsubscribing(err, callback);
