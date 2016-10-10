@@ -127,27 +127,22 @@ logger.setLevel = function(level) {
 
     header('header', logger.NO_CLIENT_ID, {title: 'Log'});
 
-    if (npmlog.levels[npmlog.level] <= npmlog.levels.detail) {
-      // Set PN_TRACE_FRM if detailed data level logging is enabled.
-      logger.log('debug', logger.NO_CLIENT_ID, 'Setting PN_TRACE_FRM');
-      process.env.PN_TRACE_FRM = '1';
-      if (npmlog.levels[npmlog.level] <= npmlog.levels.raw) {
-        // Set PN_TRACE_RAW if raw level logging is enabled.
-        logger.log('debug', logger.NO_CLIENT_ID, 'Setting PN_TRACE_RAW');
-        process.env.PN_TRACE_RAW = '1';
+    var debug = process.env.PN_TRACE_FRM + ',' || '';
+    if (npmlog.levels[npmlog.level] <= npmlog.levels.debug) {
+      logger.log('debug', logger.NO_CLIENT_ID, 'Setting basic amqp10 debug');
+      process.env.DEBUG = debug + 'amqp10:*,-amqp10:session,-amqp10:framing';
+      if (npmlog.levels[npmlog.level] <= npmlog.levels.detail) {
+        logger.log('debug', logger.NO_CLIENT_ID,
+                   'Setting detailed amqp10 debug');
+        process.env.DEBUG = debug + 'amqp10:*';
+      }
+    } else if (process.env.DEBUG && /amqp10:/.test(debug)) {
+      logger.log('debug', logger.NO_CLIENT_ID, 'Unsetting amqp10 debug');
+      debug = debug.slice(0, debug.indexOf('amqp10'));
+      if (debug.length > 0) {
+        process.env.DEBUG = debug;
       } else {
-        logger.log('debug', logger.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
-        delete process.env.PN_TRACE_RAW;
-      }
-    }
-    else {
-      if (process.env.PN_TRACE_RAW) {
-        logger.log('debug', logger.NO_CLIENT_ID, 'Unsetting PN_TRACE_RAW');
-        delete process.env.PN_TRACE_RAW;
-      }
-      if (process.env.PN_TRACE_FRM) {
-        logger.log('debug', logger.NO_CLIENT_ID, 'Unsetting PN_TRACE_FRM');
-        delete process.env.PN_TRACE_FRM;
+        delete process.env.DEBUG;
       }
     }
   } else {

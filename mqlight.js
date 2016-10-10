@@ -1633,7 +1633,9 @@ var Client = function(service, id, securityOptions) {
             // reconnect this would be done via the callback we set, first
             // connect its the users callback so won't process anything.
             logger.log('data', _id, 'first start since being stopped');
-            processQueuedActions.apply(client);
+            setImmediate(function() {
+              processQueuedActions.apply(client);
+            });
           } else {
             client._retryCount = 0;
             eventToEmit = STATE_RESTARTED;
@@ -1645,6 +1647,7 @@ var Client = function(service, id, securityOptions) {
             client.emit(eventToEmit);
             client._invokeStartedCallbacks(null);
           });
+          return null;
         };
 
         // Otherwise do a standard net connect.
