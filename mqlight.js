@@ -579,7 +579,7 @@ var stopMessenger = function(client, stopProcessingCallback, callback) {
       logger.log('debug', client.id, 'disconnecting messenger');
       client._messenger.disconnect().then(function() {
         logger.log('debug', client.id, 'messenger disconnected');
-        cb();
+        process.nextTick(cb);
       }).catch(function(err) {
         logger.caught('stopMessenger', client.id, err);
         callback(err);
@@ -781,7 +781,9 @@ var reconnect = function(client) {
         callback: processQueuedActions,
         create: false
       });
-      client._performConnect(false, true);
+      process.nextTick(function() {
+        client._performConnect(false, true);
+      });
 
       logger.exit('Client.reconnect.stopProcessing', client.id, null);
     });
