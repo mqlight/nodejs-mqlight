@@ -48,21 +48,6 @@ var https = require('https');
 
 var AMQP = require('amqp10');
 var DescribedType = require('amqp10/lib/types/described_type');
-// XXX: !!horrible monkey patching alert!!
-var frames = require('amqp10/lib/frames.js');
-var Link = require('amqp10/lib/link.js');
-Link.prototype._sendDetach = function() {
-  // no-op
-};
-Link.prototype._sendDetach2 = function(closed) {
-  var detachFrame = new frames.DetachFrame({
-    handle: this.handle,
-    channel: this.session.channel,
-    closed: Boolean(closed)
-  });
-
-  this.session.connection.sendFrame(detachFrame);
-};
 var linkCache = require('amqp10-link-cache');
 AMQP.use(linkCache({ttl: Infinity}));
 
@@ -3300,7 +3285,7 @@ Client.prototype.unsubscribe = function(topicPattern, share, options,
   // unsubscribe using the specified topic pattern and share options
   try {
     var closed = (ttl === 0);
-    receiver.detach(closed).then(function() {
+    receiver.detach({closed: closed}).then(function() {
       finishedUnsubscribing(null, callback);
     }).catch(function(err) {
       if (closed || err !== 'link not closed') {
