@@ -1871,7 +1871,8 @@ var Client = function(service, id, securityOptions) {
       },
       connect: {
         options: {
-          containerId: _id
+          containerId: _id,
+          idleTimeout: 0
         }
       }
     });
@@ -2954,6 +2955,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
   } else {
     var link = {
       name: address,
+      bypassCache: true,
       credit:
         (qos === exports.QOS_AT_MOST_ONCE) ?
         // XXX: previously we renewed credit at 80% rather than 50%...
