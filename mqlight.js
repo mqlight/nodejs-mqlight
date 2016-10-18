@@ -2629,39 +2629,36 @@ Client.prototype.send = function(topic, data, options, callback) {
     },
     callback: (qos === exports.QOS_AT_MOST_ONCE) ? 'sent' : 'settled'
   }).then(function(sender) {
-    sender.send(protonMsg).then(function() {
-      client._outstandingSends.shift();
-      // generate drain event, if required.
-      if (client._drainEventRequired &&
-        (client._outstandingSends.length <= 1)) {
-        client._drainEventRequired = false;
-        process.nextTick(function() {
-          logger.log('emit', client.id, 'drain');
-          client.emit('drain');
-        });
-      }
-      if (callback) {
-        // TODO: check if we need to handle different values of state
-        callback.apply(client, [null, topic, data, options]);
-      }
-    }).catch(function(err) {
-      logger.caught('Client.send', client.id, err);
-      client._outstandingSends.shift();
-      if (callback) {
-        err = lookupError(err);
-        callback.apply(client, [err, topic, data, options]);
-      }
-    }).error(function(err) {
-      logger.caught('Client.send', client.id, err);
-      client._outstandingSends.shift();
-      if (callback) {
-        err = lookupError(err);
-        callback.apply(client, [err, topic, data, options]);
-      }
-    });
+    return sender.send(protonMsg);
+  }).then(function() {
+    client._outstandingSends.shift();
+    // generate drain event, if required.
+    if (client._drainEventRequired &&
+      (client._outstandingSends.length <= 1)) {
+      client._drainEventRequired = false;
+      process.nextTick(function() {
+        logger.log('emit', client.id, 'drain');
+        client.emit('drain');
+      });
+    }
+    if (callback) {
+      // TODO: check if we need to handle different values of state
+      callback.apply(client, [null, topic, data, options]);
+    }
   }).catch(function(err) {
-    console.error(err);
     logger.caught('Client.send', client.id, err);
+    client._outstandingSends.shift();
+    if (callback) {
+      err = lookupError(err);
+      callback.apply(client, [err, topic, data, options]);
+    }
+  }).error(function(err) {
+    logger.caught('Client.send', client.id, err);
+    client._outstandingSends.shift();
+    if (callback) {
+      err = lookupError(err);
+      callback.apply(client, [err, topic, data, options]);
+    }
   });
 
   logger.exit('Client.send', this.id, nextMessage);
