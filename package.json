@@ -1,6 +1,6 @@
 {
   "name": "mqlight",
-  "version": "2.0.2016101400",
+  "version": "2.0.2016101900",
   "description": "IBM MQ Light Client Module",
   "author": "IBM MQ Light <mqlight@uk.ibm.com>",
   "homepage": "https://developer.ibm.com/messaging/mq-light/",
@@ -27,7 +27,7 @@
   },
   "bundledDependencies": [ "amqp10" ],
   "dependencies": {
-    "amqp10": "^3.2.5",
+    "amqp10": "^3.3.0",
     "amqp10-link-cache": "^1.1.0",
     "debug": "^2.2.0",
     "moment": "~2.14.1",

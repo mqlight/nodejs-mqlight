@@ -47,7 +47,6 @@ var http = require('http');
 var https = require('https');
 
 var AMQP = require('amqp10');
-var DescribedType = require('amqp10/lib/types/described_type');
 var linkCache = require('amqp10-link-cache');
 AMQP.use(linkCache({ttl: Infinity}));
 
@@ -2536,7 +2535,7 @@ Client.prototype.send = function(topic, data, options, callback) {
       protonMsg.body = data;
       protonMsg.properties.contentType = 'text/plain';
     } else if (data instanceof Buffer) {
-      protonMsg.body = new DescribedType(0x77, data); // wrap in AMQPValue
+      protonMsg.body = new AMQP.DescribedType(0x77, data); // wrap in AMQPValue
       protonMsg.properties.contentType = 'application/octet-stream';
     } else {
       protonMsg.body = JSON.stringify(data);
