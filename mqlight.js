@@ -1924,8 +1924,10 @@ var Client = function(service, id, securityOptions) {
     if (err) {
       err = lookupError(err);
       logger.log('parms', _id, 'err:', err);
-      if (_state === STATE_STARTED || err instanceof SecurityError) {
-        if (!(err instanceof NotPermittedError)) {
+      logger.log('data', _id, _state);
+      if (_state === STATE_STARTED || err instanceof SecurityError ||
+          err instanceof NotPermittedError) {
+        if (!(err instanceof NotPermittedError) || _state !== STATE_STARTED) {
           logger.log('debug', _id, '_state', _state);
           logger.log('emit', _id, 'error', err);
           client.emit('error', err);
