@@ -130,7 +130,8 @@ logger.setLevel = function(level) {
     var debug = process.env.PN_TRACE_FRM + ',' || '';
     if (npmlog.levels[npmlog.level] <= npmlog.levels.debug) {
       logger.log('debug', logger.NO_CLIENT_ID, 'Setting basic amqp10 debug');
-      process.env.DEBUG = debug + 'amqp10:*,-amqp10:session,-amqp10:framing';
+      process.env.DEBUG =
+          debug + 'amqp10:*,-amqp10:session,-amqp10:framing,-amqp10:sasl';
       if (npmlog.levels[npmlog.level] <= npmlog.levels.detail) {
         logger.log('debug', logger.NO_CLIENT_ID,
                    'Setting detailed amqp10 debug');
