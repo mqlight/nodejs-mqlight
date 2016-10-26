@@ -746,15 +746,15 @@ module.exports.test_createClient_multiple_with_same_id = function(test) {
  * @param {object} test - test case.
  */
 module.exports.test_createClient_multiple_with_same_id_retry = function(test) {
-  var optsA  = { service: 'amqp://localhost', id: 'Aname2' };
-  var optsB1 = { service: 'amqp://bad', id: 'Bname2' };
-  var optsB2 = { service: 'amqp://localhost', id: 'Bname2' };
+  var optsA = {service: 'amqp://localhost', id: 'Aname2'};
+  var optsB1 = {service: 'amqp://bad', id: 'Bname2'};
+  var optsB2 = {service: 'amqp://localhost', id: 'Bname2'};
 
-  var clientA = mqlight.createClient(optsA, function(err) {
+  test.expect(6);
+
+  var clientA = mqlight.createClient(optsA, function() {
     var firstTime = true;
-    var clientB1 = mqlight.createClient(optsB1, function(err) {
-      test.ok(err);
-    }).on('error', function(err) {
+    var clientB1 = mqlight.createClient(optsB1).on('error', function(err) {
       if (firstTime) {
         firstTime = false;
         test.equal('NetworkError', err.name, 'expected a NetworkError');
@@ -770,10 +770,10 @@ module.exports.test_createClient_multiple_with_same_id_retry = function(test) {
             });
           });
         }).on('error', function(err) {
-          test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
+          test.ok(false, 'Did not expect to see error ' + err);
         });
-      } else {
-        test.equal('ReplacedError',  err.name, 'expected a ReplacedError');
+      } else if (err instanceof mqlight.ReplacedError) {
+        test.equal('ReplacedError', err.name, 'expected a ReplacedError');
       }
     });
   });
