@@ -105,7 +105,6 @@ module.exports.test_reconnect_when_disconnected = function(test) {
 * @param {object} test the unittest interface
 */
 module.exports.test_multi_restart_call = function(test) {
-  test.expect(3);
   var client = mqlight.createClient({id: 'test_multi_restart_call', service:
         'amqp://host'});
   var reconnectedEvents = 0;
@@ -114,19 +113,19 @@ module.exports.test_multi_restart_call = function(test) {
     if (client) client.stop();
     test.done();
   }, 5000);
-  client.on('started', function(x, y) {
+  client.on('started', function() {
     stubproton.setConnectStatus(1);
     mqlight.reconnect(client);
     mqlight.reconnect(client);
     mqlight.reconnect(client);
   });
-  client.on('error', function(x, y) {
-    //second reconnect call should return immediately
+  client.on('error', function() {
+    // second reconnect call should return immediately
     test.deepEqual(mqlight.reconnect(client).state, 'retrying');
     stubproton.setConnectStatus(0);
   });
 
-  client.on('restarted', function(x, y) {
+  client.on('restarted', function() {
     reconnectedEvents++;
     test.equals(client.state, 'started',
         'client state started after restart');
@@ -149,7 +148,6 @@ module.exports.test_multi_restart_call = function(test) {
 * @param {object} test the unittest interface
 */
 module.exports.test_resubscribe_on_restart = function(test) {
-  test.expect(13);
   var client = mqlight.createClient({id: 'test_resubscribe_on_restart',
     service: 'amqp://host'});
 
@@ -173,7 +171,7 @@ module.exports.test_resubscribe_on_restart = function(test) {
   });
 
   var origSubsList = [];
-  client.once('started', function(err) {
+  client.once('started', function() {
     client.subscribe('/topic', 'myshare', function(err) {
       test.ifError(err);
       if (connectErrors > 0) return;

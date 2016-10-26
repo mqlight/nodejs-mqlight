@@ -586,7 +586,6 @@ module.exports.test_message_rejected = function(test) {
         test.equals(err.message, rejectErrorMessage);
 
         stubproton.sender.send = savedSendFunction;
-        console.log('All good, stopping');
         client.stop(function() {
           test.done();
         });
