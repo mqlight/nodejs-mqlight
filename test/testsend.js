@@ -27,6 +27,7 @@ process.env.NODE_ENV = 'unittest';
 var stubproton = require('./stubs/stubproton');
 var testCase = require('nodeunit').testCase;
 var mqlight = require('../mqlight');
+var AMQP = require('amqp10');
 var Promise = require('bluebird');
 
 
@@ -190,8 +191,8 @@ module.exports.test_send_payloads = function(test) {
             test.equals(lastMsg.properties.contentType, 'text/plain');
             break;
           case ('buffer'):
-            test.ok(lastMsg.body instanceof Buffer);
-            test.deepEqual(lastMsg.body, data[i].message);
+            test.ok(lastMsg.body instanceof AMQP.DescribedType);
+            test.deepEqual(lastMsg.body.value, data[i].message);
             break;
           case ('json'):
             test.ok(typeof lastMsg.body === 'string');

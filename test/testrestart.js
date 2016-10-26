@@ -765,8 +765,6 @@ module.exports.test_initial_failure_retry_sub = function(test){
   var callbackCalled = 0;
   var first = true;
   client.on('started', function() {
-    test.equal(client._queuedSubscriptions.length, 0,
-        'should be no queued subs');
     setTimeout(function() { client.stop() }, 20);
   });
 
@@ -802,21 +800,23 @@ module.exports.test_initial_failure_retry_sub = function(test){
  * @param {object} test the unittest interface.
  */
 module.exports.test_initial_failure_retry_send = function(test){
-
-  var client = mqlight.createClient({id: 'test_initial_failure_retry_send',
-    service: 'amqp://host'});
+  stubproton.setConnectStatus(1);
+  var client = mqlight.createClient(
+    {id: 'test_initial_failure_retry_send',
+     service: 'amqp://host'}
+  );
   var callbackCalled = 0;
   var first = true;
   client.on('started', function() {
-    test.equal(client._queuedSends.length, 0,
-        'should be no queued sends');
-    setTimeout(function() { client.stop(); },10);
+    setTimeout(function() {
+      client.stop();
+    }, 10);
   });
 
   client.on('error', function() {
-    if ( first ) {
-      client.send('topic', 'message', function(err){
-        if (err){
+    if (first) {
+      client.send('topic', 'message', function(err) {
+        if (err) {
           test.ok(false, 'should not be called in err');
         } else {
           callbackCalled++;
@@ -830,9 +830,8 @@ module.exports.test_initial_failure_retry_send = function(test){
     }
   });
 
-  client.on('stopped', function(){
+  client.on('stopped', function() {
     test.equal(callbackCalled, 1, 'should be one callback called');
     test.done();
   });
-  stubproton.setConnectStatus(1);
 };
