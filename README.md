@@ -608,7 +608,7 @@ that goes to stderr when you run your application.
 
 ## Release notes
 
-### 2.0.2016092800
+### 2.0.2016102601
 
 * Complete rewrite of the client to use a pure JavaScript implementation of the
   AMQP 1.0 protocol. Hence we no longer require compilation of a native addon
