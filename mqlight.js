@@ -50,7 +50,7 @@ var AMQP = require('amqp10');
 var linkCache = require('amqp10-link-cache');
 AMQP.use(linkCache({ttl: Infinity}));
 
-var invalidClientIdRegex = /[^A-Za-z0-9%\/\._]+/;
+var invalidClientIdRegex = /[^A-Za-z0-9%/._]+/;
 var pemCertRegex = new RegExp('-----BEGIN CERTIFICATE-----(.|[\r\n])*?' +
                               '-----END CERTIFICATE-----', 'gm');
 
@@ -338,7 +338,7 @@ function shouldReconnect(err) {
           !(err instanceof StoppedError) &&
           !(err instanceof SubscribedError) &&
           !(err instanceof UnsubscribedError)
-         );
+  );
 }
 
 /**
@@ -1144,7 +1144,7 @@ var Client = function(service, id, securityOptions) {
 
   logger.entry('Client.constructor', logger.NO_CLIENT_ID);
   logger.log('parms', logger.NO_CLIENT_ID, 'service:',
-             String(service).replace(/:[^\/:]+@/g, ':********@'));
+             String(service).replace(/:[^/:]+@/g, ':********@'));
   logger.log('parms', logger.NO_CLIENT_ID, 'id:', id);
   logger.log('parms', logger.NO_CLIENT_ID, 'securityOptions:',
              securityOptions.toString());
@@ -1178,7 +1178,7 @@ var Client = function(service, id, securityOptions) {
   this._generateServiceList = function(service) {
     logger.entry('_generateServiceList', _id);
     logger.log('parms', _id, 'service:',
-        String(service).replace(/:[^\/:]+@/g, ':********@'));
+        String(service).replace(/:[^/:]+@/g, ':********@'));
     logger.log('parms', _id, 'securityOptions:',
                securityOptions.toString());
 
@@ -1325,7 +1325,7 @@ var Client = function(service, id, securityOptions) {
     logger.exit('_generateServiceList', _id,
       [
         'serviceList:',
-        String(serviceList).replace(/:[^\/:]+@/g, ':********@'),
+        String(serviceList).replace(/:[^/:]+@/g, ':********@'),
         'securityOptions:', securityOptions.toString()
       ]);
     return serviceList;
@@ -1523,7 +1523,7 @@ var Client = function(service, id, securityOptions) {
         if (auth) {
           service = serviceUrl.protocol + '//' + auth + serviceUrl.host;
           logUrl = serviceUrl.protocol + '//' +
-                   auth.replace(/:[^\/:]+@/g, ':********@') + serviceUrl.host;
+                   auth.replace(/:[^/:]+@/g, ':********@') + serviceUrl.host;
         } else {
           logUrl = service;
         }
