@@ -1025,6 +1025,7 @@ var lookupError = function(err) {
   } else if (err instanceof AMQP.Errors.AuthenticationError) {
     err = new SecurityError('sasl authentication failed');
   } else if (err.condition === 'amqp:precondition-failed' ||
+             err.condition === 'amqp:resource-limit-exceeded' ||
              err.condition === 'amqp:not-allowed' ||
              err.condition === 'amqp:link:detach-forced' ||
              err.condition === 'amqp:link:message-size-exceeded' ||
