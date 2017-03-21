@@ -1890,6 +1890,27 @@ var Client = function(service, id, securityOptions) {
       };
     }
 
+    // Replace the default AMQP policy for parsing addresses (because it is too
+    // simplistic and looks for the first colon (':') character in the decoded
+    // URI, breaking if either the username or password contain this character).
+    if (policy.parseAddress) {
+      var originalParseAddress = policy.parseAddress;
+      policy.parseAddress = function(amqpAddress) {
+        var result = originalParseAddress(amqpAddress);
+        if (amqpAddress.auth) {
+          // Capture the part of the encoded URI between '//' and '@'
+          var matchAuth = /.+\/\/([^@]+).+/g;
+          var auth = matchAuth.exec(amqpAddress.href)[1];
+          var authSplit = auth.split(':');
+          result.user = decodeURIComponent(authSplit[0]);
+          if (authSplit[1]) {
+            result.pass = decodeURIComponent(authSplit[1]);
+          }
+        }
+        return result;
+      };
+    }
+
     // Read the client keystore or pem files as appropriate, setting the
     // required security related connection options
     if (typeof securityOptions.sslKeystore === 'undefined') {
