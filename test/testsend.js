@@ -441,7 +441,7 @@ module.exports.test_clear_queuedsends_disconnect = function(test) {
     client.send('test', 'message', opts, function(err) {
       //test.deepEqual(client.state, 'stopped',
       //    'callback called when stopped');
-      test.notDeepEqual(err, undefined, 'not undefined so err set');
+      test.notEqual(err, undefined, 'not undefined so err set');
       test.equal(client._queuedSends.length, 0, 'no queued sends left');
       stubproton.sender.send = savedSendFunction;
       clearTimeout(timeout);
