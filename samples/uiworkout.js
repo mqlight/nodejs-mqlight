@@ -24,6 +24,9 @@ var mqlight = require('mqlight');
 var uuid = require('uuid');
 var nopt = require('nopt');
 
+var mqlightServiceName = 'mqlight'
+var messageHubServiceName = 'messagehub';
+
 // The URL to use when connecting to the MQ Light server
 var serviceURL = 'amqp://localhost';
 
@@ -183,18 +186,23 @@ function bluemixServiceLookup(options, verbose) {
   if (process.env.VCAP_SERVICES) {
     if (verbose) console.log('VCAP_SERVICES variable present in environment');
     var services = JSON.parse(process.env.VCAP_SERVICES);
-    if (services.mqlight) {
-      options.user = services.mqlight[0].credentials.username;
-      options.password = services.mqlight[0].credentials.password;
-      options.service = services.mqlight[0].credentials.connectionLookupURI;
-      if (verbose) {
-        console.log('Username:  ' + options.user);
-        console.log('Password:  ' + options.user);
-        console.log('LookupURI: ' + options.service);
+    for (var key in services) {
+      if (key.lastIndexOf(mqlightServiceName, 0) === 0) {
+        var mqlightService = services[key][0];
+        options.service = mqlightService.credentials.nonTLSConnectionLookupURI;
+        options.user = mqlightService.credentials.username;
+        options.password = mqlightService.credentials.password;
+      } else if (key.lastIndexOf(messageHubServiceName, 0) === 0) {
+        var messageHubService = services[key][0];
+        options.service = messageHubService.credentials.mqlight_lookup_url;
+        options.user = messageHubService.credentials.user;
+        options.password = messageHubService.credentials.password;
       }
-    } else {
-      throw new Error('Running in IBM Bluemix but not bound to an instance ' +
-                      "of the 'mqlight' service.");
+    }
+    if (!options.hasOwnProperty('service') ||
+        !options.hasOwnProperty('user') ||
+        !options.hasOwnProperty('password')) {
+      throw 'Error - Check that app is bound to service';
     }
     result = true;
   } else if (verbose) {
