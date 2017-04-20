@@ -2645,7 +2645,7 @@ Client.prototype.send = function(topic, data, options, callback) {
   }
   messenger.createSender(topic, {
     attach: {
-      senderSettleMode:
+      sndSettleMode:
         (qos === exports.QOS_AT_MOST_ONCE) ?
         AMQP.Constants.senderSettleMode.settled :
         AMQP.Constants.senderSettleMode.unsettled
@@ -2990,7 +2990,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
         target: {
           address: address
         },
-        receiverSettleMode:
+        rcvSettleMode:
           (qos === exports.QOS_AT_MOST_ONCE) ?
           AMQP.Constants.receiverSettleMode.autoSettle :
           AMQP.Constants.receiverSettleMode.settleOnDisposition

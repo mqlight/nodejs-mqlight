@@ -1,6 +1,6 @@
 {
   "name": "mqlight",
-  "version": "2.0.2017033100",
+  "version": "2.0.2017042000",
   "description": "IBM MQ Light Client Module",
   "author": "IBM MQ Light <mqlight@uk.ibm.com>",
   "homepage": "https://developer.ibm.com/messaging/mq-light/",
@@ -26,8 +26,8 @@
     "mqlight-debug": "./bin/mqlight-debug.js"
   },
   "dependencies": {
-    "amqp10": "^3.3.1",
-    "amqp10-link-cache": "^1.1.0",
+    "amqp10": "3.5.2",
+    "amqp10-link-cache": "1.2.2",
     "debug": "^2.2.0",
     "moment": "~2.14.1",
     "nopt": "~3.0.6",

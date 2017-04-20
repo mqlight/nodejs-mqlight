@@ -19,14 +19,6 @@ You will need a Node.js 4.x or newer runtime environment to use the MQ Light
 API module. This can be installed from http://nodejs.org/download/, or by using
 your operating system's package manager.
 
-The following are the currently supported platform architectures:
-
-* 64-bit or 32-bit runtime on Windows (x64 or x86)
-* 64-bit runtime on Linux (x64)
-* 64-bit runtime on Mac OS X (x64)
-
-You will receive an error if you attempt to use any other combination.
-
 ### Usage
 
 Install using npm:
@@ -608,16 +600,17 @@ that goes to stderr when you run your application.
 
 ## Release notes
 
+### 2.0.2017042000
+
+* Bugfix for issues around delivery confirmation and link credit policies.
+
 ### 2.0.2016102601
 
+* Support for Node.js 6.x.x engine.
 * Complete rewrite of the client to use a pure JavaScript implementation of the
   AMQP 1.0 protocol. Hence we no longer require compilation of a native addon
   and can more easily support newer releases of the Node.js runtime.
 * This is considered a major semver bump.
-
-### 1.0.2016071802
-
-* Support for Node.js 6.x.x engine.
 
 ### 1.0.2016061711
 
