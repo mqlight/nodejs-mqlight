@@ -189,7 +189,7 @@ function bluemixServiceLookup(options, verbose) {
     for (var key in services) {
       if (key.lastIndexOf(mqlightServiceName, 0) === 0) {
         var mqlightService = services[key][0];
-        options.service = mqlightService.credentials.nonTLSConnectionLookupURI;
+        options.service = mqlightService.credentials.connectionLookupURI;
         options.user = mqlightService.credentials.username;
         options.password = mqlightService.credentials.password;
       } else if (key.lastIndexOf(messageHubServiceName, 0) === 0) {
