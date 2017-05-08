@@ -171,8 +171,8 @@ function getNamedError(obj) {
  * @constructor
  */
 exports.InvalidArgumentError = function(message) {
-  Error.captureStackTrace(this, this.constructor);
   setupError(this, 'InvalidArgumentError', message);
+  Error.captureStackTrace(this, this.constructor);
 };
 var InvalidArgumentError = exports.InvalidArgumentError;
 util.inherits(InvalidArgumentError, Error);
@@ -189,8 +189,8 @@ util.inherits(InvalidArgumentError, Error);
  * @constructor
  */
 exports.NetworkError = function(message) {
-  Error.captureStackTrace(this, this.constructor);
   setupError(this, 'NetworkError', message);
+  Error.captureStackTrace(this, this.constructor);
 };
 var NetworkError = exports.NetworkError;
 util.inherits(NetworkError, Error);
@@ -207,8 +207,8 @@ util.inherits(NetworkError, Error);
  * @constructor
  */
 exports.NotPermittedError = function(message) {
-  Error.captureStackTrace(this, this.constructor);
   setupError(this, 'NotPermittedError', message);
+  Error.captureStackTrace(this, this.constructor);
 };
 var NotPermittedError = exports.NotPermittedError;
 util.inherits(NotPermittedError, Error);
@@ -225,8 +225,8 @@ util.inherits(NotPermittedError, Error);
  * @constructor
  */
 exports.ReplacedError = function(message) {
-  Error.captureStackTrace(this, this.constructor);
   setupError(this, 'ReplacedError', message);
+  Error.captureStackTrace(this, this.constructor);
 };
 var ReplacedError = exports.ReplacedError;
 util.inherits(ReplacedError, Error);
@@ -258,8 +258,8 @@ util.inherits(LocalReplacedError, ReplacedError);
  * @constructor
  */
 exports.SecurityError = function(message) {
-  Error.captureStackTrace(this, this.constructor);
   setupError(this, 'SecurityError', message);
+  Error.captureStackTrace(this, this.constructor);
 };
 var SecurityError = exports.SecurityError;
 util.inherits(SecurityError, Error);
@@ -279,8 +279,8 @@ util.inherits(SecurityError, Error);
  * @constructor
  */
 exports.StoppedError = function(message) {
-  Error.captureStackTrace(this, this.constructor);
   setupError(this, 'StoppedError', message);
+  Error.captureStackTrace(this, this.constructor);
 };
 var StoppedError = exports.StoppedError;
 util.inherits(StoppedError, Error);
@@ -297,8 +297,8 @@ util.inherits(StoppedError, Error);
  * @constructor
  */
 exports.SubscribedError = function(message) {
-  Error.captureStackTrace(this, this.constructor);
   setupError(this, 'SubscribedError', message);
+  Error.captureStackTrace(this, this.constructor);
 };
 var SubscribedError = exports.SubscribedError;
 util.inherits(SubscribedError, Error);
@@ -315,8 +315,8 @@ util.inherits(SubscribedError, Error);
  * @constructor
  */
 exports.UnsubscribedError = function(message) {
-  Error.captureStackTrace(this, this.constructor);
   setupError(this, 'UnsubscribedError', message);
+  Error.captureStackTrace(this, this.constructor);
 };
 var UnsubscribedError = exports.UnsubscribedError;
 util.inherits(UnsubscribedError, Error);
