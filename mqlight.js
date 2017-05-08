@@ -2989,12 +2989,12 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
         },
         target: {
           address: address
-        },
-        rcvSettleMode:
-          (qos === exports.QOS_AT_MOST_ONCE) ?
-          AMQP.Constants.receiverSettleMode.autoSettle :
-          AMQP.Constants.receiverSettleMode.settleOnDisposition
-      }
+        }
+      },
+      settlement:
+        (qos === exports.QOS_AT_MOST_ONCE) ?
+        AMQP.Constants.settlement.auto :
+        AMQP.Constants.settlement.manual
     };
     // if (ttl) {
     link.attach.source.expiryPolicy = link.attach.target.expiryPolicy =

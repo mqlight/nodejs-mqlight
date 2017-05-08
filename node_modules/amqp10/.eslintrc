@@ -1,0 +1,53 @@
+{
+  "env": {
+    "node": true,
+    "mocha": true,
+    "chai": true
+  },
+  "globals": {
+    "Promise": true
+  },
+  "rules": {
+    "no-bitwise": 0,
+    "no-cond-assign": [
+      2,
+      "except-parens"
+    ],
+    "no-unused-expressions": 2,
+    "camelcase": 0,
+    "curly": 0,
+    "eqeqeq": 2,
+    "no-extend-native": 2,
+    "wrap-iife": [
+      2,
+      "any"
+    ],
+    "indent": [
+      2,
+      2,
+      {
+        "SwitchCase": 1,
+        "VariableDeclarator": 2,
+      }
+    ],
+    "no-use-before-define": [
+      2,
+      {
+        "functions": false
+      }
+    ],
+    "linebreak-style": 2,
+    "comma-style": [
+      2,
+      "last"
+    ],
+    "new-cap": 0, // should be 2 (but fails on current codebase)
+    "no-caller": 2,
+    "strict": [
+      2,
+      "safe"
+    ],
+    "no-undef": 2,
+    "no-unused-vars": 0 // should be 2 (but fails on current codebase)
+  }
+}
