@@ -931,8 +931,8 @@ var processMessage = function(client, receiver, protonMsg) {
     delivery.message.ttl = protonMsg.ttl;
   }
 
-  if (protonMsg.properties.applicationProperties) {
-    delivery.message.properties = protonMsg.properties;
+  if (protonMsg.applicationProperties) {
+    delivery.message.properties = protonMsg.applicationProperties;
   }
 
   var da = protonMsg.deliveryAnnotations;
