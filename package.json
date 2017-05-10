@@ -1,6 +1,6 @@
 {
   "name": "mqlight",
-  "version": "2.0.2017050800",
+  "version": "2.0.2017051000",
   "description": "IBM MQ Light Client Module",
   "author": "IBM MQ Light <mqlight@uk.ibm.com>",
   "homepage": "https://developer.ibm.com/messaging/mq-light/",
