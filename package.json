@@ -1,6 +1,6 @@
 {
   "name": "mqlight",
-  "version": "2.0.2017051000",
+  "version": "2.0.2017053000",
   "description": "IBM MQ Light Client Module",
   "author": "IBM MQ Light <mqlight@uk.ibm.com>",
   "homepage": "https://developer.ibm.com/messaging/mq-light/",
@@ -45,7 +45,8 @@
   "license": "Apache-2.0",
   "scripts": {
     "lint": "node ./node_modules/.bin/eslint mqlight.js",
-    "test": "npm run lint && node ./node_modules/istanbul/lib/cli.js cover ./node_modules/nodeunit/bin/nodeunit -- --config test/nodeunit.json test"
+    "test": "npm run lint && node ./node_modules/istanbul/lib/cli.js cover ./node_modules/nodeunit/bin/nodeunit -- --config test/nodeunit.json test",
+    "postinstall": "cd ./node_modules/amqp10 && npm install --production . && cd -"
   },
   "engines": {
     "node": ">=4.0.0"
