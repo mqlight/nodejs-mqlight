@@ -928,7 +928,7 @@ var processMessage = function(client, receiver, protonMsg) {
         link.substring(link.indexOf(':') + 1, link.length);
   }
   if (protonMsg.header.ttl > 0) {
-    delivery.message.ttl = protonMsg.ttl;
+    delivery.message.ttl = protonMsg.header.ttl;
   }
 
   if (protonMsg.applicationProperties) {
