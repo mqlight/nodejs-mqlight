@@ -27,7 +27,7 @@ process.env.NODE_ENV = 'unittest';
 var stubproton = require('./stubs/stubproton');
 var testCase = require('nodeunit').testCase;
 var mqlight = require('../mqlight');
-var AMQP = require('amqp10');
+var AMQP = require('mqlight-forked-amqp10');
 var Promise = require('bluebird');
 
 

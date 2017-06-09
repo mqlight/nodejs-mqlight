@@ -46,7 +46,7 @@ var fs = require('fs');
 var http = require('http');
 var https = require('https');
 
-var AMQP = require('amqp10');
+var AMQP = require('mqlight-forked-amqp10');
 var linkCache = require('amqp10-link-cache');
 AMQP.use(linkCache({ttl: Infinity}));
 
