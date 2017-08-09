@@ -1030,7 +1030,11 @@ var lookupError = function(err) {
              err.condition === 'amqp:link:detach-forced' ||
              err.condition === 'amqp:link:message-size-exceeded' ||
              err.condition === 'amqp:not-implemented') {
-    err = new NotPermittedError(err.description);
+    if (/to a different adapter/.test(err.description)) {
+      err = new NetworkError(err.description);
+    } else {
+      err = new NotPermittedError(err.description);
+    }
   } else if (err.condition === 'amqp:unauthorized-access') {
     err = new SecurityError(err.description);
   } else if (err.condition === 'amqp:link:stolen') {
