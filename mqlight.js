@@ -1101,8 +1101,10 @@ var Client = function(service, id, securityOptions) {
    *        should be defined in the constructor.
    */
   this._setState = function(value) {
-    logger.log('data', _id, 'Client.state', value);
-    _state = value;
+    if (_state != value) {
+      logger.log('data', _id, 'Client.state', value);
+      _state = value;
+    }
   };
 
   /**
@@ -1142,7 +1144,6 @@ var Client = function(service, id, securityOptions) {
    */
   Object.defineProperty(this, 'state', {
     get: function() {
-      logger.log('data_often', _id, 'Client.state', _state);
       return _state;
     }
   });
@@ -2654,7 +2655,8 @@ Client.prototype.send = function(topic, data, options, callback) {
         AMQP.Constants.senderSettleMode.settled :
         AMQP.Constants.senderSettleMode.unsettled
     },
-    callback: (qos === exports.QOS_AT_MOST_ONCE) ? 'sent' : 'settled'
+    callback: (qos === exports.QOS_AT_MOST_ONCE) ? 'sent' : 'settled',
+    reattach: false
   }).then(function(sender) {
     return sender.send(protonMsg);
   }).then(function() {
@@ -2995,6 +2997,7 @@ Client.prototype.subscribe = function(topicPattern, share, options, callback) {
           address: address
         }
       },
+      reattach: false,
       settlement:
         (qos === exports.QOS_AT_MOST_ONCE) ?
         AMQP.Constants.settlement.auto :
