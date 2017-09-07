@@ -1460,15 +1460,22 @@ var Client = function(service, id, securityOptions) {
             }, 5000);
           }
         } else {
-          try {
-            client._setState(STATE_STARTING);
-            serviceList =
-                client._generateServiceList(service);
-            client._connectToService(serviceList);
-          } catch (err) {
-            logger.caught('_serviceFunction', client.id, err);
-            client._setState(STATE_STOPPED);
-            client._invokeStartedCallbacks(err);
+          if (typeof service === 'undefined') {
+            var message = 'service lookup response does not contain any service definitions';
+            var error = new NetworkError(message);
+            logger.log('error', client.id, error);
+            client.emit('error', error);
+          } else {
+            try {
+              client._setState(STATE_STARTING);
+              serviceList =
+                  client._generateServiceList(service);
+              client._connectToService(serviceList);
+            } catch (err) {
+              logger.caught('_serviceFunction', client.id, err);
+              client._setState(STATE_STOPPED);
+              client._invokeStartedCallbacks(err);
+            }
           }
         }
       };
