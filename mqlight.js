@@ -1101,7 +1101,7 @@ var Client = function(service, id, securityOptions) {
    *        should be defined in the constructor.
    */
   this._setState = function(value) {
-    if (_state != value) {
+    if (_state !== value) {
       logger.log('data', _id, 'Client.state', value);
       _state = value;
     }
