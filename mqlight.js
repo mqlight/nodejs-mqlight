@@ -48,7 +48,7 @@ var https = require('https');
 
 var AMQP = require('mqlight-forked-amqp10');
 var linkCache = require('amqp10-link-cache');
-AMQP.use(linkCache({ttl: Infinity}));
+AMQP.use(linkCache({ttl: 2147483647}));
 
 var invalidClientIdRegex = /[^A-Za-z0-9%/._]+/;
 var pemCertRegex = new RegExp('-----BEGIN CERTIFICATE-----(.|[\r\n])*?' +
