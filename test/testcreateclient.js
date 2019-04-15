@@ -442,7 +442,7 @@ module.exports.test_bad_ssl_options = function(test) {
   var validCertificateFd = fs.openSync('ValidCertificate', 'w');
   var validKeyFd = fs.openSync('ValidKey', 'w');
   var validKeystoreFd = fs.openSync('ValidKeystore', 'w');
-  fs.mkdirSync('dirCertificate');
+  fs.mkdirSync('dirCertificate', {'recursive': true});
   test.expect(testData.length);
   for (var i = 0; i < testData.length; i++) {
     test.throws(function() {
@@ -479,9 +479,9 @@ module.exports.test_bad_ssl_options = function(test) {
     }, 'invalid bad ssl options test (' + i + '): ' + testData[i]);
   }
   test.done();
-  fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
-  fs.close(validKeyFd); fs.unlinkSync('ValidKey');
-  fs.close(validKeystoreFd); fs.unlinkSync('ValidKeystore');
+  fs.closeSync(validCertificateFd); fs.unlinkSync('ValidCertificate');
+  fs.closeSync(validKeyFd); fs.unlinkSync('ValidKey');
+  fs.closeSync(validKeystoreFd); fs.unlinkSync('ValidKeystore');
   fs.rmdirSync('dirCertificate');
 };
 
@@ -552,9 +552,9 @@ module.exports.test_valid_ssl_options = function(test) {
       client.stop();
       test.ok(!err, 'unexpected error event: ' + err);
       test.done();
-      fs.close(validKeystoreFd); fs.unlinkSync('ValidKeystore');
-      fs.close(validKeyFd); fs.unlinkSync('ValidKey');
-      fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
+      fs.closeSync(validKeystoreFd); fs.unlinkSync('ValidKeystore');
+      fs.closeSync(validKeyFd); fs.unlinkSync('ValidKey');
+      fs.closeSync(validCertificateFd); fs.unlinkSync('ValidCertificate');
     });
     client.start(function(err) {
       test.ok(!err);
@@ -562,9 +562,9 @@ module.exports.test_valid_ssl_options = function(test) {
       ++count;
       if (count == testData.length) {
         test.done();
-        fs.close(validKeystoreFd); fs.unlinkSync('ValidKeystore');
-        fs.close(validKeyFd); fs.unlinkSync('ValidKey');
-        fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
+        fs.closeSync(validKeystoreFd); fs.unlinkSync('ValidKeystore');
+        fs.closeSync(validKeyFd); fs.unlinkSync('ValidKey');
+        fs.closeSync(validCertificateFd); fs.unlinkSync('ValidCertificate');
       } else {
         validSSLTest(testData[count]);
       }
@@ -668,14 +668,14 @@ module.exports.test_invalid_ssl_options = function(test) {
           ++count;
           if (count == testData.length) {
             test.done();
-            fs.close(badKeystoreFd); fs.unlinkSync('BadKeystore');
-            fs.close(badKeyFd); fs.unlinkSync('BadKey');
-            fs.close(validKeyFd); fs.unlinkSync('ValidKey');
-            fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
-            fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
-            fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
-            fs.close(selfSignedFd); fs.unlinkSync('SelfSignedCertificate');
-            fs.close(expiredFd); fs.unlinkSync('ExpiredCertificate');
+            fs.closeSync(badKeystoreFd); fs.unlinkSync('BadKeystore');
+            fs.closeSync(badKeyFd); fs.unlinkSync('BadKey');
+            fs.closeSync(validKeyFd); fs.unlinkSync('ValidKey');
+            fs.closeSync(badCertificateFd); fs.unlinkSync('BadCertificate');
+            fs.closeSync(validCertificateFd); fs.unlinkSync('ValidCertificate');
+            fs.closeSync(badVerifyFd); fs.unlinkSync('BadVerify');
+            fs.closeSync(selfSignedFd); fs.unlinkSync('SelfSignedCertificate');
+            fs.closeSync(expiredFd); fs.unlinkSync('ExpiredCertificate');
           } else {
             invalidSSLTest(testData[count]);
           }
@@ -686,14 +686,14 @@ module.exports.test_invalid_ssl_options = function(test) {
       client.stop();
       test.ok(!err, 'unexpected started event');
       test.done();
-      fs.close(badKeystoreFd); fs.unlinkSync('BadKeystore');
-      fs.close(badKeyFd); fs.unlinkSync('BadKey');
-      fs.close(validKeyFd); fs.unlinkSync('ValidKey');
-      fs.close(badCertificateFd); fs.unlinkSync('BadCertificate');
-      fs.close(validCertificateFd); fs.unlinkSync('ValidCertificate');
-      fs.close(badVerifyFd); fs.unlinkSync('BadVerify');
-      fs.close(selfSignedFd); fs.unlinkSync('SelfSignedCertificate');
-      fs.close(expiredFd); fs.unlinkSync('ExpiredCertificate');
+      fs.closeSync(badKeystoreFd); fs.unlinkSync('BadKeystore');
+      fs.closeSync(badKeyFd); fs.unlinkSync('BadKey');
+      fs.closeSync(validKeyFd); fs.unlinkSync('ValidKey');
+      fs.closeSync(badCertificateFd); fs.unlinkSync('BadCertificate');
+      fs.closeSync(validCertificateFd); fs.unlinkSync('ValidCertificate');
+      fs.closeSync(badVerifyFd); fs.unlinkSync('BadVerify');
+      fs.closeSync(selfSignedFd); fs.unlinkSync('SelfSignedCertificate');
+      fs.closeSync(expiredFd); fs.unlinkSync('ExpiredCertificate');
     });
     client.start();
   };

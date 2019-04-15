@@ -600,6 +600,12 @@ that goes to stderr when you run your application.
 
 ## Release notes
 
+### 2.0.2019041500
+
+* Maintenance release
+* Fixes for Node 9.x / 10.x API compatibility
+* Bump version of moment to resolve CVEs
+
 ### 2.0.2017042000
 
 * Bugfix for issues around delivery confirmation and link credit policies.
