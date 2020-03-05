@@ -32,7 +32,7 @@
     "mqlight-forked-amqp10": "=3.5.3-1.fork",
     "nopt": "~3.0.6",
     "npmlog": "~2.0.4",
-    "uuid": "^2.0.2"
+    "uuid": "^7.0.2"
   },
   "devDependencies": {
     "bluebird": "^3.4.6",
